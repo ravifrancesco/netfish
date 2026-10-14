@@ -30,7 +30,7 @@ static class Program
         catch (WebView2RuntimeNotFoundException)
         {
             var answer = MessageBox.Show(
-                "Netfish needs Microsoft Edge WebView2, which isn't on this PC yet. Open the download page?",
+                L("Netfish needs Microsoft Edge WebView2, which isn't on this PC yet. Open the download page?"),
                 "Netfish", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
             if (answer == DialogResult.Yes)
                 Process.Start(new ProcessStartInfo("https://go.microsoft.com/fwlink/p/?LinkId=2124703") { UseShellExecute = true });
@@ -38,7 +38,7 @@ static class Program
         }
         if (!MpvPlayer.Available(out var problem))
         {
-            MessageBox.Show($"Netfish's video player (libmpv-2.dll, with vulkan-1.dll beside it) couldn't load. Reinstalling Netfish usually fixes this.\n\n{problem}", "Netfish", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(L("Netfish's video player (libmpv-2.dll, with vulkan-1.dll beside it) couldn't load. Reinstalling Netfish usually fixes this.\n\n{problem}", ("problem", problem)), "Netfish", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return;
         }
 

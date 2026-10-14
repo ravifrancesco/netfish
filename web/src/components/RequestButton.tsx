@@ -5,6 +5,7 @@ import type { TitleDetail } from '@netfish/shared';
 import { api } from '../api';
 import { useRefreshTitle } from '../lib/hooks';
 import { Modal, Spinner, useToast } from './ui';
+import { t, tn } from '../i18n';
 
 /** Request a movie, or pick which seasons of a show to request. Goes through Seerr as the signed-in user. */
 export function RequestButton({ title, className = 'btn btn--accent' }: { title: TitleDetail; className?: string }) {
@@ -18,7 +19,12 @@ export function RequestButton({ title, className = 'btn btn--accent' }: { title:
     mutationFn: (seasons?: number[]) => api.request({ mediaType: title.mediaType, tmdbId: title.tmdbId!, seasons }),
     onSuccess: (res) => {
       setPicking(false);
-      toast('ok', res.status === 'pending' ? `Requested ${title.title}. Waiting for approval.` : `Requested ${title.title}. It'll start downloading shortly.`);
+      toast(
+        'ok',
+        res.status === 'pending'
+          ? t('Requested {title}. Waiting for approval.', { title: title.title })
+          : t("Requested {title}. It'll start downloading shortly.", { title: title.title }),
+      );
       refresh(title.mediaType, title.tmdbId);
     },
     onError: (err) => toast('error', (err as Error).message),
@@ -32,25 +38,27 @@ export function RequestButton({ title, className = 'btn btn--accent' }: { title:
     <>
       <button className={className} disabled={request.isPending} onClick={() => (isTv ? setPicking(true) : request.mutate(undefined))}>
         {request.isPending ? <Spinner size={18} /> : <Plus size={20} />}
-        {partial ? 'Request more' : 'Request'}
+        {partial ? t('Request more') : t('Request')}
       </button>
       {picking && (
         <Modal
-          title={`Request ${title.title}`}
+          title={t('Request {title}', { title: title.title })}
           onClose={() => setPicking(false)}
           footer={
             <>
               <button className="btn btn--ghost" onClick={() => setPicking(false)}>
-                Cancel
+                {t('Cancel')}
               </button>
               <button className="btn btn--accent" disabled={!chosen.length || request.isPending} onClick={() => request.mutate(chosen)}>
                 {request.isPending ? <Spinner size={18} /> : <Check size={18} />}
-                Request {chosen.length === missing.length ? 'all' : chosen.length} season{chosen.length === 1 ? '' : 's'}
+                {chosen.length === missing.length && chosen.length > 1
+                  ? t('Request all seasons')
+                  : tn(chosen.length, 'Request {n} season', 'Request {n} seasons')}
               </button>
             </>
           }
         >
-          <p className="muted">Pick the seasons you want. Ones you already have aren't listed.</p>
+          <p className="muted">{t("Pick the seasons you want. Ones you already have aren't listed.")}</p>
           <div className="season-picks">
             <label className="check">
               <input
@@ -58,7 +66,7 @@ export function RequestButton({ title, className = 'btn btn--accent' }: { title:
                 checked={chosen.length === missing.length}
                 onChange={(e) => setChosen(e.target.checked ? missing.map((s) => s.seasonNumber) : [])}
               />
-              <span>All missing seasons</span>
+              <span>{t('All missing seasons')}</span>
             </label>
             {missing.map((s) => (
               <label key={s.seasonNumber} className="check">
@@ -70,7 +78,7 @@ export function RequestButton({ title, className = 'btn btn--accent' }: { title:
                   }
                 />
                 <span>{s.name}</span>
-                <span className="muted">{s.episodeCount} episodes</span>
+                <span className="muted">{tn(s.episodeCount, '{n} episode', '{n} episodes')}</span>
               </label>
             ))}
           </div>

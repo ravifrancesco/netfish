@@ -2,6 +2,7 @@ package app.netfish.tv;
 
 import android.app.Activity;
 import android.app.UiModeManager;
+import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
@@ -146,7 +147,7 @@ public class MainActivity extends Activity {
                 if (!request.isForMainFrame() || url.startsWith("file:") || url.startsWith(OfflineStore.ORIGIN)) return;
                 // Away from home with films downloaded: straight to them.
                 if (offline != null && offline.hasDownloads()) showOffline(new JSONObject());
-                else showSetup("Couldn't reach " + server() + " (" + error.getDescription() + "). Is the server on?");
+                else showSetup(getString(R.string.error_server_unreachable, server(), error.getDescription()));
             }
         });
 
@@ -275,13 +276,13 @@ public class MainActivity extends Activity {
     }
 
     /** "192.168.1.50" → "http://192.168.1.50:7777"; real domains keep their own port. */
-    static String normalize(String input) throws Exception {
+    static String normalize(Context context, String input) throws Exception {
         String value = input == null ? "" : input.trim();
-        if (value.isEmpty()) throw new Exception("Enter the address of your Netfish server");
+        if (value.isEmpty()) throw new Exception(context.getString(R.string.error_enter_address));
         if (!value.matches("(?i)^https?://.*")) value = "http://" + value;
         Uri uri = Uri.parse(value);
         String host = uri.getHost();
-        if (host == null || host.isEmpty()) throw new Exception("That doesn't look like an address");
+        if (host == null || host.isEmpty()) throw new Exception(context.getString(R.string.error_not_an_address));
         String scheme = uri.getScheme().toLowerCase();
         boolean local = host.matches("^\\d{1,3}(\\.\\d{1,3}){3}$") || host.endsWith(".local") || !host.contains(".");
         int port = uri.getPort();
@@ -290,7 +291,7 @@ public class MainActivity extends Activity {
     }
 
     /** Make sure the address really is a Netfish server before saving it. */
-    static void probe(String origin) throws Exception {
+    static void probe(Context context, String origin) throws Exception {
         HttpURLConnection conn = null;
         try {
             conn = (HttpURLConnection) new URL(origin + "/api/health").openConnection();
@@ -302,11 +303,11 @@ public class MainActivity extends Activity {
             byte[] buffer = new byte[4096];
             for (int n; in != null && (n = in.read(buffer)) > 0; ) body.write(buffer, 0, n);
             JSONObject json = new JSONObject(body.toString("UTF-8"));
-            if (status >= 400 || !"netfish".equals(json.optString("name"))) throw new Exception(origin + " doesn't look like a Netfish server");
+            if (status >= 400 || !"netfish".equals(json.optString("name"))) throw new Exception(context.getString(R.string.error_not_netfish, origin));
         } catch (JSONException e) {
-            throw new Exception(origin + " doesn't look like a Netfish server");
+            throw new Exception(context.getString(R.string.error_not_netfish, origin));
         } catch (java.io.IOException e) {
-            throw new Exception("Can't reach " + origin + " (" + e.getMessage() + ")");
+            throw new Exception(context.getString(R.string.error_cant_reach, origin, e.getMessage()));
         } finally {
             if (conn != null) conn.disconnect();
         }
@@ -342,10 +343,10 @@ public class MainActivity extends Activity {
         /** Setup page only. Returns "" on success, otherwise what went wrong. Blocks while checking. */
         @JavascriptInterface
         public String connect(String input) {
-            if (!currentUrl.startsWith(SETUP)) return "Not allowed here";
+            if (!currentUrl.startsWith(SETUP)) return getString(R.string.error_not_allowed);
             try {
-                String origin = normalize(input);
-                probe(origin);
+                String origin = normalize(MainActivity.this, input);
+                probe(MainActivity.this, origin);
                 prefs.edit().putString("server", origin).apply();
                 runOnUiThread(() -> {
                     forgetHistory = true;
@@ -409,7 +410,7 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public String download(String descriptor) {
-            if (offline == null || !fromServer()) return OfflineStore.error("Downloads aren't available on this device");
+            if (offline == null || !fromServer()) return OfflineStore.error(getString(R.string.error_downloads_unavailable));
             return offline.start(descriptor, server());
         }
 

@@ -5,6 +5,7 @@ import { qbittorrent, type Torrent } from '../clients/qbittorrent';
 import { onConnectionChange } from '../connections';
 import { SECOND, TTLCache } from '../lib/cache';
 import { languageLabel } from '../lib/languages';
+import { lang, t } from '../lib/i18n';
 
 /**
  * Live download state, straight from Radarr/Sonarr's queues (and qBittorrent
@@ -28,12 +29,12 @@ function stateOf(r: ArrQueueRecord, torrent?: Torrent): { state: DownloadState; 
   const message = r.errorMessage || messages[0];
   const tracked = r.trackedDownloadState;
   if (tracked === 'importPending' || tracked === 'importing') return { state: 'importing' };
-  if (tracked === 'importBlocked') return { state: 'warning', message: message ?? 'Downloaded, but the import needs attention' };
+  if (tracked === 'importBlocked') return { state: 'warning', message: message ?? t('Downloaded, but the import needs attention') };
   if (tracked === 'failed' || tracked === 'failedPending' || r.status === 'failed') return { state: 'failed', message };
   if (r.status === 'completed') return { state: 'importing' };
   if (r.status === 'paused') return { state: 'paused' };
   if (r.status === 'queued' || r.status === 'delay') return { state: 'queued', message };
-  if (torrent && /^(stalledDL|metaDL)$/.test(torrent.state)) return { state: 'stalled', message: message ?? 'Waiting for peers' };
+  if (torrent && /^(stalledDL|metaDL)$/.test(torrent.state)) return { state: 'stalled', message: message ?? t('Waiting for peers') };
   if (r.trackedDownloadStatus === 'warning') return { state: 'stalled', message };
   if (r.trackedDownloadStatus === 'error' || r.status === 'warning') return { state: 'warning', message };
   return { state: 'downloading', message };
@@ -66,7 +67,7 @@ function fromRadarr(records: ArrQueueRecord[], torrents: Map<string, Torrent>): 
     source: 'radarr',
     mediaType: 'movie',
     tmdbId: r.movie?.tmdbId,
-    title: r.movie?.title ?? r.title ?? 'Unknown movie',
+    title: r.movie?.title ?? r.title ?? t('Unknown movie'),
     detail: r.movie?.year ? String(r.movie.year) : undefined,
     poster: posterOf(r.movie?.images),
     mine: false,
@@ -101,7 +102,7 @@ function fromSonarr(records: ArrQueueRecord[], torrents: Map<string, Torrent>): 
       mediaType: 'tv',
       tmdbId: r.series?.tmdbId || undefined,
       tvdbId: r.series?.tvdbId,
-      title: r.series?.title ?? r.title ?? 'Unknown show',
+      title: r.series?.title ?? r.title ?? t('Unknown show'),
       detail,
       seasonNumber: season,
       episodes,
@@ -124,7 +125,8 @@ const ORDER: Record<DownloadState, number> = {
 
 /** All active downloads. Never throws: a dead service just contributes nothing. */
 export function allDownloads(): Promise<DownloadItem[]> {
-  return cache.wrap('all', 3 * SECOND, async () => {
+  // Kept per language: the list carries messages and language names for people.
+  return cache.wrap(`all:${lang()}`, 3 * SECOND, async () => {
     const [movies, shows, torrents] = await Promise.allSettled([
       has.radarr() ? radarr.queue() : Promise.resolve({ records: [] }),
       has.sonarr() ? sonarr.queue() : Promise.resolve({ records: [] }),

@@ -176,9 +176,9 @@ final class OfflineStore {
             JSONObject d = new JSONObject(descriptor);
             String itemId = d.optString("itemId");
             if (itemId.isEmpty() || d.optString("fileName").isEmpty() || d.optString("url").isEmpty()) {
-                return error(d.optString("error", "The server didn't say what to download"));
+                return error(d.optString("error", context.getString(R.string.error_nothing_to_download)));
             }
-            if (origin == null) return error("Not connected to a Netfish server");
+            if (origin == null) return error(context.getString(R.string.error_not_connected));
             JSONObject existing = entry(itemId);
             if (existing != null && ("done".equals(existing.optString("state")) || "downloading".equals(existing.optString("state")))) return list();
 
@@ -204,7 +204,7 @@ final class OfflineStore {
             io.execute(() -> fetchAndEnqueue(e, d, origin));
             return list();
         } catch (JSONException ex) {
-            return error("The server didn't say what to download");
+            return error(context.getString(R.string.error_nothing_to_download));
         }
     }
 
@@ -228,13 +228,13 @@ final class OfflineStore {
                 String code = sub.optString("code", "track" + n);
                 File file = new File(dir, base + "." + code + "." + n + ".vtt");
                 if (fetch(origin + sub.optString("url"), cookie, file) != null) {
-                    e.getJSONArray("subtitles").put(new JSONObject().put("label", sub.optString("label", "Subtitles")).put("code", code)
+                    e.getJSONArray("subtitles").put(new JSONObject().put("label", sub.optString("label", context.getString(R.string.subtitles_default_label))).put("code", code)
                             .put("file", e.optString("folder") + "/" + file.getName()));
                 }
             }
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(origin + d.optString("url")))
                     .setTitle(d.optString("title"))
-                    .setDescription("Netfish download")
+                    .setDescription(context.getString(R.string.download_notification_description))
                     .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
                     .setDestinationInExternalFilesDir(context, null, "Offline/" + e.optString("folder") + "/" + e.optString("fileName"));
             if (cookie != null) request.addRequestHeader("Cookie", cookie);
@@ -244,7 +244,7 @@ final class OfflineStore {
             e.put("downloadId", downloads.enqueue(request));
         } catch (JSONException | RuntimeException ex) {
             try {
-                e.put("state", "failed").put("error", "Couldn't start the download: " + ex.getMessage());
+                e.put("state", "failed").put("error", context.getString(R.string.error_download_start, ex.getMessage()));
             } catch (JSONException ignored) {
                 // can't happen
             }
@@ -302,7 +302,7 @@ final class OfflineStore {
                         e.put("state", "done").put("size", videoFile(e).length()).put("received", videoFile(e).length()).remove("error");
                         changed = true;
                     } else if (status == DownloadManager.STATUS_FAILED) {
-                        e.put("state", "failed").put("error", "The download stopped. Try again when you're on your home network.");
+                        e.put("state", "failed").put("error", context.getString(R.string.error_download_stopped));
                         changed = true;
                     }
                 } catch (JSONException | IllegalArgumentException ignored) {
@@ -316,7 +316,7 @@ final class OfflineStore {
 
     String retry(String itemId) {
         JSONObject e = entry(itemId);
-        if (e == null || e.optJSONObject("source") == null) return error("Nothing to retry");
+        if (e == null || e.optJSONObject("source") == null) return error(context.getString(R.string.error_nothing_to_retry));
         try {
             e.put("state", "failed");
         } catch (JSONException ignored) {

@@ -24,10 +24,12 @@ if [ "${SKIP_BUILD:-}" != 1 ]; then
   npm run build:mac
   npm run build:android
   npm run build:windows
+  npm run build:samsung
+  npm run build:ios
 fi
 
 STAGE=$(mktemp -d)
-for kind in server.tar.gz mac.dmg windows.exe android.apk; do
+for kind in server.tar.gz mac.dmg windows.exe android.apk samsung.wgt ios.ipa; do
   cp "release/Netfish-$VERSION-$kind" "$STAGE/Netfish-$kind"
 done
 cat > "$STAGE/notes.md" <<NOTES
@@ -36,10 +38,13 @@ cat > "$STAGE/notes.md" <<NOTES
 | For | Get |
 |---|---|
 | **Server** (Raspberry Pi or any Docker host) | Portainer pulls \`ghcr.io/$OWNER/netfish:latest\` (or \`:$VERSION\`), see the README. Or upload **Netfish-server.tar.gz** in Portainer to build the image on the Pi itself. |
-| **Mac** (Apple silicon) | **Netfish-mac.dmg**. Run \`brew install mpv\` first: the app plays films with its libmpv. |
+| **Mac** (Apple silicon, macOS 15 or later) | **Netfish-mac.dmg** (everything included) |
 | **Windows 10/11** (64-bit) | **Netfish-windows.exe** (installs for your account, no admin rights) |
 | **Android**: phones, tablets, Fire TV, Android TV | **Netfish-android.apk**. On a Fire TV, the Downloader app takes this link: \`https://github.com/$OWNER/netfish/releases/latest/download/Netfish-android.apk\` |
-| **iPhone & iPad** | Built with Xcode on a Mac, see the README |
+| **Samsung TV** (2022 or newer) | **Netfish-samsung.wgt**, installed with TizenBrew or Tizen Studio: [guide](https://github.com/$OWNER/netfish/blob/main/docs/install/samsung-tv.md) |
+| **iPhone & iPad** | **Netfish-ios.ipa** for AltStore/SideStore, or install with Xcode: [guide](https://github.com/$OWNER/netfish/blob/main/docs/install/iphone-ipad.md) |
+
+Step-by-step guides for every device: [docs/install](https://github.com/$OWNER/netfish/tree/main/docs/install) (in Italian: [docs/install/it](https://github.com/$OWNER/netfish/tree/main/docs/install/it)).
 
 The apps aren't signed by Apple or Microsoft yet: on a Mac, right-click → **Open** the first time; on Windows, **More info → Run anyway**.
 
@@ -48,6 +53,7 @@ NOTES
 git tag -a "$TAG" -m "Netfish $VERSION"
 git push origin "$TAG"
 gh release create "$TAG" --title "Netfish $VERSION" --notes-file "$STAGE/notes.md" --generate-notes \
-  "$STAGE/Netfish-server.tar.gz" "$STAGE/Netfish-mac.dmg" "$STAGE/Netfish-windows.exe" "$STAGE/Netfish-android.apk"
+  "$STAGE/Netfish-server.tar.gz" "$STAGE/Netfish-mac.dmg" "$STAGE/Netfish-windows.exe" "$STAGE/Netfish-android.apk" \
+  "$STAGE/Netfish-samsung.wgt" "$STAGE/Netfish-ios.ipa"
 rm -rf "$STAGE"
 echo "Published https://github.com/$OWNER/netfish/releases/tag/$TAG"

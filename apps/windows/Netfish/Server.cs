@@ -53,9 +53,9 @@ static class Server
     public static Uri Normalize(string input)
     {
         var value = (input ?? "").Trim();
-        if (value.Length == 0) throw new Problem("Enter the address of your Netfish server");
+        if (value.Length == 0) throw new Problem(L("Enter the address of your Netfish server"));
         if (!Regex.IsMatch(value, "^https?://", RegexOptions.IgnoreCase)) value = "http://" + value;
-        if (!Uri.TryCreate(value, UriKind.Absolute, out var url) || url.Host.Length == 0) throw new Problem("That doesn't look like an address");
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var url) || url.Host.Length == 0) throw new Problem(L("That doesn't look like an address"));
         var host = url.Host;
         var local = Regex.IsMatch(host, @"^\d{1,3}(\.\d{1,3}){3}$") || host.EndsWith(".local") || !host.Contains('.');
         var builder = new UriBuilder(url.Scheme.ToLowerInvariant(), host, url.IsDefaultPort && url.Scheme == "http" && local ? 7777 : url.Port);
@@ -72,11 +72,11 @@ static class Server
     {
         HttpResponseMessage response;
         try { response = await http.GetAsync(new Uri(origin, "/api/health")); }
-        catch (Exception e) { throw new Problem($"Can't reach {origin.GetLeftPart(UriPartial.Authority)} ({(e is TaskCanceledException ? "no answer" : e.Message)})"); }
+        catch (Exception e) { throw new Problem(L("Can't reach {server} ({why})", ("server", origin.GetLeftPart(UriPartial.Authority)), ("why", e is TaskCanceledException ? L("no answer") : e.Message))); }
         JsonNode? body = null;
         try { body = JsonNode.Parse(await response.Content.ReadAsStringAsync()); } catch { }
         if (!response.IsSuccessStatusCode || body?["name"]?.GetValue<string>() != "netfish")
-            throw new Problem($"{origin.GetLeftPart(UriPartial.Authority)} doesn't look like a Netfish server");
+            throw new Problem(L("{server} doesn't look like a Netfish server", ("server", origin.GetLeftPart(UriPartial.Authority))));
         var answered = response.RequestMessage?.RequestUri ?? origin;
         return new Uri(answered.GetLeftPart(UriPartial.Authority));
     }

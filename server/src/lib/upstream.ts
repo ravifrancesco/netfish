@@ -1,3 +1,5 @@
+import { t } from './i18n';
+
 /** A thin fetch wrapper for talking to the other services on the box. */
 
 export class UpstreamError extends Error {
@@ -14,7 +16,7 @@ export class UpstreamError extends Error {
 export class NotConfiguredError extends Error {
   readonly status = 503;
   constructor(readonly service: string) {
-    super(`${service} is not configured on this Netfish server`);
+    super(t('{service} is not configured on this Netfish server', { service }));
   }
 }
 
@@ -90,8 +92,8 @@ export async function request<T>(
     });
   } catch (err) {
     const e = err as Error & { cause?: { code?: string } };
-    const reason = e.name === 'TimeoutError' ? 'timed out' : (e.cause?.code ?? e.message);
-    throw new UpstreamError(service, 502, `${service} is unreachable (${reason})`);
+    const reason = e.name === 'TimeoutError' ? t('timed out') : (e.cause?.code ?? e.message);
+    throw new UpstreamError(service, 502, t('{service} is unreachable ({reason})', { service, reason }));
   }
 
   const text = await res.text();

@@ -113,15 +113,15 @@
       <h1 id="heading">Downloads on this computer</h1>
       <span class="spacer"></span>
       <span class="usage" id="usage"></span>
-      <button class="btn btn--accent" id="home">Back to Netfish</button>
+      <button class="btn btn--accent" id="home" data-t>Back to Netfish</button>
     </header>
     <main>
-      <p class="note">These play without a connection to your server. Download more from any movie or episode page.</p>
+      <p class="note" data-t>These play without a connection to your server. Download more from any movie or episode page.</p>
       <div id="view"></div>
     </main>
     <div id="player" hidden>
       <div class="drag"></div>
-      <button class="btn back" id="close">← Back</button>
+      <button class="btn back" id="close" data-t>← Back</button>
       <video id="video" controls autoplay playsinline></video>
       <div class="controls" id="controls" hidden>
         <input type="range" id="seek" min="0" max="0" step="1" value="0" aria-label="Position" />
@@ -136,13 +136,77 @@
       </div>
     </div>
     <script>
+      // Italian when the system language is Italian, English otherwise. Keys are the exact English text.
+      const lang = (navigator.languages && navigator.languages[0]) || navigator.language || 'en';
+      const italian = /^it\b/i.test(lang);
+      const locale = italian ? 'it-IT' : 'en-US'; // numbers: "1,2 GB" in Italian
+      const IT = {
+        'Netfish · Downloads': 'Netfish · Download',
+        'Downloads on this computer': 'Download su questo computer',
+        'Downloads on this device': 'Download su questo dispositivo',
+        'Back to Netfish': 'Torna a Netfish',
+        'These play without a connection to your server. Download more from any movie or episode page.':
+          'Puoi guardarli anche senza connessione al tuo server. Scaricane altri dalla pagina di un film o di un episodio.',
+        '← Back': '← Indietro',
+        Position: 'Posizione',
+        Play: 'Riproduci',
+        Pause: 'Pausa',
+        Audio: 'Audio',
+        Subtitles: 'Sottotitoli',
+        'Full screen': 'Schermo intero',
+        'Ready · {size}': 'Pronto · {size}',
+        'Downloading {pct}% · {received} of {size}': 'Download al {pct}% · {received} di {size}',
+        'Downloading · {received}': 'Download in corso · {received}',
+        Paused: 'In pausa',
+        'Failed: try again at home': 'Non riuscito: riprova da casa',
+        'Interrupted: try again at home': 'Interrotto: riprova da casa',
+        Retry: 'Riprova',
+        Delete: 'Elimina',
+        Cancel: 'Annulla',
+        'Play {title}': 'Riproduci {title}',
+        'Open {title}': 'Apri {title}',
+        Show: 'Serie TV',
+        '{n} episode': '{n} episodio',
+        '{n} episodes': '{n} episodi',
+        '{n} downloading': '{n} in download',
+        Episodes: 'Episodi',
+        'Delete all': 'Elimina tutto',
+        'Nothing downloaded yet': 'Ancora nessun download',
+        'Open a movie or episode in Netfish and press Download.': 'Apri un film o un episodio in Netfish e premi Scarica.',
+        Movies: 'Film',
+        Shows: 'Serie TV',
+        '← All downloads': '← Tutti i download',
+        'Delete all episodes': 'Elimina tutti gli episodi',
+        '{n} download · {size} used': '{n} download · {size} occupati',
+        '{n} downloads · {size} used': '{n} download · {size} occupati',
+        'Delete "{name}" from this computer?': 'Eliminare "{name}" da questo computer?',
+        'Delete "{name}" from this device?': 'Eliminare "{name}" da questo dispositivo?',
+        'Delete all {n} downloaded episode of "{title}"?': 'Eliminare l\'episodio scaricato di "{title}"?',
+        'Delete all {n} downloaded episodes of "{title}"?': 'Eliminare tutti i {n} episodi scaricati di "{title}"?',
+        "This download couldn't play: {error}": 'Impossibile riprodurre questo download: {error}',
+        'Track {id}': 'Traccia {id}',
+        'Subtitles off': 'Sottotitoli disattivati',
+      };
+      /** t('Play {title}', { title }) → the Italian (or the English) with {placeholders} filled in. */
+      const t = (text, values) =>
+        ((italian && IT[text]) || text).replace(/\{(\w+)\}/g, (match, name) => (values && name in values ? String(values[name]) : match));
+      /** Singular or plural: tn(3, '{n} episode', '{n} episodes') → "3 episodi". */
+      const tn = (n, one, other, values) => t(n === 1 ? one : other, { n, ...values });
+      // The page's own text, written in English above.
+      if (italian) {
+        document.documentElement.lang = 'it';
+        document.title = t(document.title);
+        for (const el of document.querySelectorAll('[data-t]')) el.textContent = t(el.textContent.replace(/\s+/g, ' ').trim());
+        for (const el of document.querySelectorAll('[aria-label]')) el.setAttribute('aria-label', t(el.getAttribute('aria-label')));
+      }
+
       const desktop = window.netfishDesktop;
       if (desktop.platform === 'darwin') document.documentElement.classList.add('mac');
       // Phones and tablets (iPhone, iPad, Android): touch-friendly, clear of notches.
       const mobile = desktop.platform === 'ios' || desktop.platform === 'android';
       if (mobile) document.documentElement.classList.add('ios');
       const device = mobile ? 'this device' : 'this computer';
-      document.getElementById('heading').textContent = `Downloads on ${device}`;
+      document.getElementById('heading').textContent = t(`Downloads on ${device}`);
       const view = document.getElementById('view');
       const player = document.getElementById('player');
       const video = document.getElementById('video');
@@ -152,24 +216,27 @@
       let openShow = query.get('show') || undefined; // series key when looking at one show's episodes
       let autoplay = query.get('play') || undefined;
 
-      const gb = (n) => (n ? (n / 1024 ** 3 >= 1 ? `${(n / 1024 ** 3).toFixed(1)} GB` : `${Math.round(n / 1024 ** 2)} MB`) : '');
+      const number = (n, digits) => n.toLocaleString(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits, useGrouping: false });
+      const gb = (n) => (n ? (n / 1024 ** 3 >= 1 ? `${number(n / 1024 ** 3, 1)} GB` : `${number(Math.round(n / 1024 ** 2), 0)} MB`) : '');
       const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
       const showKey = (i) => i.seriesId || i.seriesTitle || i.title;
       const pctOf = (i) => (i.size ? Math.min(100, (i.received / i.size) * 100) : 0);
 
       function status(i) {
-        if (i.state === 'done') return `<span class="meta">Ready · ${gb(i.size)}</span>`;
+        if (i.state === 'done') return `<span class="meta">${t('Ready · {size}', { size: gb(i.size) })}</span>`;
         if (i.state === 'downloading') {
-          const pct = i.size ? Math.min(99, Math.round((i.received / i.size) * 100)) : null;
-          return `<span class="meta">Downloading${pct !== null ? ` ${pct}%` : ''} · ${gb(i.received)}${i.size ? ` of ${i.converted ? '~' : ''}${gb(i.size)}` : ''}</span>`;
+          if (!i.size) return `<span class="meta">${t('Downloading · {received}', { received: gb(i.received) })}</span>`;
+          const pct = Math.min(99, Math.round((i.received / i.size) * 100));
+          const size = `${i.converted ? '~' : ''}${gb(i.size)}`;
+          return `<span class="meta">${t('Downloading {pct}% · {received} of {size}', { pct, received: gb(i.received), size })}</span>`;
         }
-        if (i.state === 'paused') return '<span class="meta">Paused</span>';
-        return `<span class="meta warn">${i.state === 'failed' ? 'Failed' : 'Interrupted'}: try again at home</span>`;
+        if (i.state === 'paused') return `<span class="meta">${t('Paused')}</span>`;
+        return `<span class="meta warn">${i.state === 'failed' ? t('Failed: try again at home') : t('Interrupted: try again at home')}</span>`;
       }
 
       const actions = (i) => `<span class="actions">
-          ${i.state === 'interrupted' || i.state === 'failed' ? `<button class="link" data-retry="${esc(i.itemId)}">Retry</button>` : ''}
-          <button class="link" data-remove="${esc(i.itemId)}">${i.state === 'done' ? 'Delete' : 'Cancel'}</button>
+          ${i.state === 'interrupted' || i.state === 'failed' ? `<button class="link" data-retry="${esc(i.itemId)}">${t('Retry')}</button>` : ''}
+          <button class="link" data-remove="${esc(i.itemId)}">${i.state === 'done' ? t('Delete') : t('Cancel')}</button>
         </span>`;
 
       function posterTile(attrs, poster, ready, pct, label) {
@@ -185,7 +252,7 @@
         for (const ep of list.filter((i) => i.kind === 'Episode')) shows.set(showKey(ep), [...(shows.get(showKey(ep)) ?? []), ep]);
 
         const movieTiles = movies.map((i) => `<div class="item">
-            ${posterTile(`data-play="${esc(i.itemId)}" ${i.state === 'done' ? '' : 'disabled'}`, i.poster, i.state === 'done', pctOf(i), `Play ${i.title}`)}
+            ${posterTile(`data-play="${esc(i.itemId)}" ${i.state === 'done' ? '' : 'disabled'}`, i.poster, i.state === 'done', pctOf(i), t('Play {title}', { title: i.title }))}
             <span class="title">${esc(i.title)}</span>
             ${i.subtitle ? `<span class="meta">${esc(i.subtitle)}</span>` : ''}
             ${status(i)}
@@ -197,21 +264,21 @@
           const busy = eps.filter((e) => e.state === 'downloading');
           const size = eps.reduce((n, e) => n + (e.state === 'done' ? e.size : e.received), 0);
           return `<div class="item">
-            ${posterTile(`data-show="${esc(key)}"`, eps[0].poster, true, 0, `Open ${eps[0].seriesTitle}`)}
-            <span class="title">${esc(eps[0].seriesTitle || 'Show')}</span>
-            <span class="meta">${eps.length} episode${eps.length === 1 ? '' : 's'} · ${gb(size)}${busy.length ? ` · ${busy.length} downloading` : ''}</span>
+            ${posterTile(`data-show="${esc(key)}"`, eps[0].poster, true, 0, t('Open {title}', { title: eps[0].seriesTitle }))}
+            <span class="title">${esc(eps[0].seriesTitle || t('Show'))}</span>
+            <span class="meta">${tn(eps.length, '{n} episode', '{n} episodes')} · ${gb(size)}${busy.length ? ` · ${t('{n} downloading', { n: busy.length })}` : ''}</span>
             <span class="actions">
-              <button class="link" data-show="${esc(key)}">Episodes</button>
-              <button class="link" data-remove-show="${esc(key)}">Delete all</button>
+              <button class="link" data-show="${esc(key)}">${t('Episodes')}</button>
+              <button class="link" data-remove-show="${esc(key)}">${t('Delete all')}</button>
             </span>
           </div>`;
         });
 
         if (!list.length) {
-          return '<div class="empty"><strong>Nothing downloaded yet</strong><span>Open a movie or episode in Netfish and press Download.</span></div>';
+          return `<div class="empty"><strong>${t('Nothing downloaded yet')}</strong><span>${t('Open a movie or episode in Netfish and press Download.')}</span></div>`;
         }
-        return `${movieTiles.length ? `<h2>Movies</h2><div class="grid">${movieTiles.join('')}</div>` : ''}
-          ${showTiles.length ? `<h2>Shows</h2><div class="grid">${showTiles.join('')}</div>` : ''}`;
+        return `${movieTiles.length ? `<h2>${t('Movies')}</h2><div class="grid">${movieTiles.join('')}</div>` : ''}
+          ${showTiles.length ? `<h2>${t('Shows')}</h2><div class="grid">${showTiles.join('')}</div>` : ''}`;
       }
 
       function showView(list, key) {
@@ -223,14 +290,14 @@
           return homeView(list);
         }
         return `<div class="crumbs">
-            <button class="btn" data-home>← All downloads</button>
+            <button class="btn" data-home>${t('← All downloads')}</button>
             <h2>${esc(eps[0].seriesTitle)}</h2>
-            <button class="btn" data-remove-show="${esc(key)}">Delete all episodes</button>
+            <button class="btn" data-remove-show="${esc(key)}">${t('Delete all episodes')}</button>
           </div>
           <div class="episodes">${eps
             .map(
               (e) => `<div class="episode">
-                <button class="play-btn" data-play="${esc(e.itemId)}" ${e.state === 'done' ? '' : 'disabled'} aria-label="Play">▶</button>
+                <button class="play-btn" data-play="${esc(e.itemId)}" ${e.state === 'done' ? '' : 'disabled'} aria-label="${t('Play')}">▶</button>
                 <div class="info">
                   <span class="title">${esc(e.subtitle || e.title)}</span>
                   ${status(e)}
@@ -245,7 +312,7 @@
       const usage = document.getElementById('usage');
       function render() {
         view.innerHTML = openShow ? showView(items, openShow) : homeView(items);
-        desktop.offlineUsage().then((bytes) => (usage.textContent = items.length ? `${items.length} download${items.length === 1 ? '' : 's'} · ${gb(bytes) || '0 MB'} used` : ''));
+        desktop.offlineUsage().then((bytes) => (usage.textContent = items.length ? tn(items.length, '{n} download · {size} used', '{n} downloads · {size} used', { size: gb(bytes) || '0 MB' }) : ''));
       }
       const update = (list) => {
         items = list;
@@ -279,12 +346,12 @@
         if (el.dataset.remove) {
           const item = items.find((i) => i.itemId === el.dataset.remove);
           const name = item?.kind === 'Episode' ? `${item.seriesTitle} ${item.subtitle ?? ''}` : item?.title;
-          if (confirm(`Delete "${name}" from ${device}?`)) update(await desktop.removeOffline(el.dataset.remove));
+          if (confirm(t(`Delete "{name}" from ${device}?`, { name }))) update(await desktop.removeOffline(el.dataset.remove));
           return;
         }
         if (el.dataset.removeShow) {
           const eps = items.filter((i) => i.kind === 'Episode' && showKey(i) === el.dataset.removeShow);
-          if (confirm(`Delete all ${eps.length} downloaded episode${eps.length === 1 ? '' : 's'} of "${eps[0]?.seriesTitle}"?`)) {
+          if (confirm(tn(eps.length, 'Delete all {n} downloaded episode of "{title}"?', 'Delete all {n} downloaded episodes of "{title}"?', { title: eps[0]?.seriesTitle }))) {
             update(await desktop.removeOfflineSeries(el.dataset.removeShow));
           }
         }
@@ -317,16 +384,18 @@
       let names;
       const language = (code) => {
         try {
-          names ??= new Intl.DisplayNames(['en'], { type: 'language' });
-          return code && code !== 'und' ? names.of(code) : '';
+          names ??= new Intl.DisplayNames([locale], { type: 'language' });
+          const name = code && code !== 'und' ? names.of(code) : '';
+          return italian ? name.charAt(0).toLocaleUpperCase(locale) + name.slice(1) : name; // Italian names come lowercase: "inglese"
         } catch {
           return code || '';
         }
       };
-      const trackName = (t) => [language(t.lang), t.title && t.title !== language(t.lang) ? t.title : ''].filter(Boolean).join(' · ') || `Track ${t.id}`;
+      const trackName = (track) =>
+        [language(track.lang), track.title && track.title !== language(track.lang) ? track.title : ''].filter(Boolean).join(' · ') || t('Track {id}', { id: track.id });
       function showFilm() {
         toggle.innerHTML = film.paused ? ICONS.play : ICONS.pause;
-        toggle.setAttribute('aria-label', film.paused ? 'Play' : 'Pause');
+        toggle.setAttribute('aria-label', film.paused ? t('Play') : t('Pause'));
         if (!seeking) {
           seek.max = String(Math.floor(film.duration || 0));
           seek.value = String(Math.floor(film.time));
@@ -340,7 +409,7 @@
         audioPick.innerHTML = audio.map((t) => `<option value="${t.id}">${esc(trackName(t))}</option>`).join('');
         audioPick.value = String(film.aid ?? audio.find((t) => t.selected)?.id ?? '');
         subsPick.hidden = !subs.length;
-        subsPick.innerHTML = '<option value="">Subtitles off</option>' + subs.map((t) => `<option value="${t.id}">${esc(trackName(t))}</option>`).join('');
+        subsPick.innerHTML = `<option value="">${t('Subtitles off')}</option>` + subs.map((t) => `<option value="${t.id}">${esc(trackName(t))}</option>`).join('');
         subsPick.value = film.sid ? String(film.sid) : '';
       }
       function filmState(state) {
@@ -352,7 +421,7 @@
         if (Array.isArray(state.tracks)) film.tracks = state.tracks;
         if ('aid' in state || 'sid' in state || Array.isArray(state.tracks)) showTracks();
         if (state.ended) {
-          if (typeof state.error === 'string') alert(`This download couldn't play: ${state.error}`);
+          if (typeof state.error === 'string') alert(t("This download couldn't play: {error}", { error: state.error }));
           else if (state.finished && current) localStorage.removeItem(posKey(current.itemId));
           close();
           return;
@@ -379,7 +448,7 @@
           segments: [],
         };
         engine.load(request).catch((err) => {
-          alert(`This download couldn't play: ${err.message || err}`);
+          alert(t("This download couldn't play: {error}", { error: err.message || err }));
           close();
         });
       }

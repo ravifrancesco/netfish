@@ -113,7 +113,7 @@ sealed class Bridge(MainWindow window, OfflineStore store)
         var local = LocalPages.IsLocal(source);
         if (!local && !Server.Owns(source))
         {
-            Reply(id, null, "Not allowed here");
+            Reply(id, null, L("Not allowed here"));
             return;
         }
         try
@@ -138,7 +138,7 @@ sealed class Bridge(MainWindow window, OfflineStore store)
                 return null;
             case "connect":
             {
-                if (!local) throw new Problem("Not allowed here");
+                if (!local) throw new Problem(L("Not allowed here"));
                 var url = await Server.Probe(Server.Normalize(Str(args) ?? ""));
                 Server.Url = url;
                 window.ShowServer(fresh: true);
@@ -149,12 +149,12 @@ sealed class Bridge(MainWindow window, OfflineStore store)
             case "list": return store.PublicList();
             case "download":
             {
-                var origin = Server.Url ?? throw new Problem("Not connected to a Netfish server");
+                var origin = Server.Url ?? throw new Problem(L("Not connected to a Netfish server"));
                 return await store.Start(args as JsonObject ?? new JsonObject(), origin, await window.CookieHeader(origin));
             }
             case "retry":
             {
-                var origin = Server.Url ?? throw new Problem("Not connected to a Netfish server");
+                var origin = Server.Url ?? throw new Problem(L("Not connected to a Netfish server"));
                 return await store.Retry(Str(args) ?? "", origin, await window.CookieHeader(origin));
             }
             case "remove": return store.Remove(Str(args) ?? "");
@@ -178,18 +178,18 @@ sealed class Bridge(MainWindow window, OfflineStore store)
 
             // Playback in mpv
             case "videoProfile": return Profile();
-            case "videoLoad": return await Load(args as JsonObject ?? throw new Problem("Nothing to play"));
+            case "videoLoad": return await Load(args as JsonObject ?? throw new Problem(L("Nothing to play")));
             case "videoCommand":
                 Command(args as JsonObject ?? new JsonObject());
                 return null;
             default:
-                throw new Problem("Unknown request");
+                throw new Problem(L("Unknown request"));
         }
     }
 
     async Task<JsonNode?> Load(JsonObject request)
     {
-        if (!Uri.TryCreate(Str(request["url"]), UriKind.Absolute, out var url)) throw new Problem("Nothing to play");
+        if (!Uri.TryCreate(Str(request["url"]), UriKind.Absolute, out var url)) throw new Problem(L("Nothing to play"));
         var externals = (request["externalSubtitles"] as JsonArray ?? new JsonArray()).Select(s => Str(s?["url"])).OfType<string>().ToList();
         string target;
         var cookie = "";
@@ -197,7 +197,7 @@ sealed class Bridge(MainWindow window, OfflineStore store)
         if (LocalPages.IsLocal(url))
         {
             // A download: mpv plays the file itself, with its subtitle files.
-            target = store.MediaPath(url) ?? throw new Problem("This download isn't on this computer any more");
+            target = store.MediaPath(url) ?? throw new Problem(L("This download isn't on this computer any more"));
             foreach (var s in externals)
                 if (Uri.TryCreate(s, UriKind.Absolute, out var u) && store.MediaPath(u) is { } file) files.Add(file);
         }
@@ -210,7 +210,7 @@ sealed class Bridge(MainWindow window, OfflineStore store)
         }
         else
         {
-            throw new Problem("Nothing to play");
+            throw new Problem(L("Nothing to play"));
         }
         var audio = Num((request["audio"] as JsonObject)?["position"]);
         var subtitles = request["subtitles"] as JsonObject;

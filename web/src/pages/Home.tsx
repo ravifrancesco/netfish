@@ -6,7 +6,8 @@ import type { Card } from '@netfish/shared';
 import { api } from '../api';
 import { Row, RowSkeleton } from '../components/Cards';
 import { ErrorState, Img, StatusChip } from '../components/ui';
-import { titleHref } from '../lib/format';
+import { decimal, titleHref } from '../lib/format';
+import { t } from '../i18n';
 import { useConfig, useMe } from '../lib/hooks';
 
 /** Admins: a nudge to finish connecting services until they're all there. */
@@ -22,23 +23,21 @@ function SetupNudge() {
   });
   if (!me?.isAdmin || !config || hidden) return null;
   const missing = [
-    !config.features.requests && 'Seerr (discovery and requests)',
-    !config.features.downloads && 'Radarr/Sonarr (downloads and versions)',
-    !config.features.subtitles && 'Bazarr (subtitles)',
+    !config.features.requests && t('Seerr (discovery and requests)'),
+    !config.features.downloads && t('Radarr/Sonarr (downloads and versions)'),
+    !config.features.subtitles && t('Bazarr (subtitles)'),
   ].filter(Boolean);
   if (!missing.length) return null;
   return (
     <div className="nudge">
       <Plug size={18} />
-      <span>
-        Finish setting up Netfish: connect {missing.join(', ')}.
-      </span>
+      <span>{t('Finish setting up Netfish: connect {services}.', { services: missing.join(', ') })}</span>
       <Link to="/settings#connections" className="btn btn--accent btn--sm">
-        Connections
+        {t('Connections')}
       </Link>
       <button
         className="icon-btn icon-btn--sm"
-        aria-label="Hide"
+        aria-label={t('Hide')}
         onClick={() => {
           setHidden(true);
           try {
@@ -63,13 +62,13 @@ function Hero({ card }: { card: Card }) {
       </div>
       <div className="hero__shade" />
       <div className="hero__content">
-        <span className="hero__kicker">{card.mediaType === 'tv' ? 'Series' : 'Film'}</span>
+        <span className="hero__kicker">{card.mediaType === 'tv' ? t('Series') : t('Film')}</span>
         <h1 className="hero__title">{card.title}</h1>
         <div className="hero__meta">
           {card.year && <span>{card.year}</span>}
           {card.rating && (
             <span className="rating">
-              <Star size={14} fill="currentColor" /> {card.rating.toFixed(1)}
+              <Star size={14} fill="currentColor" /> {decimal(card.rating)}
             </span>
           )}
           <StatusChip status={card.status} progress={card.downloadProgress} compact />
@@ -78,15 +77,15 @@ function Hero({ card }: { card: Card }) {
         <div className="hero__actions">
           {playable ? (
             <Link to={`/watch/${card.jellyfinId}`} className="btn btn--primary btn--lg">
-              <Play size={22} fill="currentColor" /> Play
+              <Play size={22} fill="currentColor" /> {t('Play')}
             </Link>
           ) : card.status === 'none' ? (
             <Link to={titleHref(card)} className="btn btn--accent btn--lg">
-              <Plus size={22} /> Request
+              <Plus size={22} /> {t('Request')}
             </Link>
           ) : null}
           <Link to={titleHref(card)} className="btn btn--ghost btn--lg">
-            <Info size={22} /> More info
+            <Info size={22} /> {t('More info')}
           </Link>
         </div>
       </div>
@@ -122,7 +121,7 @@ export default function Home() {
         ))}
         {rows.length === 0 && (
           <div className="empty">
-            <p>Your library is empty for now. Search for something and request it.</p>
+            <p>{t('Your library is empty for now. Search for something and request it.')}</p>
           </div>
         )}
       </div>

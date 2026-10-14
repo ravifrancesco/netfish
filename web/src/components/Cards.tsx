@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Info, Play } from 'lucide-react';
 import type { Card, Row as RowData } from '@netfish/shared';
 import { titleHref } from '../lib/format';
 import { Img, Progress, StatusChip } from './ui';
+import { t } from '../i18n';
 
 export function PosterCard({ card }: { card: Card }) {
   const downloading = card.downloadProgress !== undefined && card.status !== 'available';
@@ -28,7 +29,7 @@ export function PosterCard({ card }: { card: Card }) {
 export function WideCard({ card }: { card: Card }) {
   return (
     <div className="wide">
-      <Link to={card.playItemId ? `/watch/${card.playItemId}` : titleHref(card)} className="wide__frame" aria-label={`Play ${card.title}`}>
+      <Link to={card.playItemId ? `/watch/${card.playItemId}` : titleHref(card)} className="wide__frame" aria-label={t('Play {title}', { title: card.title })}>
         <Img src={card.thumb ?? card.backdrop} className="wide__img" fallback={<span className="card__fallback">{card.title}</span>} />
         <span className="wide__play" aria-hidden="true">
           <Play size={22} fill="currentColor" />
@@ -40,7 +41,7 @@ export function WideCard({ card }: { card: Card }) {
           <span className="wide__title">{card.title}</span>
           {card.subtitle && <span className="wide__subtitle">{card.subtitle}</span>}
         </div>
-        <Link to={titleHref(card)} className="icon-btn icon-btn--sm" aria-label={`More about ${card.title}`}>
+        <Link to={titleHref(card)} className="icon-btn icon-btn--sm" aria-label={t('More about {title}', { title: card.title })}>
           <Info size={18} />
         </Link>
       </div>
@@ -71,13 +72,13 @@ export function Row({ row }: { row: RowData }) {
         <h2 className="row__title">{row.title}</h2>
         {row.href && (
           <Link to={row.href} className="row__more">
-            See all <ChevronRight size={16} />
+            {t('See all')} <ChevronRight size={16} />
           </Link>
         )}
       </div>
       <div className="row__viewport">
         {edges.left && (
-          <button className="row__arrow row__arrow--left" onClick={() => page(-1)} aria-label="Scroll left" tabIndex={-1}>
+          <button className="row__arrow row__arrow--left" onClick={() => page(-1)} aria-label={t('Scroll left')} tabIndex={-1}>
             <ChevronLeft size={32} />
           </button>
         )}
@@ -87,7 +88,7 @@ export function Row({ row }: { row: RowData }) {
           )}
         </div>
         {edges.right && (
-          <button className="row__arrow row__arrow--right" onClick={() => page(1)} aria-label="Scroll right" tabIndex={-1}>
+          <button className="row__arrow row__arrow--right" onClick={() => page(1)} aria-label={t('Scroll right')} tabIndex={-1}>
             <ChevronRight size={32} />
           </button>
         )}

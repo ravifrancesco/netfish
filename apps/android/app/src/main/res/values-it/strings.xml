@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Italian (informal "tu"); terms from docs/i18n-glossary.md. -->
+<resources>
+    <!-- Server address (setup page) -->
+    <string name="error_server_unreachable">Impossibile raggiungere %1$s (%2$s). Il server è acceso?</string>
+    <string name="error_enter_address">Inserisci l\'indirizzo del tuo server Netfish</string>
+    <string name="error_not_an_address">Questo non sembra un indirizzo</string>
+    <string name="error_not_netfish">%1$s non sembra un server Netfish</string>
+    <string name="error_cant_reach">Impossibile raggiungere %1$s (%2$s)</string>
+    <string name="error_not_allowed">Non consentito qui</string>
+
+    <!-- Downloads -->
+    <string name="error_downloads_unavailable">I download non sono disponibili su questo dispositivo</string>
+    <string name="error_nothing_to_download">Il server non ha indicato cosa scaricare</string>
+    <string name="error_not_connected">Non sei connesso a un server Netfish</string>
+    <string name="error_download_start">Impossibile avviare il download: %1$s</string>
+    <string name="error_download_stopped">Il download si è interrotto. Riprova quando sei sulla rete di casa.</string>
+    <string name="error_nothing_to_retry">Niente da riprovare</string>
+    <string name="download_notification_description">Download di Netfish</string>
+    <string name="subtitles_default_label">Sottotitoli</string>
+
+    <!-- Player -->
+    <string name="error_cant_play">La TV non è riuscita a riprodurre questo video (%1$s)</string>
+</resources>

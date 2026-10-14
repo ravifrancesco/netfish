@@ -67,12 +67,12 @@ final class MacBridge: NSObject, WKScriptMessageHandlerWithReply {
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping @MainActor (Any?, String?) -> Void) {
-        guard let body = message.body as? [String: Any], let cmd = body["cmd"] as? String else { return replyHandler(nil, "Bad request") }
+        guard let body = message.body as? [String: Any], let cmd = body["cmd"] as? String else { return replyHandler(nil, L("Bad request")) }
         let args = body["args"]
         let origin = message.frameInfo.securityOrigin
         let local = origin.protocol == LocalScheme.scheme
         let fromServer = Server.url.map { origin.protocol == $0.scheme && origin.host == $0.host && origin.port == ($0.port ?? 0) } ?? false
-        guard message.frameInfo.isMainFrame, local || fromServer else { return replyHandler(nil, "Not allowed here") }
+        guard message.frameInfo.isMainFrame, local || fromServer else { return replyHandler(nil, L("Not allowed here")) }
 
         Task { @MainActor in
             do {
@@ -93,7 +93,7 @@ final class MacBridge: NSObject, WKScriptMessageHandlerWithReply {
             window.showSetup(error: nil)
             return nil
         case "connect":
-            guard local else { throw Problem("Not allowed here") }
+            guard local else { throw Problem(L("Not allowed here")) }
             let url = try Server.normalize(args as? String ?? "")
             try await Server.probe(url)
             Server.url = url
@@ -130,7 +130,7 @@ final class MacBridge: NSObject, WKScriptMessageHandlerWithReply {
         case "videoProfile": return MacBridge.profile
         case "videoLoad":
             guard let request = args as? [String: Any], let urlString = request["url"] as? String, let url = URL(string: urlString), Server.owns(url) else {
-                throw Problem("Nothing to play")
+                throw Problem(L("Nothing to play"))
             }
             let cookie = await window.cookieHeader(for: url)
             let audio = (request["audio"] as? [String: Any])?["position"] as? Int
@@ -162,7 +162,7 @@ final class MacBridge: NSObject, WKScriptMessageHandlerWithReply {
             let hit = frame.hitTest(NSPoint(x: point[0], y: frame.bounds.height - point[1]))
             return hit.map { String(describing: type(of: $0)) } ?? "nothing"
         default:
-            throw Problem("Unknown request")
+            throw Problem(L("Unknown request"))
         }
     }
 

@@ -6,6 +6,7 @@ import { JF_PREFIX } from './lib/images';
 import { registerJellyfinProxy } from './lib/jellyfinProxy';
 import { HttpError, NotConfiguredError, UpstreamError } from './lib/upstream';
 import { apiRoutes } from './routes';
+import { inLanguage, languageFrom, t } from './lib/i18n';
 
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -20,6 +21,11 @@ export async function buildApp() {
 
   await app.register(cookie);
 
+  // Everything a request produces for people comes out in its language (see lib/i18n).
+  app.addHook('onRequest', (req, _reply, done) => {
+    inLanguage(languageFrom(req.headers['x-netfish-lang'] ?? req.headers['accept-language']), done);
+  });
+
   app.setErrorHandler((err: FastifyError | Error, req, reply) => {
     if (err instanceof HttpError) return reply.code(err.status).send({ error: err.message });
     if (err instanceof NotConfiguredError) return reply.code(503).send({ error: err.message, service: err.service });
@@ -33,7 +39,7 @@ export async function buildApp() {
     const status = (err as FastifyError).statusCode;
     if (status && status < 500) return reply.code(status).send({ error: err.message });
     req.log.error(err);
-    return reply.code(500).send({ error: 'Something went wrong on the Netfish server' });
+    return reply.code(500).send({ error: t('Something went wrong on the Netfish server') });
   });
 
   // Cookie-authenticated writes must come from our own app: browsers won't send this
@@ -61,7 +67,7 @@ export async function buildApp() {
     // Client-side routes (/title/movie/123, /watch/…) all load the app shell.
     app.setNotFoundHandler((req, reply) => {
       if (req.method !== 'GET' || req.url.startsWith('/api/') || req.url.startsWith(`${JF_PREFIX}/`)) {
-        return reply.code(404).send({ error: 'Not found' });
+        return reply.code(404).send({ error: t('Not found') });
       }
       return reply.header('cache-control', 'no-cache').sendFile('index.html');
     });

@@ -1,5 +1,6 @@
 import { config, has } from '../config';
 import { NotConfiguredError, request, type RequestOptions } from '../lib/upstream';
+import { lang as requestLanguage } from '../lib/i18n';
 
 /**
  * Seerr (Jellyseerr / Overseerr lineage) gives us TMDB discovery,
@@ -55,6 +56,30 @@ export interface SeerrResult {
   voteAverage?: number;
   originalLanguage?: string;
   mediaInfo?: SeerrMediaInfo;
+  genreIds?: number[];
+  voteCount?: number;
+  popularity?: number;
+  /** People only: their photo and a few titles they're known for. */
+  profilePath?: string | null;
+  knownFor?: SeerrResult[];
+}
+
+/** A film or show in someone's filmography. */
+export interface SeerrCredit extends SeerrResult {
+  character?: string;
+  job?: string;
+  department?: string;
+}
+
+export interface SeerrPerson {
+  id: number;
+  name: string;
+  biography?: string;
+  birthday?: string | null;
+  deathday?: string | null;
+  placeOfBirth?: string | null;
+  profilePath?: string | null;
+  knownForDepartment?: string;
 }
 
 export interface SeerrPage {
@@ -65,8 +90,8 @@ export interface SeerrPage {
 }
 
 interface Credits {
-  cast?: Array<{ name: string; character?: string; profilePath?: string | null; order?: number }>;
-  crew?: Array<{ name: string; job?: string; department?: string; profilePath?: string | null }>;
+  cast?: Array<{ id?: number; name: string; character?: string; profilePath?: string | null; order?: number }>;
+  crew?: Array<{ id?: number; name: string; job?: string; department?: string; profilePath?: string | null }>;
 }
 
 interface Video {
@@ -110,7 +135,7 @@ export interface SeerrTv {
   voteAverage?: number;
   originalLanguage?: string;
   credits?: Credits;
-  createdBy?: Array<{ name: string; profilePath?: string | null }>;
+  createdBy?: Array<{ id?: number; name: string; profilePath?: string | null }>;
   networks?: Array<{ name: string }>;
   relatedVideos?: Video[];
   contentRatings?: { results?: Array<{ iso_3166_1: string; rating?: string }> };
@@ -165,7 +190,9 @@ function seerrRequest<T>(path: string, opts: Options = {}) {
   return request<T>('Seerr', `${config.seerr.url}/api/v1`, path, { ...opts, headers });
 }
 
-const lang = () => ({ language: config.metadataLanguage });
+// TMDB text (titles, plots) in the person's language: Italian if they use Netfish in Italian,
+// otherwise the server's METADATA_LANGUAGE.
+const lang = () => ({ language: requestLanguage() === 'it' ? 'it' : config.metadataLanguage });
 
 export type DiscoverKind = 'trending' | 'movies' | 'tv' | 'movies/upcoming' | 'tv/upcoming';
 
@@ -182,6 +209,9 @@ export const seerr = {
   tvRatings: (id: number) => seerrRequest<SeerrRT>(`/tv/${id}/ratings`, { timeoutMs: 20_000 }),
   recommendations: (type: 'movie' | 'tv', id: number, page = 1) =>
     seerrRequest<SeerrPage>(`/${type}/${id}/recommendations`, { query: { page, ...lang() } }),
+  person: (id: number) => seerrRequest<SeerrPerson>(`/person/${id}`, { query: lang() }),
+  personCredits: (id: number) =>
+    seerrRequest<{ cast?: SeerrCredit[]; crew?: SeerrCredit[] }>(`/person/${id}/combined_credits`, { query: lang() }),
 
   createRequest: (
     body: { mediaType: 'movie' | 'tv'; mediaId: number; tvdbId?: number; seasons?: number[] | 'all'; is4k?: boolean },

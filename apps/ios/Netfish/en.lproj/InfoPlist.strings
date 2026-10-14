@@ -1,0 +1,2 @@
+/* Shown when iOS or macOS asks to let Netfish find devices on your network. */
+"NSLocalNetworkUsageDescription" = "Netfish connects to your Netfish server on your home network.";

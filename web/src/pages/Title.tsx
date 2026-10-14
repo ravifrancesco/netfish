@@ -6,12 +6,14 @@ import type { DownloadItem, MediaType, SeasonSummary, TitleDetail } from '@netfi
 import { api, type TitleRef } from '../api';
 import { Row } from '../components/Cards';
 import { DownloadButton } from '../components/DownloadButton';
+import { NameLinks, PeopleRow } from '../components/People';
 import { RatingsStrip, TrailerPlayer } from '../components/Extras';
 import { RequestButton } from '../components/RequestButton';
 import { SubtitlesSheet } from '../components/SubtitlesSheet';
 import { VersionsSheet } from '../components/VersionsSheet';
 import { ErrorState, Img, Progress, Spinner, StatusChip, useToast } from '../components/ui';
-import { AVAILABILITY_LABEL, DOWNLOAD_LABEL, ago, bytes, duration, percent } from '../lib/format';
+import { AVAILABILITY_LABEL, DOWNLOAD_LABEL, ago, bytes, decimal, duration, percent } from '../lib/format';
+import { t, tn, locale } from '../i18n';
 import { useConfig, useRefreshTitle } from '../lib/hooks';
 
 type Sheet =
@@ -21,8 +23,8 @@ type Sheet =
 function DownloadLine({ d }: { d: DownloadItem }) {
   const bits = [
     d.state === 'downloading' ? percent(d.progress) : DOWNLOAD_LABEL[d.state],
-    d.size ? `${bytes(d.size - d.sizeLeft)} of ${bytes(d.size)}` : undefined,
-    d.etaSeconds ? `${duration(d.etaSeconds)} left` : undefined,
+    d.size ? t('{done} of {total}', { done: bytes(d.size - d.sizeLeft), total: bytes(d.size) }) : undefined,
+    d.etaSeconds ? t('{time} left', { time: duration(d.etaSeconds) }) : undefined,
     d.speed ? `${bytes(d.speed)}/s` : undefined,
   ].filter(Boolean);
   return (
@@ -52,18 +54,20 @@ function StatusPanel({ d }: { d: TitleDetail }) {
       ))}
       {!d.downloads.length && d.status === 'processing' && (
         <p className="statusbox__note">
-          <Clock size={16} /> Requested — looking for a good release. It'll start downloading as soon as one turns up.
+          <Clock size={16} /> {t("Requested — looking for a good release. It'll start downloading as soon as one turns up.")}
         </p>
       )}
       {d.status === 'pending' && (
         <p className="statusbox__note">
-          <Clock size={16} /> Waiting for an admin to approve the request.
+          <Clock size={16} /> {t('Waiting for an admin to approve the request.')}
         </p>
       )}
       {latest && (
         <p className="muted small">
-          Requested by {latest.mine ? 'you' : latest.requestedBy} {ago(latest.createdAt)}
-          {latest.status === 'declined' && ' · declined'}
+          {latest.mine
+            ? t('Requested by you {when}', { when: ago(latest.createdAt) })
+            : t('Requested by {name} {when}', { name: latest.requestedBy, when: ago(latest.createdAt) })}
+          {latest.status === 'declined' && ` · ${t('declined')}`}
         </p>
       )}
     </div>
@@ -77,23 +81,23 @@ function Languages({ d, onSheet }: { d: TitleDetail; onSheet: (s: Sheet) => void
   return (
     <dl className="langs">
       <div className="langs__row">
-        <dt>Audio</dt>
+        <dt>{t('Audio')}</dt>
         <dd>
-          {d.audio.length ? d.audio.map((a) => a.label).join(' · ') : <span className="muted">Unknown</span>}
+          {d.audio.length ? d.audio.map((a) => a.label).join(' · ') : <span className="muted">{t('Unknown')}</span>}
           {d.canChooseVersion && (
             <button className="link-btn" onClick={() => onSheet({ kind: 'versions', language: '' })}>
-              <Plus size={14} /> Another language
+              <Plus size={14} /> {t('Another language')}
             </button>
           )}
         </dd>
       </div>
       <div className="langs__row">
-        <dt>Subtitles</dt>
+        <dt>{t('Subtitles')}</dt>
         <dd>
-          {d.subtitles.length ? d.subtitles.map((s) => s.label + (s.forced ? ' (forced)' : '')).join(' · ') : <span className="muted">None</span>}
+          {d.subtitles.length ? d.subtitles.map((s) => (s.forced ? t('{language} (forced)', { language: s.label }) : s.label)).join(' · ') : <span className="muted">{t('None')}</span>}
           {canSubs && (
             <button className="link-btn" onClick={() => onSheet({ kind: 'subtitles' })}>
-              <Plus size={14} /> Add subtitles
+              <Plus size={14} /> {t('Add subtitles')}
             </button>
           )}
         </dd>
@@ -108,14 +112,14 @@ function RequestSeason({ d, season }: { d: TitleDetail; season: SeasonSummary })
   const request = useMutation({
     mutationFn: () => api.request({ mediaType: 'tv', tmdbId: d.tmdbId!, seasons: [season.seasonNumber] }),
     onSuccess: () => {
-      toast('ok', `Requested ${season.name}.`);
+      toast('ok', t('Requested {season}.', { season: season.name }));
       refresh('tv', d.tmdbId);
     },
     onError: (err) => toast('error', (err as Error).message),
   });
   return (
     <button className="btn btn--accent btn--sm" disabled={request.isPending} onClick={() => request.mutate()}>
-      {request.isPending ? <Spinner size={14} /> : <Plus size={16} />} Request {season.name}
+      {request.isPending ? <Spinner size={14} /> : <Plus size={16} />} {t('Request {season}', { season: season.name })}
     </button>
   );
 }
@@ -134,8 +138,8 @@ function Episodes({ d, titleRef, onSheet, initialSeason }: { d: TitleDetail; tit
   return (
     <section className="section container">
       <div className="section__head">
-        <h2>Episodes</h2>
-        <select className="select" value={season} onChange={(e) => setSeason(Number(e.target.value))} aria-label="Season">
+        <h2>{t('Episodes')}</h2>
+        <select className="select" value={season} onChange={(e) => setSeason(Number(e.target.value))} aria-label={t('Season')}>
           {seasons.map((s) => (
             <option key={s.seasonNumber} value={s.seasonNumber}>
               {s.name}
@@ -147,7 +151,7 @@ function Episodes({ d, titleRef, onSheet, initialSeason }: { d: TitleDetail; tit
         {current?.status === 'none' && d.tmdbId && <RequestSeason d={d} season={current} />}
         {d.canChooseVersion && (
           <button className="btn btn--ghost btn--sm" onClick={() => onSheet({ kind: 'versions', seasonNumber: season })}>
-            <Layers size={16} /> Versions
+            <Layers size={16} /> {t('Versions')}
           </button>
         )}
       </div>
@@ -175,7 +179,7 @@ function Episodes({ d, titleRef, onSheet, initialSeason }: { d: TitleDetail; tit
               <li key={e.episodeNumber} className={`episode${e.available ? '' : ' is-missing'}`}>
                 <span className="episode__num">{e.episodeNumber}</span>
                 {e.jellyfinId ? (
-                  <Link to={`/watch/${e.jellyfinId}`} className="episode__thumb" aria-label={`Play episode ${e.episodeNumber}`}>
+                  <Link to={`/watch/${e.jellyfinId}`} className="episode__thumb" aria-label={t('Play episode {n}', { n: e.episodeNumber })}>
                     {thumb}
                   </Link>
                 ) : (
@@ -184,18 +188,18 @@ function Episodes({ d, titleRef, onSheet, initialSeason }: { d: TitleDetail; tit
                 <div className="episode__body">
                   <div className="episode__top">
                     <h3>{e.title}</h3>
-                    {e.runtimeMinutes && <span className="muted">{e.runtimeMinutes} min</span>}
+                    {e.runtimeMinutes && <span className="muted">{t('{m} min', { m: e.runtimeMinutes })}</span>}
                   </div>
                   {e.overview && <p className="episode__overview">{e.overview}</p>}
                   <div className="episode__status">
                     {e.download ? (
-                      <span className="chip chip--dl">Downloading {percent(e.download.progress)}</span>
+                      <span className="chip chip--dl">{t('Downloading {pct}%', { pct: Math.round(e.download.progress * 100) })}</span>
                     ) : upcoming ? (
-                      <span className="muted small">Airs {new Date(e.airDate!).toLocaleDateString()}</span>
+                      <span className="muted small">{t('Airs {date}', { date: new Date(e.airDate!).toLocaleDateString(locale) })}</span>
                     ) : !e.available ? (
-                      <span className="muted small">Not in your library</span>
+                      <span className="muted small">{t('Not in your library')}</span>
                     ) : e.played ? (
-                      <span className="muted small">Watched</span>
+                      <span className="muted small">{t('Watched')}</span>
                     ) : null}
                   </div>
                 </div>
@@ -207,8 +211,8 @@ function Episodes({ d, titleRef, onSheet, initialSeason }: { d: TitleDetail; tit
                 {d.canChooseVersion && !upcoming && (
                   <button
                     className="icon-btn icon-btn--sm episode__more"
-                    title="Versions of this episode"
-                    aria-label={`Versions of episode ${e.episodeNumber}`}
+                    title={t('Versions of this episode')}
+                    aria-label={t('Versions of episode {n}', { n: e.episodeNumber })}
                     onClick={() => onSheet({ kind: 'versions', seasonNumber: season, episodeNumber: e.episodeNumber })}
                   >
                     <Layers size={16} />
@@ -267,9 +271,9 @@ export default function Title() {
   const meta = [
     d.year,
     d.certification,
-    d.mediaType === 'movie' ? (d.runtimeMinutes ? duration(d.runtimeMinutes * 60) : undefined) : d.seasons ? `${d.seasons.filter((s) => s.seasonNumber > 0).length} seasons` : undefined,
+    d.mediaType === 'movie' ? (d.runtimeMinutes ? duration(d.runtimeMinutes * 60) : undefined) : d.seasons ? tn(d.seasons.filter((s) => s.seasonNumber > 0).length, '{n} season', '{n} seasons') : undefined,
   ].filter(Boolean);
-  const stars = d.cast.slice(0, 4).map((c) => c.name);
+  const stars = d.cast.slice(0, 4);
 
   return (
     <div className="tp">
@@ -290,7 +294,7 @@ export default function Title() {
             ))}
             {d.rating && !d.tmdbId && (
               <span className="rating">
-                <Star size={14} fill="currentColor" /> {d.rating.toFixed(1)}
+                <Star size={14} fill="currentColor" /> {decimal(d.rating)}
               </span>
             )}
             <span className={`avail avail--${d.status}`}>{AVAILABILITY_LABEL[d.status]}</span>
@@ -310,12 +314,12 @@ export default function Title() {
             <RequestButton title={d} className={d.play ? 'btn btn--ghost btn--lg' : 'btn btn--accent btn--lg'} />
             {d.canChooseVersion && (
               <button className="btn btn--ghost btn--lg" onClick={() => setSheet({ kind: 'versions' })}>
-                <Layers size={20} /> Versions
+                <Layers size={20} /> {t('Versions')}
               </button>
             )}
             {d.trailerYoutubeKey && (
               <button className="btn btn--ghost btn--lg" onClick={() => setTrailer(true)}>
-                <Clapperboard size={20} /> Trailer
+                <Clapperboard size={20} /> {t('Trailer')}
               </button>
             )}
           </div>
@@ -328,12 +332,12 @@ export default function Title() {
             <div className="tp__credits">
               {stars.length > 0 && (
                 <p>
-                  <span className="muted">Starring</span> {stars.join(', ')}
+                  <span className="muted">{t('Starring')}</span> <NameLinks people={stars} />
                 </p>
               )}
               {d.crew.length > 0 && (
                 <p>
-                  <span className="muted">{d.mediaType === 'tv' ? 'Created by' : 'Directed & written by'}</span> {d.crew.map((c) => c.name).join(', ')}
+                  <span className="muted">{d.mediaType === 'tv' ? t('Created by') : t('Directed & written by')}</span> <NameLinks people={d.crew} />
                 </p>
               )}
             </div>
@@ -345,22 +349,14 @@ export default function Title() {
 
       {d.cast.length > 0 && (
         <section className="section container">
-          <h2>Cast</h2>
-          <div className="people">
-            {d.cast.map((p) => (
-              <div key={p.name + p.role} className="person">
-                <Img src={p.photo} className="person__img" fallback={<span>{p.name[0]}</span>} />
-                <span className="person__name">{p.name}</span>
-                {p.role && <span className="person__role">{p.role}</span>}
-              </div>
-            ))}
-          </div>
+          <h2>{t('Cast')}</h2>
+          <PeopleRow people={d.cast} />
         </section>
       )}
 
       {d.recommendations.length > 0 && (
         <div className="rows rows--flat">
-          <Row row={{ id: 'more', title: 'More like this', style: 'poster', items: d.recommendations }} />
+          <Row row={{ id: 'more', title: t('More like this'), style: 'poster', items: d.recommendations }} />
         </div>
       )}
 

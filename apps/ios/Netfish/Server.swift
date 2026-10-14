@@ -19,10 +19,10 @@ enum Server {
     /// "192.168.1.50" → http://192.168.1.50:7777. Real domains keep their own port.
     static func normalize(_ input: String) throws -> URL {
         var value = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !value.isEmpty else { throw Problem("Enter the address of your Netfish server") }
+        guard !value.isEmpty else { throw Problem(L("Enter the address of your Netfish server")) }
         if value.range(of: "^https?://", options: [.regularExpression, .caseInsensitive]) == nil { value = "http://" + value }
         guard var parts = URLComponents(string: value), let host = parts.host, !host.isEmpty else {
-            throw Problem("That doesn't look like an address")
+            throw Problem(L("That doesn't look like an address"))
         }
         let scheme = (parts.scheme ?? "http").lowercased()
         let local = host.range(of: #"^\d{1,3}(\.\d{1,3}){3}$"#, options: .regularExpression) != nil || host.hasSuffix(".local") || !host.contains(".")
@@ -31,7 +31,7 @@ enum Server {
         parts.path = ""
         parts.query = nil
         parts.fragment = nil
-        guard let url = parts.url else { throw Problem("That doesn't look like an address") }
+        guard let url = parts.url else { throw Problem(L("That doesn't look like an address")) }
         return url
     }
 
@@ -44,11 +44,11 @@ enum Server {
         do {
             (data, response) = try await URLSession.shared.data(for: request)
         } catch {
-            throw Problem("Can't reach \(origin.absoluteString) (\(error.localizedDescription))")
+            throw Problem(L("Can't reach {address} ({error})", ["address": origin.absoluteString, "error": error.localizedDescription]))
         }
         let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
         guard (response as? HTTPURLResponse)?.statusCode == 200, json?["name"] as? String == "netfish" else {
-            throw Problem("\(origin.absoluteString) doesn't look like a Netfish server")
+            throw Problem(L("{address} doesn't look like a Netfish server", ["address": origin.absoluteString]))
         }
     }
 }

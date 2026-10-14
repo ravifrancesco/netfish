@@ -219,7 +219,9 @@ final class MainWindow: NSWindowController, NSWindowDelegate, WKNavigationDelega
         if (err.userInfo[NSURLErrorFailingURLErrorKey] as? URL)?.scheme == LocalScheme.scheme { return }
         // Away from home with films downloaded: straight to them.
         if store.hasDownloads { return showOffline([:]) }
-        showSetup(error: "Couldn't reach \(Server.url?.absoluteString ?? "the server") (\(err.localizedDescription)). Is it on?")
+        showSetup(error: L("Couldn't reach {server} ({error}). Is it on?", [
+            "server": Server.url?.absoluteString ?? L("the server"), "error": err.localizedDescription,
+        ]))
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
@@ -236,8 +238,8 @@ final class MainWindow: NSWindowController, NSWindowDelegate, WKNavigationDelega
     func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor (Bool) -> Void) {
         let alert = NSAlert()
         alert.messageText = message
-        alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: L("OK"))
+        alert.addButton(withTitle: L("Cancel"))
         alert.beginSheetModal(for: window!) { completionHandler($0 == .alertFirstButtonReturn) }
     }
 }

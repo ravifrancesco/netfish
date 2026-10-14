@@ -27,6 +27,7 @@ import { buildDeviceProfile } from '../player/profile';
 import { OverlayVideo, trackPositions } from '../player/overlay';
 import { parseVtt, type Cue } from '../player/vtt';
 import { explainReasons } from '../player/reasons';
+import { t } from '../i18n';
 
 const REPORT_EVERY = 10;
 
@@ -210,7 +211,7 @@ export default function Watch() {
           recovered = true;
           h.recoverMediaError();
         } else {
-          setError('The stream stopped unexpectedly.');
+          setError(t('The stream stopped unexpectedly.'));
         }
       });
       h.loadSource(s.url);
@@ -314,7 +315,7 @@ export default function Watch() {
       fallbackTried.current = true;
       void load({ start: video.current?.currentTime ?? 0, audio: audioIndex, allowDirectPlay: false });
     } else if (!hls.current) {
-      setError("This video can't be played in this app.");
+      setError(t("This video can't be played in this app."));
     }
   };
 
@@ -376,8 +377,8 @@ export default function Watch() {
       return;
     }
     setNextCountdown((c) => c ?? 10);
-    const t = setInterval(() => setNextCountdown((c) => (c === undefined ? c : c - 1)), 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNextCountdown((c) => (c === undefined ? c : c - 1)), 1000);
+    return () => clearInterval(timer);
   }, [nearEnd]);
   useEffect(() => {
     if (nextCountdown !== undefined && nextCountdown <= 0) goNext();
@@ -642,17 +643,17 @@ export default function Watch() {
           <p>{error ?? (info.error as Error).message}</p>
           <div className="row-gap">
             <button className="btn btn--primary" onClick={() => void load({ start: time, audio: audioIndex, allowDirectPlay: false })}>
-              Try again
+              {t('Try again')}
             </button>
             <button className="btn btn--ghost" onClick={() => navigate(-1)}>
-              Go back
+              {t('Go back')}
             </button>
           </div>
         </div>
       )}
 
       <div className="player__top">
-        <button className="icon-btn icon-btn--lg" onClick={() => navigate(-1)} aria-label="Back">
+        <button className="icon-btn icon-btn--lg" onClick={() => navigate(-1)} aria-label={t('Back')}>
           <ArrowLeft size={28} />
         </button>
         <div className="player__heading">
@@ -665,13 +666,13 @@ export default function Watch() {
               className={`badge ${session.method === 'Transcode' ? 'badge--warn' : 'badge--dim'}`}
               onClick={() => setWhy((w) => !w)}
               aria-expanded={why}
-              title="Why is the server working on this video?"
+              title={t('Why is the server working on this video?')}
             >
-              {session.method === 'DirectStream' ? 'Repackaged' : 'Transcoding'}
+              {session.method === 'DirectStream' ? t('Repackaged') : t('Transcoding')}
             </button>
             {why && (
               <div className="player__why" role="note">
-                <strong>{session.method === 'Transcode' ? 'The server is re-encoding this video' : 'The server is lightly repackaging this video'}</strong>
+                <strong>{session.method === 'Transcode' ? t('The server is re-encoding this video') : t('The server is lightly repackaging this video')}</strong>
                 <ul>
                   {explainReasons(session.transcodeReasons).map((text) => (
                     <li key={text}>{text}</li>
@@ -679,7 +680,7 @@ export default function Watch() {
                 </ul>
                 {subtitle?.burnIn && (
                   <button className="btn btn--sm btn--ghost" onClick={() => (setWhy(false), chooseSubtitle(session.subtitleTracks.find((t) => !t.burnIn && t.code === subtitle.code)))}>
-                    {session.subtitleTracks.some((t) => !t.burnIn && t.code === subtitle.code) ? 'Use text subtitles instead' : 'Turn subtitles off'}
+                    {session.subtitleTracks.some((t) => !t.burnIn && t.code === subtitle.code) ? t('Use text subtitles instead') : t('Turn subtitles off')}
                   </button>
                 )}
               </div>
@@ -690,20 +691,20 @@ export default function Watch() {
 
       {intro && (
         <button className="player__skip btn btn--ghost" onClick={() => seekTo(intro.end)}>
-          Skip {intro.type === 'Recap' ? 'recap' : 'intro'} <SkipForward size={18} />
+          {intro.type === 'Recap' ? t('Skip recap') : t('Skip intro')} <SkipForward size={18} />
         </button>
       )}
       {nearEnd && next && (
         <div className="player__next">
-          <span className="muted small">Next episode{nextCountdown !== undefined ? ` in ${nextCountdown}` : ''}</span>
+          <span className="muted small">{nextCountdown !== undefined ? t('Next episode in {n}', { n: nextCountdown }) : t('Next episode')}</span>
           <strong>{d?.nextTitle}</strong>
           <div className="row-gap">
             <button className="btn btn--primary btn--sm" onClick={goNext}>
-              <Play size={16} fill="currentColor" /> Play now
+              <Play size={16} fill="currentColor" /> {t('Play now')}
             </button>
             {nextCountdown !== undefined && (
               <button className="btn btn--ghost btn--sm" onClick={() => setNextCountdown(undefined)}>
-                Cancel
+                {t('Cancel')}
               </button>
             )}
           </div>
@@ -718,7 +719,7 @@ export default function Watch() {
           onPointerMove={onBarMove}
           onPointerUp={onBarUp}
           role="slider"
-          aria-label="Seek"
+          aria-label={t('Seek')}
           aria-valuemin={0}
           aria-valuemax={Math.round(duration)}
           aria-valuenow={Math.round(shownTime)}
@@ -741,73 +742,73 @@ export default function Watch() {
         </div>
 
         <div className="player__controls">
-          <button className="icon-btn icon-btn--lg" onClick={toggle} aria-label={playing ? 'Pause' : 'Play'}>
+          <button className="icon-btn icon-btn--lg" onClick={toggle} aria-label={playing ? t('Pause') : t('Play')}>
             {playing ? <Pause size={30} fill="currentColor" /> : <Play size={30} fill="currentColor" />}
           </button>
-          <button className="icon-btn" onClick={() => seekTo(time - 10)} aria-label="Back 10 seconds">
+          <button className="icon-btn" onClick={() => seekTo(time - 10)} aria-label={t('Back 10 seconds')}>
             <RotateCcw size={24} />
           </button>
-          <button className="icon-btn" onClick={() => seekTo(time + 10)} aria-label="Forward 10 seconds">
+          <button className="icon-btn" onClick={() => seekTo(time + 10)} aria-label={t('Forward 10 seconds')}>
             <RotateCw size={24} />
           </button>
           <div className="volume">
-            <button className="icon-btn" onClick={() => setVol(muted || volume === 0 ? Math.max(volume, 0.5) : 0)} aria-label={muted ? 'Unmute' : 'Mute'}>
+            <button className="icon-btn" onClick={() => setVol(muted || volume === 0 ? Math.max(volume, 0.5) : 0)} aria-label={muted ? t('Unmute') : t('Mute')}>
               {muted || volume === 0 ? <VolumeX size={24} /> : <Volume2 size={24} />}
             </button>
-            <input className="volume__slider" type="range" min={0} max={1} step={0.05} value={muted ? 0 : volume} onChange={(e) => setVol(Number(e.target.value))} aria-label="Volume" />
+            <input className="volume__slider" type="range" min={0} max={1} step={0.05} value={muted ? 0 : volume} onChange={(e) => setVol(Number(e.target.value))} aria-label={t('Volume')} />
           </div>
           <span className="player__time">
             {clock(shownTime)} <span className="muted">/ {clock(duration)}</span>
           </span>
           <span className="spacer" />
           {next && (
-            <button className="icon-btn" onClick={goNext} aria-label="Next episode" title="Next episode">
+            <button className="icon-btn" onClick={goNext} aria-label={t('Next episode')} title={t('Next episode')}>
               <SkipForward size={24} />
             </button>
           )}
           <div className="player__menu-wrap">
-            <button className={`icon-btn${menu ? ' is-active' : ''}`} onClick={() => setMenu((m) => !m)} aria-label="Audio and subtitles" aria-expanded={menu}>
+            <button className={`icon-btn${menu ? ' is-active' : ''}`} onClick={() => setMenu((m) => !m)} aria-label={t('Audio and subtitles')} aria-expanded={menu}>
               <Captions size={24} />
             </button>
             {menu && session && (
               <div className="player__menu">
                 <div className="player__menu-col">
-                  <h3>Audio</h3>
-                  {session.audioTracks.map((t) => (
-                    <button key={t.index} className={`player__opt${t.index === audioIndex ? ' is-on' : ''}`} onClick={() => chooseAudio(t)}>
+                  <h3>{t('Audio')}</h3>
+                  {session.audioTracks.map((track) => (
+                    <button key={track.index} className={`player__opt${track.index === audioIndex ? ' is-on' : ''}`} onClick={() => chooseAudio(track)}>
                       <Check size={16} className="player__tick" />
-                      {t.label}
+                      {track.label}
                     </button>
                   ))}
                   {d?.detailHref && (
                     <Link className="player__link" to={`${d.detailHref}?sheet=versions`}>
-                      Get another language…
+                      {t('Get another language…')}
                     </Link>
                   )}
                 </div>
                 <div className="player__menu-col">
-                  <h3>Subtitles</h3>
+                  <h3>{t('Subtitles')}</h3>
                   <button className={`player__opt${!subtitle ? ' is-on' : ''}`} onClick={() => chooseSubtitle(undefined)}>
                     <Check size={16} className="player__tick" />
-                    Off
+                    {t('Off')}
                   </button>
-                  {session.subtitleTracks.map((t) => (
-                    <button key={t.index} className={`player__opt${subtitle?.index === t.index ? ' is-on' : ''}`} onClick={() => chooseSubtitle(t)}>
+                  {session.subtitleTracks.map((track) => (
+                    <button key={track.index} className={`player__opt${subtitle?.index === track.index ? ' is-on' : ''}`} onClick={() => chooseSubtitle(track)}>
                       <Check size={16} className="player__tick" />
-                      {t.label}
-                      {t.burnIn && <span className="muted small"> · picture subtitles, heavy for the server</span>}
+                      {track.label}
+                      {track.burnIn && <span className="muted small"> · {t('picture subtitles, heavy for the server')}</span>}
                     </button>
                   ))}
                   {d?.detailHref && (
                     <Link className="player__link" to={`${d.detailHref}?sheet=subtitles`}>
-                      Find more subtitles…
+                      {t('Find more subtitles…')}
                     </Link>
                   )}
                 </div>
               </div>
             )}
           </div>
-          <button className="icon-btn" onClick={toggleFullscreen} aria-label={fullscreen ? 'Exit full screen' : 'Full screen'}>
+          <button className="icon-btn" onClick={toggleFullscreen} aria-label={fullscreen ? t('Exit full screen') : t('Full screen')}>
             {fullscreen ? <Minimize size={24} /> : <Maximize size={24} />}
           </button>
         </div>

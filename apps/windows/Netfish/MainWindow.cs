@@ -86,14 +86,15 @@ sealed class MainWindow : Form
         }
         catch (Exception error)
         {
-            MessageBox.Show(this, $"Netfish couldn't start: {error.Message}", "Netfish", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(this, L("Netfish couldn't start: {error}", ("error", error.Message)), "Netfish", MessageBoxButtons.OK, MessageBoxIcon.Error);
             Close();
         }
     }
 
     async Task CreateWebView()
     {
-        var options = new CoreWebView2EnvironmentOptions("--autoplay-policy=no-user-gesture-required");
+        // The interface follows navigator.language: the same language as Windows (and these messages).
+        var options = new CoreWebView2EnvironmentOptions("--autoplay-policy=no-user-gesture-required") { Language = Strings.Language };
         environment = await CoreWebView2Environment.CreateAsync(null, Path.Combine(AppData.Root, "WebView2"), options);
         controller = await environment.CreateCoreWebView2CompositionControllerAsync(Handle);
         // See-through where the page is transparent (during playback), so mpv's picture shows.
@@ -159,7 +160,7 @@ sealed class MainWindow : Form
         try { await CreateWebView(); }
         catch (Exception error)
         {
-            MessageBox.Show(this, $"Netfish's window stopped working ({error.Message}). Please open Netfish again.", "Netfish");
+            MessageBox.Show(this, L("Netfish's window stopped working ({error}). Please open Netfish again.", ("error", error.Message)), "Netfish");
             Close();
         }
     }
@@ -254,13 +255,13 @@ sealed class MainWindow : Form
         }
         var why = e.WebErrorStatus switch
         {
-            CoreWebView2WebErrorStatus.HostNameNotResolved => "address not found",
-            CoreWebView2WebErrorStatus.CannotConnect or CoreWebView2WebErrorStatus.ServerUnreachable => "nothing answered",
-            CoreWebView2WebErrorStatus.Timeout => "it took too long",
-            CoreWebView2WebErrorStatus.Disconnected => "this computer is offline",
+            CoreWebView2WebErrorStatus.HostNameNotResolved => L("address not found"),
+            CoreWebView2WebErrorStatus.CannotConnect or CoreWebView2WebErrorStatus.ServerUnreachable => L("nothing answered"),
+            CoreWebView2WebErrorStatus.Timeout => L("it took too long"),
+            CoreWebView2WebErrorStatus.Disconnected => L("this computer is offline"),
             var other => other.ToString(),
         };
-        ShowSetup($"Couldn't reach {Server.Url?.GetLeftPart(UriPartial.Authority) ?? "the server"} ({why}). Is it on?");
+        ShowSetup(L("Couldn't reach {server} ({why}). Is it on?", ("server", Server.Url?.GetLeftPart(UriPartial.Authority) ?? L("the server")), ("why", why)));
     }
 
     // confirm() / alert() from the pages.

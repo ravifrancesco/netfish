@@ -58,6 +58,8 @@ static class Native
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")] public static extern IntPtr SetWindowLongPtr(IntPtr hwnd, int index, IntPtr value);
     [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
     [DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint flags);
+    [DllImport("kernel32.dll")] public static extern ushort GetUserDefaultUILanguage();
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] public static extern int LCIDToLocaleName(uint locale, [Out] char[] name, int size, uint flags);
     [DllImport("dwmapi.dll")] public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
     public const int GWL_STYLE = -16;

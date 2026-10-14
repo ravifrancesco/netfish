@@ -7,6 +7,7 @@ import { authHeader } from '../clients/jellyfin';
 import { config } from '../config';
 import { cachedImage } from './imageCache';
 import { JF_PREFIX } from './images';
+import { t } from './i18n';
 
 /**
  * Jellyfin, read-only, behind the user's Netfish session: images, video
@@ -24,7 +25,7 @@ export function registerJellyfinProxy(app: FastifyInstance) {
     method: ['GET', 'HEAD'],
     url: `${JF_PREFIX}/*`,
     handler: async (req, reply) => {
-      if (!config.jellyfin.url) return reply.code(503).send({ error: 'Jellyfin is not connected yet' });
+      if (!config.jellyfin.url) return reply.code(503).send({ error: t('Jellyfin is not connected yet') });
       const rest = req.url.slice(JF_PREFIX.length);
 
       if (req.method === 'GET') {
@@ -60,7 +61,7 @@ export function registerJellyfinProxy(app: FastifyInstance) {
         });
         upstream.setTimeout(30_000, () => upstream.destroy(new Error('timed out')));
         upstream.on('error', (err) => {
-          if (!reply.sent) reply.code(502).send({ error: `Jellyfin is unreachable (${err.message})` });
+          if (!reply.sent) reply.code(502).send({ error: t('Jellyfin is unreachable ({reason})', { reason: err.message }) });
           resolve();
         });
         // Viewer seeked or closed the player: stop pulling the old byte range from the Pi.

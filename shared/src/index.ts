@@ -48,7 +48,7 @@ export interface AppConfig {
 
 // ---------- Connections (admin) ----------
 
-export type ServiceId = 'jellyfin' | 'seerr' | 'radarr' | 'sonarr' | 'bazarr' | 'qbittorrent' | 'mdblist';
+export type ServiceId = 'jellyfin' | 'seerr' | 'radarr' | 'sonarr' | 'bazarr' | 'qbittorrent' | 'mdblist' | 'trakt';
 
 /** What the admin sees for one service. Secrets are never sent back, only a hint. */
 export interface ServiceConnection {
@@ -65,6 +65,11 @@ export interface ServiceConnection {
   fixedUrl?: boolean;
   usesKey: boolean;
   usesLogin: boolean;
+  /** A second secret next to the key (Trakt's client secret), kept in `password`. */
+  usesSecret?: boolean;
+  /** What the service calls its key and secret, when not "API key". */
+  keyLabel?: string;
+  secretLabel?: string;
   hasKey: boolean;
   keyHint?: string;
   username?: string;
@@ -129,9 +134,42 @@ export interface HomeResponse {
 }
 
 export interface Person {
+  /** Their page is /person/<id>: a TMDB person id, or `jf-<id>` for someone only Jellyfin knows. */
+  id?: string;
   name: string;
   role?: string;
   photo?: string;
+}
+
+/** A person matching a search, e.g. a director or actor. */
+export interface PersonResult {
+  id: string;
+  name: string;
+  photo?: string;
+  /** A few of their best-known titles. */
+  knownFor?: string;
+}
+
+export type CreditKind = 'directed' | 'acted' | 'written' | 'created';
+
+export interface SearchResponse {
+  items: Card[];
+  people: PersonResult[];
+  /** When the search is clearly a person's name: their films and shows, ahead of everything else. */
+  person?: { id: string; name: string; kind: CreditKind; title: string; items: Card[] };
+}
+
+export interface PersonDetail {
+  id: string;
+  name: string;
+  photo?: string;
+  biography?: string;
+  /** "Directing", "Acting"…, in the viewer's language. */
+  knownFor?: string;
+  born?: string;
+  died?: string;
+  birthplace?: string;
+  sections: Array<{ kind: CreditKind; title: string; items: Card[] }>;
 }
 
 /** An audio or subtitle track that already exists in the library file(s). */
@@ -493,6 +531,22 @@ export interface NativePlayRequest {
   /** Subtitle files the player loads besides the video (sidecar files, or all of them for HLS), as WebVTT. */
   externalSubtitles: { url: string; label: string; language?: string }[];
   segments: MediaSegment[];
+}
+
+/** The one Trakt account the whole server sends watches to and takes recommendations from. */
+export interface TraktStatus {
+  /** Client ID and secret are saved in Connections. */
+  configured: boolean;
+  linked: boolean;
+  username?: string;
+  /** Send what everyone watches to Trakt. */
+  scrobble: boolean;
+  /** Linking in progress: enter `userCode` at `verificationUrl`. */
+  pending?: { userCode: string; verificationUrl: string; expiresAt: string };
+  /** Why the last link attempt ended, if it didn't work. */
+  linkError?: string;
+  lastScrobble?: { title: string; at: string };
+  import?: { running: boolean; added?: number; alreadyThere?: number; notFound?: number; at?: string; error?: string };
 }
 
 export interface ProgressReport {

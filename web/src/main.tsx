@@ -7,6 +7,9 @@ import './styles.css';
 import { ApiError } from './api';
 import { App } from './App';
 import { isTV, startTV } from './lib/tv';
+import { language } from './i18n';
+
+document.documentElement.lang = language;
 
 const queryClient = new QueryClient({
   defaultOptions: {

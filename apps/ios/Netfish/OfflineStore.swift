@@ -170,7 +170,7 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
         request.httpShouldHandleCookies = false
         request.setValue(cookie, forHTTPHeaderField: "Cookie")
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { throw Problem("HTTP error") }
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { throw Problem(L("HTTP error")) }
         try data.write(to: file, options: .atomic)
         return http.value(forHTTPHeaderField: "Content-Type") ?? ""
     }
@@ -179,9 +179,9 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
     @MainActor
     func start(_ d: [String: Any]) async throws -> [[String: Any]] {
         guard let itemId = d["itemId"] as? String, let fileName = d["fileName"] as? String, let path = d["url"] as? String else {
-            throw Problem(d["error"] as? String ?? "The server didn't say what to download")
+            throw Problem(d["error"] as? String ?? L("The server didn't say what to download"))
         }
-        guard let origin = Server.url else { throw Problem("Not connected to a Netfish server") }
+        guard let origin = Server.url else { throw Problem(L("Not connected to a Netfish server")) }
         if let existing = entry(itemId), existing.state == "done" || existing.state == "downloading" { return publicList() }
 
         let kind = d["kind"] as? String ?? "Movie"
@@ -221,10 +221,10 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
             let code = sub["code"] as? String
             let name = "\(base).\(code ?? "track\(n)").\(n).vtt"
             if (try? await fetch(url, cookie: cookie, to: dir.appendingPathComponent(name))) != nil {
-                entry.subtitles.append(Subtitle(label: sub["label"] as? String ?? "Subtitles", code: code, file: "\(folder)/\(name)"))
+                entry.subtitles.append(Subtitle(label: sub["label"] as? String ?? L("Subtitles"), code: code, file: "\(folder)/\(name)"))
             }
         }
-        guard let url = URL(string: origin.absoluteString + path) else { throw Problem("Bad download address") }
+        guard let url = URL(string: origin.absoluteString + path) else { throw Problem(L("Bad download address")) }
         var request = URLRequest(url: url)
         request.httpShouldHandleCookies = false
         request.setValue(cookie, forHTTPHeaderField: "Cookie")
@@ -245,7 +245,7 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
     @MainActor
     func retry(_ itemId: String) async throws -> [[String: Any]] {
         guard let e = entry(itemId), let data = e.source.data(using: .utf8),
-              let d = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw Problem("Nothing to retry") }
+              let d = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw Problem(L("Nothing to retry")) }
         if let i = entries.firstIndex(where: { $0.itemId == itemId }) { entries[i].state = "failed" }
         return try await start(d)
     }
@@ -314,7 +314,7 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
         let status = (downloadTask.response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else {
             entries[i].state = "failed"
-            entries[i].error = status == 401 ? "Sign in to Netfish again, then retry." : "The server said no (\(status))."
+            entries[i].error = status == 401 ? L("Sign in to Netfish again, then retry.") : L("The server said no ({status}).", ["status": String(status)])
             return
         }
         // The temporary file disappears when this returns: move it now.
@@ -330,7 +330,7 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
             entries[i].error = nil
         } catch {
             entries[i].state = "failed"
-            entries[i].error = "Couldn't save the file: \(error.localizedDescription)"
+            entries[i].error = L("Couldn't save the file: {error}", ["error": error.localizedDescription])
         }
         save()
         broadcast(now: true)
@@ -341,7 +341,7 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
         if (error as NSError).code == NSURLErrorCancelled, entries[i].state != "downloading" { return }
         if entries[i].state == "done" { return }
         entries[i].state = (error as NSError).code == NSURLErrorCancelled ? "interrupted" : "failed"
-        entries[i].error = "The download stopped. Try again when you're on your home network."
+        entries[i].error = L("The download stopped. Try again when you're on your home network.")
         save()
         broadcast(now: true)
     }

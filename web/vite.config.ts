@@ -18,7 +18,10 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    target: 'es2022',
+    // TV browsers lag behind: Samsung TVs from 2022 run Chromium 85, so code and CSS are
+    // written down to that (e.g. "inset" becomes top/right/bottom/left).
+    target: ['chrome85', 'safari15', 'firefox100', 'edge88'],
+    cssTarget: ['chrome85', 'safari15', 'firefox100', 'edge88'],
     chunkSizeWarningLimit: 900,
   },
 });

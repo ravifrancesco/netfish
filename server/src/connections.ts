@@ -5,6 +5,8 @@ import type { ConnectionTest, ServiceConnection, ServiceConnectionUpdate, Servic
 import { config } from './config';
 import { writeJson } from './lib/storage';
 import { HttpError, request } from './lib/upstream';
+import { t } from './lib/i18n';
+import { traktCheck } from './clients/trakt';
 
 /**
  * Service addresses and API keys, editable by admins in the app. The stack's
@@ -30,6 +32,9 @@ interface Meta {
   fixedUrl?: boolean;
   usesKey: boolean;
   usesLogin?: boolean;
+  usesSecret?: boolean;
+  keyLabel?: string;
+  secretLabel?: string;
 }
 
 export const SERVICES: Record<ServiceId, Meta> = {
@@ -84,6 +89,17 @@ export const SERVICES: Record<ServiceId, Meta> = {
     fixedUrl: true,
     usesKey: true,
   },
+  trakt: {
+    name: 'Trakt',
+    purpose: 'Recommendations and a watch history for the server (optional)',
+    keyHelp:
+      'Needs Trakt VIP: Trakt only lets VIP accounts create API apps. On trakt.tv open Settings → Your API Apps → New Application, give it any name and the redirect URI urn:ietf:wg:oauth:2.0:oob, and save. Paste its Client ID and Client Secret here, then link the account below.',
+    fixedUrl: true,
+    usesKey: true,
+    usesSecret: true,
+    keyLabel: 'Client ID',
+    secretLabel: 'Client secret',
+  },
 };
 
 const IDS = Object.keys(SERVICES) as ServiceId[];
@@ -118,10 +134,8 @@ function apply() {
     const target = live(id);
     if (!SERVICES[id].fixedUrl) target.url = value.url || undefined;
     if ('apiKey' in target || SERVICES[id].usesKey) target.apiKey = value.apiKey || undefined;
-    if (SERVICES[id].usesLogin) {
-      target.username = value.username || undefined;
-      target.password = value.password || undefined;
-    }
+    if (SERVICES[id].usesLogin) target.username = value.username || undefined;
+    if (SERVICES[id].usesLogin || SERVICES[id].usesSecret) target.password = value.password || undefined;
   }
 }
 apply();
@@ -144,7 +158,7 @@ export function normalizeUrl(input: string | undefined): string | undefined {
   try {
     url = new URL(withScheme);
   } catch {
-    throw new HttpError(400, `"${value}" isn't a valid address`);
+    throw new HttpError(400, t('"{value}" isn\'t a valid address', { value }));
   }
   return `${url.origin}${url.pathname}`.replace(/\/+$/, '');
 }
@@ -159,14 +173,17 @@ export function listConnections(): ServiceConnection[] {
     return {
       id,
       name: meta.name,
-      purpose: meta.purpose,
-      keyHelp: meta.keyHelp,
+      purpose: t(meta.purpose),
+      keyHelp: meta.keyHelp && t(meta.keyHelp),
       required: Boolean(meta.required),
       url: meta.fixedUrl ? undefined : value.url,
       defaultUrl: meta.defaultUrl,
       fixedUrl: meta.fixedUrl,
       usesKey: meta.usesKey,
       usesLogin: Boolean(meta.usesLogin),
+      usesSecret: meta.usesSecret,
+      keyLabel: meta.keyLabel && t(meta.keyLabel),
+      secretLabel: meta.secretLabel && t(meta.secretLabel),
       hasKey: Boolean(value.apiKey),
       keyHint: hint(value.apiKey),
       username: value.username,
@@ -177,7 +194,7 @@ export function listConnections(): ServiceConnection[] {
 }
 
 function requireId(id: string): ServiceId {
-  if (!IDS.includes(id as ServiceId)) throw new HttpError(404, `Unknown service "${id}"`);
+  if (!IDS.includes(id as ServiceId)) throw new HttpError(404, t('Unknown service "{id}"', { id }));
   return id as ServiceId;
 }
 
@@ -196,7 +213,7 @@ function candidate(id: ServiceId, update: ServiceConnectionUpdate): Live {
 export function updateConnection(rawId: string, update: ServiceConnectionUpdate = {}): ServiceConnection {
   const id = requireId(rawId);
   const next = candidate(id, update);
-  if (id === 'jellyfin' && !next.url) throw new HttpError(400, 'Jellyfin needs an address: Netfish signs people in through it');
+  if (id === 'jellyfin' && !next.url) throw new HttpError(400, t('Jellyfin needs an address: Netfish signs people in through it'));
   const previous = saved;
   saved = { ...saved, [id]: { url: SERVICES[id].fixedUrl ? undefined : next.url, apiKey: next.apiKey, username: next.username, password: next.password } };
   try {
@@ -230,32 +247,32 @@ export function resetConnection(rawId: string): ServiceConnection {
 
 async function probe(id: ServiceId, c: Live): Promise<ConnectionTest> {
   const meta = SERVICES[id];
-  if (!meta.fixedUrl && !c.url) return { ok: false, error: 'Add an address first' };
+  if (!meta.fixedUrl && !c.url) return { ok: false, error: t('Add an address first') };
   const key = c.apiKey ?? '';
   switch (id) {
     case 'jellyfin': {
       const info = await request<{ ServerName: string; Version: string }>('Jellyfin', c.url!, '/System/Info/Public', { timeoutMs: 6000 });
       if (key) await request('Jellyfin', c.url!, '/System/Info', { headers: { authorization: `MediaBrowser Token="${key}"` }, timeoutMs: 6000 });
-      return { ok: true, version: info.Version, detail: `${info.ServerName}${key ? ' · API key accepted' : ''}` };
+      return { ok: true, version: info.Version, detail: `${info.ServerName}${key ? ` · ${t('API key accepted')}` : ''}` };
     }
     case 'seerr': {
-      if (!key) return { ok: false, error: 'Add the API key' };
+      if (!key) return { ok: false, error: t('Add the API key') };
       const status = await request<{ version: string }>('Seerr', `${c.url}/api/v1`, '/status', { headers: { 'x-api-key': key }, timeoutMs: 6000 });
       await request('Seerr', `${c.url}/api/v1`, '/auth/me', { headers: { 'x-api-key': key }, timeoutMs: 6000 });
       return { ok: true, version: status.version };
     }
     case 'radarr':
     case 'sonarr': {
-      if (!key) return { ok: false, error: 'Add the API key' };
+      if (!key) return { ok: false, error: t('Add the API key') };
       const status = await request<{ version: string; appName?: string }>(meta.name, `${c.url}/api/v3`, '/system/status', {
         headers: { 'x-api-key': key },
         timeoutMs: 6000,
       });
-      if (status.appName && status.appName.toLowerCase() !== id) return { ok: false, error: `That address is ${status.appName}, not ${meta.name}` };
+      if (status.appName && status.appName.toLowerCase() !== id) return { ok: false, error: t('That address is {app}, not {name}', { app: status.appName, name: meta.name }) };
       return { ok: true, version: status.version };
     }
     case 'bazarr': {
-      if (!key) return { ok: false, error: 'Add the API key' };
+      if (!key) return { ok: false, error: t('Add the API key') };
       const status = await request<{ data?: { bazarr_version?: string } }>('Bazarr', `${c.url}/api`, '/system/status', {
         headers: { 'x-api-key': key },
         timeoutMs: 6000,
@@ -271,20 +288,25 @@ async function probe(id: ServiceId, c: Live): Promise<ConnectionTest> {
           signal: AbortSignal.timeout(6000),
         });
         cookie = res.headers.get('set-cookie')?.split(';')[0] ?? '';
-        if (!res.ok || !cookie) return { ok: false, error: 'Wrong username or password' };
+        if (!res.ok || !cookie) return { ok: false, error: t('Wrong username or password') };
       }
       const res = await fetch(`${c.url}/api/v2/app/version`, { headers: cookie ? { cookie } : {}, signal: AbortSignal.timeout(6000) });
-      if (res.status === 403) return { ok: false, error: 'qBittorrent wants a username and password' };
-      if (!res.ok) return { ok: false, error: `qBittorrent answered ${res.status}` };
+      if (res.status === 403) return { ok: false, error: t('qBittorrent wants a username and password') };
+      if (!res.ok) return { ok: false, error: t('qBittorrent answered {status}', { status: res.status }) };
       return { ok: true, version: await res.text() };
     }
     case 'mdblist': {
-      if (!key) return { ok: false, error: 'Add the API key' };
+      if (!key) return { ok: false, error: t('Add the API key') };
       const me = await request<{ api_requests?: number; api_requests_count?: number }>('MDBList', config.mdblist.url, '/user', {
         query: { apikey: key },
         timeoutMs: 8000,
       });
       return { ok: true, detail: me.api_requests ? `${me.api_requests_count ?? 0} of ${me.api_requests} lookups used today` : undefined };
+    }
+    case 'trakt': {
+      if (!key) return { ok: false, error: t('Add the Client ID') };
+      if (!c.password) return { ok: false, error: t('Add the Client secret') };
+      return traktCheck(key, c.password);
     }
   }
 }
@@ -295,7 +317,8 @@ export async function testConnection(rawId: string, update?: ServiceConnectionUp
     return await probe(id, update ? candidate(id, update) : live(id));
   } catch (err) {
     const e = err as Error & { status?: number };
-    const message = e.status === 401 || e.status === 403 ? `${SERVICES[id].name} rejected the API key` : e.message;
+    const rejected = id === 'trakt' ? t('{name} rejected the Client ID', { name: SERVICES[id].name }) : t('{name} rejected the API key', { name: SERVICES[id].name });
+    const message = e.status === 401 || e.status === 403 ? rejected : e.message;
     return { ok: false, error: message };
   }
 }

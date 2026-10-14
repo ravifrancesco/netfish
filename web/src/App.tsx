@@ -11,10 +11,12 @@ import ActivityPage from './pages/Activity';
 import Browse from './pages/Browse';
 import Home from './pages/Home';
 import Login from './pages/Login';
+import PersonPage from './pages/Person';
 import Search from './pages/Search';
 import Settings from './pages/Settings';
 import Setup from './pages/Setup';
 import Title from './pages/Title';
+import { t } from './i18n';
 
 // The player pulls in hls.js; only load it when someone presses play.
 const Watch = lazy(() => import('./pages/Watch'));
@@ -51,6 +53,7 @@ function Shell({ user }: { user: NonNullable<ReturnType<typeof useMe>['data']> }
             <Route path="/shows" element={<Browse key="tv" mediaType="tv" />} />
             <Route path="/search" element={<Search />} />
             <Route path="/title/:type/:id" element={<Title />} />
+            <Route path="/person/:id" element={<PersonPage />} />
             <Route path="/activity" element={<ActivityPage />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/watch/:itemId" element={<Watch />} />
@@ -87,9 +90,9 @@ export function App() {
           <Shell user={me.data} />
         ) : (
           <div className="page container empty">
-            <p>{(me.error as Error)?.message ?? "Can't reach the Netfish server."}</p>
+            <p>{(me.error as Error)?.message ?? t("Can't reach the Netfish server.")}</p>
             <button className="btn btn--ghost" onClick={() => void me.refetch()}>
-              Try again
+              {t('Try again')}
             </button>
           </div>
         ))}

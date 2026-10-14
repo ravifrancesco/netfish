@@ -1,9 +1,9 @@
 /**
  * Local stand-in for the whole Pi stack (Jellyfin, Seerr, Radarr, Sonarr,
- * Bazarr, qBittorrent) so Netfish can be developed and demoed anywhere.
+ * Bazarr, qBittorrent, Trakt) so Netfish can be developed and demoed anywhere.
  *
  *   npm run dev:mock      → mock on :7700, Netfish API on :7777, web on :5173
- *   sign in as demo/demo (regular user) or admin/admin
+ *   sign in as demo/demo or sam/sam (regular users) or admin/admin
  *
  * Only the endpoints Netfish uses are implemented, with the same shapes as the
  * real services (checked against their source).
@@ -161,7 +161,7 @@ function dto(item: Item, userId?: string, full = false): Record<string, unknown>
         Overview: t.overview, Genres: t.genres, CommunityRating: t.rating, OfficialRating: 'PG-13', RunTimeTicks: RUNTIME_TICKS,
         ProviderIds: { Tmdb: String(t.tmdbId) }, ImageTags: { Primary: 'p1', Thumb: 't1' }, BackdropImageTags: ['b1'],
         DateCreated: date(titleAdded(t)), UserData: userDataDto(userId, item), Taglines: [],
-        People: [{ Id: crypto.createHash('md5').update(`p-${t.n}`).digest('hex'), Name: 'Mock Director', Type: 'Director' }],
+        People: jfPeople(t),
         ...(full ? { MediaStreams: streamsFor(item), MediaSources: [{ Id: item.id, Container: containerOf(item), Size: SAMPLE_SIZE, Bitrate: 400_000, MediaStreams: streamsFor(item) }] } : {}),
       };
     case 'series':
@@ -169,7 +169,7 @@ function dto(item: Item, userId?: string, full = false): Record<string, unknown>
         Id: item.id, Name: t.title, Type: 'Series', ProductionYear: t.year, PremiereDate: `${t.year}-01-15T00:00:00.0000000Z`,
         Overview: t.overview, Genres: t.genres, CommunityRating: t.rating, OfficialRating: 'TV-14',
         ProviderIds: { Tmdb: String(t.tmdbId), Tvdb: String(t.tvdbId) }, ImageTags: { Primary: 'p1' }, BackdropImageTags: ['b1'],
-        DateCreated: date(titleAdded(t)), UserData: userDataDto(userId, item),
+        DateCreated: date(titleAdded(t)), UserData: userDataDto(userId, item), People: jfPeople(t),
       };
     case 'season':
       return { Id: item.id, Name: `Season ${item.s}`, Type: 'Season', IndexNumber: item.s, SeriesId: seriesId, SeriesName: t.title, ImageTags: { Primary: 'p1' } };
@@ -184,6 +184,15 @@ function dto(item: Item, userId?: string, full = false): Record<string, unknown>
       };
   }
 }
+
+function jfPeople(t: Title) {
+  const lead = t.type === 'movie' ? { name: directorOf(t), type: 'Director' } : { name: creatorOf(t), type: 'Writer' };
+  return [
+    { Id: jfPersonId(lead.name), Name: lead.name, Type: lead.type, PrimaryImageTag: 'a1' },
+    ...castFor(t).slice(0, 6).map((c) => ({ Id: jfPersonId(c.name), Name: c.name, Role: c.character, Type: 'Actor', PrimaryImageTag: 'a1' })),
+  ];
+}
+const jfPerson = (name: string) => ({ Id: jfPersonId(name), Name: name, Type: 'Person', ImageTags: { Primary: 'a1' }, Overview: `${name}, as Jellyfin knows them.` });
 
 const result = (items: Item[], userId?: string, start = 0, limit?: number) => ({
   Items: items.slice(start, limit !== undefined ? start + limit : undefined).map((i) => dto(i, userId)),
@@ -228,6 +237,9 @@ void app.register(
       const u = jfUser(req)!;
       return { Id: u.id, Name: u.name, PrimaryImageTag: 'a1', Policy: { IsAdministrator: u.admin } };
     });
+    jf.get('/Users', async (req, reply) =>
+      jfUser(req)?.admin ? USERS.map((u) => ({ Id: u.id, Name: u.name, Policy: { IsAdministrator: u.admin } })) : reply.code(403).send(),
+    );
     jf.post('/Sessions/Logout', async (req, reply) => {
       sessions.delete(jfToken(req) ?? '');
       return reply.code(204).send();
@@ -245,8 +257,14 @@ void app.register(
         if (t.type === 'tv' && types.includes('Episode')) items.push(...libraryEpisodes(t));
       }
       if (q.searchTerm) items = items.filter((i) => i.title.title.toLowerCase().includes(q.searchTerm!.toLowerCase()));
+      if (q.personIds) {
+        const types = q.personTypes?.split(',');
+        items = items.filter((i) => jfPeople(i.title).some((p) => q.personIds!.split(',').includes(p.Id) && (!types || types.includes(p.Type))));
+      }
       if (userId && q.filters?.includes('IsPlayed')) items = items.filter((i) => (dto(i, userId).UserData as { Played?: boolean })?.Played);
       if (userId && q.filters?.includes('IsUnplayed')) items = items.filter((i) => !(dto(i, userId).UserData as { Played?: boolean })?.Played);
+      if (userId && q.filters?.includes('IsResumable')) items = items.filter((i) => i.kind !== 'series' && ud(userId, i.id).pos > 0 && !ud(userId, i.id).played);
+      if (q.ids) items = items.filter((i) => q.ids!.split(',').includes(i.id));
       const sort = (q.sortBy ?? 'SortName').split(',')[0];
       const key = (i: Item): number | string => {
         switch (sort) {
@@ -270,7 +288,15 @@ void app.register(
       return result(items, userId, Number(q.startIndex ?? 0), q.limit ? Number(q.limit) : undefined);
     });
 
+    jf.get<{ Querystring: Q }>('/Persons', async (req) => {
+      const term = (req.query.searchTerm ?? '').toLowerCase();
+      const inLib = new Set(TITLES.filter(inLibrary).flatMap((t) => jfPeople(t).map((p) => p.Name)));
+      const found = [...inLib].filter((name) => name.toLowerCase().includes(term)).map(jfPerson);
+      return { Items: found.slice(0, Number(req.query.limit ?? 100)), TotalRecordCount: found.length };
+    });
     jf.get<{ Params: { id: string }; Querystring: Q }>('/Items/:id', async (req, reply) => {
+      const person = jfPersonName(req.params.id);
+      if (person) return jfPerson(person);
       const item = itemsById.get(req.params.id);
       if (!item) return reply.code(404).send();
       return dto(item, req.query.userId, true);
@@ -314,7 +340,7 @@ void app.register(
       await new Promise((r) => setTimeout(r, 250)); // a Pi resizing artwork isn't instant
       reply.header('content-type', 'image/svg+xml').header('cache-control', 'public, max-age=3600');
       const item = itemsById.get(req.params.id);
-      if (!item) return svg.avatar('?');
+      if (!item) return svg.avatar(jfPersonName(req.params.id) ?? '?');
       const t = item.title;
       if (item.kind === 'episode') return svg.still(t.title, `S${item.s} · E${item.e}`);
       if (req.params.type === 'Backdrop' || req.params.type === 'Thumb') return svg.backdrop(t.title);
@@ -437,11 +463,17 @@ function mediaInfo(t: Title) {
   };
 }
 
+const GENRE_IDS: Record<string, number> = {
+  Action: 28, Adventure: 12, Animation: 16, Comedy: 35, Crime: 80, Documentary: 99, Drama: 18, Family: 10751, Fantasy: 14,
+  Horror: 27, Mystery: 9648, Romance: 10749, 'Science Fiction': 878, Thriller: 53, War: 10752, Western: 37,
+};
+const genreIds = (t: Title) => t.genres.map((name) => GENRE_IDS[name] ?? 0);
+
 function resultDto(t: Title) {
   const date = `${t.year}-06-01`;
   return {
     id: t.tmdbId, mediaType: t.type, posterPath: img('poster', t), backdropPath: img('backdrop', t), overview: t.overview,
-    voteAverage: t.rating, originalLanguage: t.lang, mediaInfo: mediaInfo(t),
+    voteAverage: t.rating, voteCount: 150 + ((t.n * 97) % 900), popularity: t.rating * 4, genreIds: genreIds(t), originalLanguage: t.lang, mediaInfo: mediaInfo(t),
     ...(t.type === 'movie' ? { title: t.title, releaseDate: date } : { name: t.title, firstAirDate: date }),
   };
 }
@@ -455,8 +487,51 @@ const LAST = ['Marlin', 'Waters', 'Gill', 'Coral', 'Fisher', 'Reed', 'Shore', 'T
 const castFor = (t: Title) =>
   Array.from({ length: 10 }, (_, i) => {
     const name = `${FIRST[(t.n * 3 + i * 5) % FIRST.length]} ${LAST[(t.n + i * 7) % LAST.length]}`;
-    return { name, character: i === 0 ? 'The Lead' : `Character ${i + 1}`, profilePath: `/profile-${encodeURIComponent(name)}.jpg`, order: i };
+    return { id: personId(name), name, character: i === 0 ? 'The Lead' : `Character ${i + 1}`, profilePath: profileOf(name), order: i };
   });
+
+// People: a handful of directors, show creators and the actors above, each with a filmography.
+const DIRECTORS = ['Greta Marlin', 'Hiro Waters', 'Ines Coral', 'Jonah Pike'];
+const directorOf = (t: Title) => DIRECTORS[t.n % DIRECTORS.length];
+const creatorOf = (t: Title) => `${FIRST[t.n % FIRST.length]} ${LAST[(t.n + 3) % LAST.length]}`;
+const profileOf = (name: string) => `/profile-${encodeURIComponent(name)}.jpg`;
+let peopleIds: Map<string, number> | undefined;
+function people(): Map<string, number> {
+  if (peopleIds) return peopleIds;
+  peopleIds = new Map();
+  const add = (name: string) => peopleIds!.has(name) || peopleIds!.set(name, 7001 + peopleIds!.size);
+  for (const t of TITLES) {
+    if (t.type === 'movie') add(directorOf(t));
+    else add(creatorOf(t));
+  }
+  for (const t of TITLES) for (let i = 0; i < 10; i++) add(`${FIRST[(t.n * 3 + i * 5) % FIRST.length]} ${LAST[(t.n + i * 7) % LAST.length]}`);
+  return peopleIds;
+}
+const personId = (name: string) => people().get(name)!;
+const personName = (id: number) => [...people()].find(([, n]) => n === id)?.[0];
+const jfPersonId = (name: string) => crypto.createHash('md5').update(`person-${name}`).digest('hex');
+const jfPersonName = (id: string) => [...people().keys()].find((name) => jfPersonId(name) === id);
+function creditsOf(name: string) {
+  const votes = (t: Title) => ({ voteCount: Math.round(t.rating * 300) + t.n, popularity: t.rating * 3, genreIds: [] as number[] });
+  const cast: object[] = [];
+  const crew: object[] = [];
+  for (const t of TITLES) {
+    const role = castFor(t).find((c) => c.name === name);
+    if (role) cast.push({ ...resultDto(t), ...votes(t), character: role.character });
+    if (t.type === 'movie' && directorOf(t) === name) {
+      crew.push({ ...resultDto(t), ...votes(t), job: 'Director', department: 'Directing' });
+      crew.push({ ...resultDto(t), ...votes(t), job: 'Screenplay', department: 'Writing' });
+    }
+    if (t.type === 'tv' && creatorOf(t) === name) crew.push({ ...resultDto(t), ...votes(t), job: 'Creator', department: 'Writing' });
+  }
+  return { cast, crew };
+}
+const departmentOf = (name: string) => (DIRECTORS.includes(name) ? 'Directing' : TITLES.some((t) => t.type === 'tv' && creatorOf(t) === name) ? 'Writing' : 'Acting');
+const personSearch = (query: string) =>
+  [...people().keys()]
+    .filter((name) => name.toLowerCase().includes(query.toLowerCase()))
+    .map((name) => ({ name, credits: creditsOf(name) }))
+    .sort((a, b) => b.credits.cast.length + b.credits.crew.length - (a.credits.cast.length + a.credits.crew.length));
 
 void app.register(
   async (s) => {
@@ -466,7 +541,28 @@ void app.register(
     });
     s.get('/status', async () => ({ version: '3.2.0-mock' }));
     s.get('/auth/me', async () => ({ id: 1, displayName: 'admin' }));
-    s.get<{ Querystring: Q }>('/search', async (req) => page(TITLES.filter((t) => t.title.toLowerCase().includes((req.query.query ?? '').toLowerCase()))));
+    s.get<{ Querystring: Q }>('/search', async (req) => {
+      const query = (req.query.query ?? '').trim();
+      const titles = page(TITLES.filter((t) => t.title.toLowerCase().includes(query.toLowerCase())));
+      const found = query.length >= 2 ? personSearch(query) : [];
+      const persons = found.map(({ name, credits }) => ({
+        id: personId(name), mediaType: 'person', name, profilePath: profileOf(name), popularity: credits.cast.length + credits.crew.length, adult: false,
+        knownFor: [...credits.crew, ...credits.cast].slice(0, 3),
+      }));
+      return { ...titles, totalResults: titles.totalResults + persons.length, results: [...titles.results, ...persons] };
+    });
+    s.get<{ Params: { id: string } }>('/person/:id', async (req, reply) => {
+      const name = personName(Number(req.params.id));
+      if (!name) return reply.code(404).send({ message: 'Unable to retrieve person.' });
+      return {
+        id: Number(req.params.id), name, profilePath: profileOf(name), knownForDepartment: departmentOf(name), birthday: '1975-03-02', deathday: null,
+        placeOfBirth: 'Genoa, Italy', biography: `${name} has spent a career near water: ${departmentOf(name).toLowerCase()} stories about the sea, rivers and the people who fish them.`,
+      };
+    });
+    s.get<{ Params: { id: string } }>('/person/:id/combined_credits', async (req, reply) => {
+      const name = personName(Number(req.params.id));
+      return name ? { id: Number(req.params.id), ...creditsOf(name) } : reply.code(404).send({ message: 'Unable to retrieve combined credits.' });
+    });
     s.get('/discover/trending', async () => page(shuffle(TITLES.filter((t) => t.year >= 2022), new Date().toDateString()).slice(0, 20)));
     s.get('/discover/movies', async () => page(TITLES.filter((t) => t.type === 'movie' && t.year < 2026).sort((a, b) => b.rating - a.rating)));
     s.get('/discover/tv', async () => page(TITLES.filter((t) => t.type === 'tv').sort((a, b) => b.rating - a.rating)));
@@ -476,10 +572,14 @@ void app.register(
     const detail = (type: 'movie' | 'tv') => async (req: FastifyRequest<{ Params: { id: string } }>, reply: import('fastify').FastifyReply) => {
       const t = titleByTmdb.get(`${type}-${req.params.id}`);
       if (!t) return reply.code(404).send({ message: 'Unable to retrieve' });
-      const credits = { cast: castFor(t), crew: [{ name: `${LAST[t.n % LAST.length]} Director`, job: 'Director' }] };
+      const director = directorOf(t);
+      const credits = {
+        cast: castFor(t),
+        crew: type === 'movie' ? [{ id: personId(director), name: director, job: 'Director', department: 'Directing' }, { id: personId(director), name: director, job: 'Screenplay', department: 'Writing' }] : [],
+      };
       const common = {
         id: t.tmdbId, overview: t.overview, posterPath: img('poster', t), backdropPath: img('backdrop', t), voteAverage: t.rating,
-        genres: t.genres.map((name, i) => ({ id: i, name })), originalLanguage: t.lang, credits, mediaInfo: mediaInfo(t),
+        genres: t.genres.map((name) => ({ id: GENRE_IDS[name] ?? 0, name })), originalLanguage: t.lang, credits, mediaInfo: mediaInfo(t),
         // Blender's open-licensed Big Buck Bunny stands in for every trailer.
         relatedVideos: [{ site: 'YouTube', key: 'aqz-KE-bpKQ', type: 'Trailer', name: 'Official Trailer' }],
         tagline: t.n % 3 === 0 ? 'The ocean keeps its secrets.' : '',
@@ -489,7 +589,7 @@ void app.register(
       }
       return {
         ...common, name: t.title, originalName: t.title, firstAirDate: `${t.year}-01-15`, episodeRunTime: [48], numberOfSeasons: t.seasons,
-        createdBy: [{ name: `${FIRST[t.n % FIRST.length]} ${LAST[(t.n + 3) % LAST.length]}` }], networks: [{ name: 'Mock+' }],
+        createdBy: [{ id: personId(creatorOf(t)), name: creatorOf(t) }], networks: [{ name: 'Mock+' }],
         contentRatings: { results: [{ iso_3166_1: 'US', rating: 'TV-14' }] }, externalIds: { tvdbId: t.tvdbId, imdbId: `tt${9100000 + t.n}` },
         seasons: Array.from({ length: t.seasons }, (_, i) => ({ id: t.tmdbId * 10 + i, seasonNumber: i + 1, name: `Season ${i + 1}`, episodeCount: EPISODES_PER_SEASON, airDate: `${t.year + i}-01-15`, posterPath: `/poster-season-${t.tmdbId}-${i + 1}.jpg` })),
       };
@@ -806,6 +906,144 @@ app.get<{ Params: { type: string; id: string }; Querystring: Q }>('/mdblist/tmdb
 });
 
 // ======================================================================
+// Trakt (the server's one linked account). Client ID "mock", secret "mock".
+// A device code is "entered" by itself after three checks.
+// ======================================================================
+
+const traktState = {
+  codes: new Map<string, { userCode: string; checks: number; used: boolean }>(),
+  access: new Set<string>(),
+  refresh: new Set<string>(),
+  movies: new Map<number, string>(),
+  episodes: new Map<string, string>(),
+  scrobbles: [] as Array<{ action: string; progress: number; what: string; at: string }>,
+};
+const traktIds = (t: Title) => ({ trakt: t.n, slug: t.title.toLowerCase().replace(/\W+/g, '-'), tmdb: t.tmdbId, imdb: `tt${(t.type === 'movie' ? 9000000 : 9100000) + t.n}`, ...(t.type === 'tv' ? { tvdb: t.tvdbId } : {}) });
+const traktTokens = () => {
+  const access = crypto.randomBytes(16).toString('hex');
+  const refresh = crypto.randomBytes(16).toString('hex');
+  traktState.access.add(access);
+  traktState.refresh.add(refresh);
+  return { access_token: access, refresh_token: refresh, expires_in: 86400, created_at: Math.floor(Date.now() / 1000), token_type: 'bearer', scope: 'public' };
+};
+type TraktBody = Record<string, unknown> & { client_id?: string; client_secret?: string };
+type TraktShowBody = { ids: { tmdb?: number; tvdb?: number }; seasons?: Array<{ number: number; episodes: Array<{ number: number; watched_at?: string }> }> };
+const traktShow = (ids: { tmdb?: number; tvdb?: number }) => TITLES.find((t) => t.type === 'tv' && (t.tmdbId === ids.tmdb || t.tvdbId === ids.tvdb));
+
+void app.register(
+  async (tr) => {
+    tr.addHook('preHandler', async (req, reply) => {
+      const body = (req.body ?? {}) as TraktBody;
+      if (req.url.includes('/oauth/')) {
+        if (body.client_id !== API_KEY) return reply.code(401).send({ error: 'invalid_client', error_description: 'Client authentication failed' });
+        if (!req.url.includes('/device/code') && body.client_secret !== API_KEY) return reply.code(401).send({ error: 'invalid_client', error_description: 'Client authentication failed' });
+        return;
+      }
+      if (req.headers['trakt-api-key'] !== API_KEY) return reply.code(403).send({ error: 'Invalid API key or unapproved app' });
+      if (req.url.includes('/trending')) return;
+      const token = req.headers.authorization?.replace(/^Bearer /, '') ?? '';
+      if (!traktState.access.has(token)) return reply.code(401).send({ error: 'invalid_token' });
+    });
+    tr.get('/movies/trending', async () => TITLES.filter((t) => t.type === 'movie').slice(0, 1).map((t) => ({ watchers: 3, movie: { title: t.title, year: t.year, ids: traktIds(t) } })));
+
+    tr.post('/oauth/device/code', async () => {
+      const deviceCode = crypto.randomBytes(16).toString('hex');
+      const userCode = crypto.randomBytes(4).toString('hex').toUpperCase();
+      traktState.codes.set(deviceCode, { userCode, checks: 0, used: false });
+      return { device_code: deviceCode, user_code: userCode, verification_url: 'https://trakt.tv/activate', expires_in: 600, interval: 1 };
+    });
+    tr.post<{ Body: TraktBody & { code?: string } }>('/oauth/device/token', async (req, reply) => {
+      const entry = traktState.codes.get(req.body.code ?? '');
+      if (!entry) return reply.code(404).send();
+      if (entry.used) return reply.code(409).send();
+      if (++entry.checks < 3) return reply.code(400).send();
+      entry.used = true;
+      return traktTokens();
+    });
+    tr.post<{ Body: TraktBody & { refresh_token?: string } }>('/oauth/token', async (req, reply) => {
+      if (!traktState.refresh.delete(req.body.refresh_token ?? '')) return reply.code(400).send({ error: 'invalid_grant', error_description: 'The provided authorization grant is invalid' });
+      return traktTokens();
+    });
+    tr.post<{ Body: TraktBody & { token?: string } }>('/oauth/revoke', async (req) => {
+      traktState.access.delete(req.body.token ?? '');
+      return {};
+    });
+
+    tr.get('/users/settings', async () => ({ user: { username: 'netfish-mock', name: 'Netfish Mock' } }));
+    const recommend = (type: 'movie' | 'tv') => async () =>
+      shuffle(
+        TITLES.filter((t) => t.type === type && !(type === 'movie' ? traktState.movies.has(t.tmdbId) : [...traktState.episodes.keys()].some((k) => k.startsWith(`${t.tmdbId}:`)))),
+        `trakt-${type}`,
+      )
+        .slice(0, 10)
+        .map((t) => ({ title: t.title, year: t.year, ids: traktIds(t) }));
+    tr.get('/recommendations/movies', recommend('movie'));
+    tr.get('/recommendations/shows', recommend('tv'));
+
+    tr.post<{ Params: { action: string }; Body: { progress?: number; movie?: { ids: { tmdb?: number } }; show?: { ids: { tmdb?: number; tvdb?: number } }; episode?: { season: number; number: number } } }>(
+      '/scrobble/:action',
+      async (req, reply) => {
+        const { progress = 0, movie, show, episode } = req.body;
+        const t = movie ? titleByTmdb.get(`movie-${movie.ids.tmdb}`) : show ? traktShow(show.ids) : undefined;
+        if (!t || (show && !episode)) return reply.code(404).send();
+        const what = movie ? t.title : `${t.title} S${episode!.season}E${episode!.number}`;
+        const action = req.params.action === 'stop' && progress < 80 ? 'pause' : req.params.action === 'stop' ? 'scrobble' : req.params.action;
+        traktState.scrobbles.push({ action, progress, what, at: new Date().toISOString() });
+        if (action === 'scrobble') {
+          if (movie) traktState.movies.set(t.tmdbId, new Date().toISOString());
+          else traktState.episodes.set(`${t.tmdbId}:${episode!.season}:${episode!.number}`, new Date().toISOString());
+        }
+        return reply.code(201).send({ id: traktState.scrobbles.length, action, progress, ...(movie ? { movie: { title: t.title, ids: traktIds(t) } } : { show: { title: t.title, ids: traktIds(t) }, episode }) });
+      },
+    );
+
+    tr.get('/sync/watched/movies', async () =>
+      [...traktState.movies].map(([tmdb, at]) => ({ plays: 1, last_watched_at: at, movie: { title: titleByTmdb.get(`movie-${tmdb}`)?.title, ids: traktIds(titleByTmdb.get(`movie-${tmdb}`)!) } })),
+    );
+    tr.get('/sync/watched/shows', async () => {
+      const shows = new Map<number, Map<number, number[]>>();
+      for (const key of traktState.episodes.keys()) {
+        const [tmdb, season, number] = key.split(':').map(Number);
+        const seasons = shows.get(tmdb) ?? new Map<number, number[]>();
+        shows.set(tmdb, seasons);
+        seasons.set(season, [...(seasons.get(season) ?? []), number]);
+      }
+      return [...shows].map(([tmdb, seasons]) => ({
+        show: { title: titleByTmdb.get(`tv-${tmdb}`)?.title, ids: traktIds(titleByTmdb.get(`tv-${tmdb}`)!) },
+        seasons: [...seasons].map(([number, eps]) => ({ number, episodes: eps.map((n) => ({ number: n, plays: 1 })) })),
+      }));
+    });
+    tr.post<{ Body: { movies?: Array<{ ids: { tmdb?: number }; watched_at?: string }>; shows?: TraktShowBody[] } }>('/sync/history', async (req, reply) => {
+      const result = { added: { movies: 0, episodes: 0 }, not_found: { movies: [] as unknown[], shows: [] as unknown[], seasons: [], episodes: [] } };
+      for (const m of req.body.movies ?? []) {
+        if (!titleByTmdb.has(`movie-${m.ids.tmdb}`)) result.not_found.movies.push(m);
+        else {
+          traktState.movies.set(m.ids.tmdb!, m.watched_at ?? new Date().toISOString());
+          result.added.movies++;
+        }
+      }
+      for (const show of req.body.shows ?? []) {
+        const t = traktShow(show.ids);
+        if (!t) {
+          result.not_found.shows.push({ ids: show.ids });
+          continue;
+        }
+        for (const season of show.seasons ?? []) {
+          for (const ep of season.episodes) {
+            traktState.episodes.set(`${t.tmdbId}:${season.number}:${ep.number}`, ep.watched_at ?? new Date().toISOString());
+            result.added.episodes++;
+          }
+        }
+      }
+      return reply.code(201).send(result);
+    });
+  },
+  { prefix: '/trakt' },
+);
+// What reached the mock Trakt, for checking scrobbles by hand.
+app.get('/trakt-state', async () => ({ ...traktState, codes: undefined, access: undefined, refresh: undefined, movies: [...traktState.movies], episodes: [...traktState.episodes] }));
+
+// ======================================================================
 // TMDB-style images
 // ======================================================================
 
@@ -835,6 +1073,6 @@ try {
 }
 void app.register(fastifyStatic, { root: MEDIA_DIR, serve: false });
 app.listen({ port: PORT, host: '127.0.0.1' }).then(() => {
-  console.log(`[mock] Jellyfin, Seerr, Radarr, Sonarr, Bazarr, qBittorrent on http://127.0.0.1:${PORT}`);
-  console.log(`[mock] users: demo/demo, admin/admin · sample video: ${mediaReady ? `${DURATION_SECONDS}s` : 'unavailable'}`);
+  console.log(`[mock] Jellyfin, Seerr, Radarr, Sonarr, Bazarr, qBittorrent, Trakt on http://127.0.0.1:${PORT}`);
+  console.log(`[mock] users: demo/demo, sam/sam, admin/admin · sample video: ${mediaReady ? `${DURATION_SECONDS}s` : 'unavailable'}`);
 });

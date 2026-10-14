@@ -61,6 +61,8 @@ export const config = {
 
   /** Optional MDBList key (free at mdblist.com): adds Letterboxd and Metacritic scores. */
   mdblist: { url: url('MDBLIST_URL') ?? 'https://api.mdblist.com', apiKey: env('MDBLIST_API_KEY') },
+  /** Optional Trakt app (free at trakt.tv): recommendations and a watch history for the whole server. */
+  trakt: { url: url('TRAKT_URL') ?? 'https://api.trakt.tv', apiKey: env('TRAKT_CLIENT_ID'), password: env('TRAKT_CLIENT_SECRET') },
   /** Where TMDB images come from (Seerr returns bare paths like "/abc.jpg"). */
   tmdbImageBase: url('TMDB_IMAGE_BASE') ?? 'https://image.tmdb.org/t/p',
   /** Default for who may pick specific releases; admins can change it in the app. */
@@ -76,4 +78,5 @@ export const has = {
   sonarr: () => Boolean(config.sonarr.url && config.sonarr.apiKey),
   bazarr: () => Boolean(config.bazarr.url && config.bazarr.apiKey),
   qbittorrent: () => Boolean(config.qbittorrent.url),
+  trakt: () => Boolean(config.trakt.apiKey && config.trakt.password),
 };

@@ -4,6 +4,13 @@
 <dict>
 	<key>CFBundleName</key>
 	<string>Netfish</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>it</string>
+	</array>
 	<key>CFBundleDisplayName</key>
 	<string>Netfish</string>
 	<key>CFBundleIdentifier</key>
@@ -19,7 +26,7 @@
 	<key>CFBundleVersion</key>
 	<string>__VERSION__</string>
 	<key>LSMinimumSystemVersion</key>
-	<string>13.0</string>
+	<string>15.0</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.entertainment</string>
 	<key>NSHighResolutionCapable</key>

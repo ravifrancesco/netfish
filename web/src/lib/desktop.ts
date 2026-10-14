@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { NativePlayRequest, OfflineDescriptor } from '@netfish/shared';
+import { t } from '../i18n';
 
 /**
  * What the Netfish apps add to the web interface: the Mac and Windows apps, the
@@ -166,10 +167,10 @@ export const desktop = (): DesktopBridge | undefined => window.netfishDesktop ??
 /** How to call this app in the interface. */
 export function appKind(): { name: string; device: string } {
   const platform = desktop()?.platform;
-  if (platform === 'ios') return { name: 'iPhone & iPad app', device: 'this device' };
-  if (platform === 'android') return { name: 'Android app', device: 'this device' };
-  if (platform === 'firetv') return { name: 'TV app', device: 'this TV' };
-  return { name: 'Desktop app', device: 'this computer' };
+  if (platform === 'ios') return { name: t('iPhone & iPad app'), device: t('this device') };
+  if (platform === 'android') return { name: t('Android app'), device: t('this device') };
+  if (platform === 'firetv') return { name: t('TV app'), device: t('this TV') };
+  return { name: t('Desktop app'), device: t('this computer') };
 }
 export const canDownloadHere = () => Boolean(window.netfishDesktop?.download);
 

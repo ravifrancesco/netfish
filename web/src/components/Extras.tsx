@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowUpRight, X } from 'lucide-react';
 import type { MediaType } from '@netfish/shared';
 import { api } from '../api';
+import { locale, t, tn } from '../i18n';
+import { decimal } from '../lib/format';
 
 /** TMDB, IMDb and Rotten Tomatoes scores, each linking to its source; Letterboxd as a link. */
 export function RatingsStrip({ mediaType, tmdbId }: { mediaType: MediaType; tmdbId: number }) {
@@ -16,17 +18,25 @@ export function RatingsStrip({ mediaType, tmdbId }: { mediaType: MediaType; tmdb
   if (!data) return null;
   const rt = data.rottenTomatoes;
   const items = [
-    data.tmdb !== undefined && { key: 'tmdb', label: 'TMDB', value: data.tmdb.toFixed(1), href: data.links.tmdb },
-    data.imdb && { key: 'imdb', label: 'IMDb', value: data.imdb.score.toFixed(1), href: data.links.imdb, title: data.imdb.votes ? `${data.imdb.votes.toLocaleString()} votes` : undefined },
-    rt?.critics !== undefined && { key: rt.critics >= 60 ? 'fresh' : 'rotten', label: 'Critics', value: `${rt.critics}%`, href: data.links.rottenTomatoes, title: `Rotten Tomatoes · ${rt.criticsRating ?? ''}` },
-    rt?.audience !== undefined && { key: 'audience', label: 'Audience', value: `${rt.audience}%`, href: data.links.rottenTomatoes, title: 'Rotten Tomatoes audience score' },
+    data.tmdb !== undefined && { key: 'tmdb', label: 'TMDB', value: decimal(data.tmdb), href: data.links.tmdb },
+    data.imdb && {
+      key: 'imdb',
+      label: 'IMDb',
+      value: decimal(data.imdb.score),
+      href: data.links.imdb,
+      title: data.imdb.votes ? tn(data.imdb.votes, '{n} vote', '{n} votes', { n: data.imdb.votes.toLocaleString(locale) }) : undefined,
+    },
+    rt?.critics !== undefined && { key: rt.critics >= 60 ? 'fresh' : 'rotten', label: t('Critics'), value: `${rt.critics}%`, href: data.links.rottenTomatoes, title: `Rotten Tomatoes · ${rt.criticsRating ?? ''}` },
+    rt?.audience !== undefined && { key: 'audience', label: t('Audience'), value: `${rt.audience}%`, href: data.links.rottenTomatoes, title: t('Rotten Tomatoes audience score') },
     data.metacritic && { key: 'metacritic', label: 'Metacritic', value: String(data.metacritic.score), href: undefined, title: 'Metascore' },
     (data.letterboxd || data.links.letterboxd) && {
       key: 'letterboxd',
       label: 'Letterboxd',
-      value: data.letterboxd ? `${data.letterboxd.score.toFixed(1)}/5` : '',
+      value: data.letterboxd ? `${decimal(data.letterboxd.score)}/5` : '',
       href: data.links.letterboxd,
-      title: data.letterboxd?.votes ? `${data.letterboxd.votes.toLocaleString()} ratings on Letterboxd` : 'Open on Letterboxd',
+      title: data.letterboxd?.votes
+        ? tn(data.letterboxd.votes, '{n} rating on Letterboxd', '{n} ratings on Letterboxd', { n: data.letterboxd.votes.toLocaleString(locale) })
+        : t('Open on Letterboxd'),
     },
   ].filter(Boolean) as Array<{ key: string; label: string; value: string; href?: string; title?: string }>;
   if (!items.length) return null;
@@ -55,12 +65,12 @@ export function TrailerPlayer({ youtubeKey, title, onClose }: { youtubeKey: stri
   }, [onClose]);
   const src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(youtubeKey)}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
   return createPortal(
-    <div className="trailer" role="dialog" aria-modal="true" aria-label={`${title} trailer`}>
+    <div className="trailer" role="dialog" aria-modal="true" aria-label={t('{title} trailer', { title })}>
       <div className="trailer__backdrop" onClick={onClose} />
       <div className="trailer__frame">
-        <iframe src={src} title={`${title} trailer`} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
+        <iframe src={src} title={t('{title} trailer', { title })} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
       </div>
-      <button className="icon-btn icon-btn--lg trailer__close" onClick={onClose} aria-label="Close trailer">
+      <button className="icon-btn icon-btn--lg trailer__close" onClick={onClose} aria-label={t('Close trailer')}>
         <X size={26} />
       </button>
     </div>,

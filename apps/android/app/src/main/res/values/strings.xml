@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app's own text (the rest comes from the Netfish server's pages). Italian: values-it/strings.xml. -->
+<resources>
+    <!-- Server address (setup page) -->
+    <string name="error_server_unreachable">Couldn\'t reach %1$s (%2$s). Is the server on?</string>
+    <string name="error_enter_address">Enter the address of your Netfish server</string>
+    <string name="error_not_an_address">That doesn\'t look like an address</string>
+    <string name="error_not_netfish">%1$s doesn\'t look like a Netfish server</string>
+    <string name="error_cant_reach">Can\'t reach %1$s (%2$s)</string>
+    <string name="error_not_allowed">Not allowed here</string>
+
+    <!-- Downloads -->
+    <string name="error_downloads_unavailable">Downloads aren\'t available on this device</string>
+    <string name="error_nothing_to_download">The server didn\'t say what to download</string>
+    <string name="error_not_connected">Not connected to a Netfish server</string>
+    <string name="error_download_start">Couldn\'t start the download: %1$s</string>
+    <string name="error_download_stopped">The download stopped. Try again when you\'re on your home network.</string>
+    <string name="error_nothing_to_retry">Nothing to retry</string>
+    <string name="download_notification_description">Netfish download</string>
+    <string name="subtitles_default_label">Subtitles</string>
+
+    <!-- Player -->
+    <string name="error_cant_play">The TV couldn\'t play this (%1$s)</string>
+</resources>

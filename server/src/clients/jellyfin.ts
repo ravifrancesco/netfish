@@ -141,6 +141,8 @@ export const jellyfin = {
     });
   },
   me: (token: string) => jfRequest<JfUser>(token, '/Users/Me'),
+  /** Every account on the server. Needs admin rights. */
+  users: (token: string) => jfRequest<JfUser[]>(token, '/Users'),
   logout: (token: string) => jfRequest<void>(token, '/Sessions/Logout', { method: 'POST' }),
   publicInfo: () =>
     request<{ ServerName: string; Version: string; Id: string }>('Jellyfin', base(), '/System/Info/Public', {
@@ -149,6 +151,9 @@ export const jellyfin = {
 
   items: (token: string, query: Record<string, string | number | boolean | undefined>) =>
     jfRequest<JfItemsResult>(token, '/Items', { query }),
+  /** People in the library (actors, directors…), e.g. by name with `searchTerm`. */
+  persons: (token: string, query: Record<string, string | number | boolean | undefined>) =>
+    jfRequest<JfItemsResult>(token, '/Persons', { query }),
   item: (token: string, userId: string, itemId: string) =>
     jfRequest<JfItem>(token, `/Items/${itemId}`, { query: { userId } }),
   resume: (token: string, userId: string, limit = 16) =>

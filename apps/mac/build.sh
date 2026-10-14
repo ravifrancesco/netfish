@@ -1,7 +1,8 @@
 #!/bin/bash
 # Builds Netfish for Mac (apps/mac/build/Netfish.app), and with --dmg the disk image in release/.
-# Needs Xcode's command-line tools and mpv from Homebrew (brew install mpv), whose
-# libmpv the app uses to play films.
+# Needs Xcode's command-line tools, plus mpv and dylibbundler from Homebrew
+# (brew install mpv dylibbundler): the app carries its own copy of libmpv and everything it
+# needs, so it runs on any Mac with macOS 15 or later, without Homebrew.
 set -euo pipefail
 cd "$(dirname "$0")"
 VERSION=$(node -p "require('../../package.json').version")
@@ -13,16 +14,20 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" build/iconset.iconset
 # Keep build output out of iCloud.
 xattr -w 'com.apple.fileprovider.ignore#P' 1 build 2>/dev/null || true
 
-swiftc -O -swift-version 5 -target arm64-apple-macos13.0 \
+swiftc -O -swift-version 5 -target arm64-apple-macos15.0 \
   -import-objc-header Netfish/Netfish-Bridging-Header.h \
   -I "$BREW/include" -L "$BREW/lib" -lmpv \
   -framework AppKit -framework WebKit -framework OpenGL \
   Netfish/*.swift ../ios/Netfish/Server.swift ../ios/Netfish/OfflineStore.swift ../ios/Netfish/LocalScheme.swift \
+  ../ios/Netfish/Strings.swift \
   -o "$APP/Contents/MacOS/Netfish" 2> >(grep -v "deprecated\|^\s*|\|^\s*$\|note:\|^\s*[0-9]* |" >&2)
 
 sed "s/__VERSION__/$VERSION/g" Netfish/Info.plist > "$APP/Contents/Info.plist"
 # The setup and downloads pages are shared with the other apps.
 cp ../common/setup.html ../common/offline.html "$APP/Contents/Resources/"
+# English and Italian (shared with the iPhone app): macOS then shows its own menu items, alerts and
+# the local network prompt in Italian too when that's your language.
+cp -R ../ios/Netfish/en.lproj ../ios/Netfish/it.lproj "$APP/Contents/Resources/"
 
 # App icon from the shared artwork.
 for size in 16 32 128 256 512; do
@@ -31,8 +36,18 @@ for size in 16 32 128 256 512; do
 done
 iconutil -c icns build/iconset.iconset -o "$APP/Contents/Resources/Netfish.icns"
 
+# libmpv and the libraries it uses (FFmpeg and friends) go inside the app, pointed at from there.
+mkdir -p "$APP/Contents/Frameworks"
+xattr -cr "$APP"
+dylibbundler -ns -cd -of -b -x "$APP/Contents/MacOS/Netfish" -d "$APP/Contents/Frameworks" -p @executable_path/../Frameworks/ >/dev/null
+if otool -L "$APP/Contents/MacOS/Netfish" "$APP"/Contents/Frameworks/*.dylib | grep -q /opt/homebrew; then
+  echo "Some libraries still point at Homebrew" >&2
+  exit 1
+fi
+
 # iCloud and Finder tag files with metadata that code signing refuses.
 xattr -cr "$APP"
+for lib in "$APP"/Contents/Frameworks/*.dylib; do codesign --force --sign - "$lib"; done
 codesign --force --sign - "$APP" >/dev/null
 echo "Built $APP"
 

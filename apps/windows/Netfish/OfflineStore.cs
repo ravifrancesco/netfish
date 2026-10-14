@@ -186,7 +186,7 @@ sealed class OfflineStore
         var itemId = Str(d, "itemId");
         var fileName = Str(d, "fileName") is { } f ? Safe(Path.GetFileName(f)) : null;
         var path = Str(d, "url");
-        if (itemId == null || fileName == null || path == null) throw new Problem(Str(d, "error") ?? "The server didn't say what to download");
+        if (itemId == null || fileName == null || path == null) throw new Problem(Str(d, "error") ?? L("The server didn't say what to download"));
         if (Find(itemId) is { State: "done" or "downloading" }) return PublicList();
         if (active.Remove(itemId, out var previous)) previous.Cancel.Cancel();
 
@@ -232,7 +232,7 @@ sealed class OfflineStore
             try
             {
                 await Fetch(new Uri(origin, subPath), cookie, Path.Combine(dir, file));
-                entry.Subtitles.Add(new Subtitle { Label = Str(sub, "label") ?? "Subtitles", Code = code, File = Path.Combine(folder, file) });
+                entry.Subtitles.Add(new Subtitle { Label = Str(sub, "label") ?? L("Subtitles"), Code = code, File = Path.Combine(folder, file) });
             }
             catch { /* skip a broken subtitle track */ }
         }
@@ -245,7 +245,7 @@ sealed class OfflineStore
 
     public async Task<JsonArray> Retry(string itemId, Uri origin, string cookie)
     {
-        if (Find(itemId) is not { } e || JsonNode.Parse(e.Source) is not JsonObject d) throw new Problem("Nothing to retry");
+        if (Find(itemId) is not { } e || JsonNode.Parse(e.Source) is not JsonObject d) throw new Problem(L("Nothing to retry"));
         e.State = "failed"; // let Start() replace it
         return await Start(d, origin, cookie);
     }
@@ -271,7 +271,7 @@ sealed class OfflineStore
         }
         catch (Exception e)
         {
-            error = e is Problem ? e.Message : "The download stopped. Try again when you're on your home network.";
+            error = e is Problem ? e.Message : L("The download stopped. Try again when you're on your home network.");
         }
         finally
         {
@@ -291,7 +291,7 @@ sealed class OfflineStore
             catch (Exception e)
             {
                 entry.State = "failed";
-                entry.Error = $"Couldn't save the file: {e.Message}";
+                entry.Error = L("Couldn't save the file: {error}", ("error", e.Message));
             }
         }
         else
@@ -314,9 +314,9 @@ sealed class OfflineStore
         request.Headers.TryAddWithoutValidation("Cookie", cookie);
         if (resumeFrom > 0) request.Headers.Range = new RangeHeaderValue(resumeFrom, null);
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
-        if (response.StatusCode == HttpStatusCode.Unauthorized) throw new Problem("Sign in to Netfish again, then retry.");
-        if (response.StatusCode == HttpStatusCode.Forbidden) throw new Problem("Your account isn't allowed to download.");
-        if (!response.IsSuccessStatusCode) throw new Problem($"The server said no ({(int)response.StatusCode}).");
+        if (response.StatusCode == HttpStatusCode.Unauthorized) throw new Problem(L("Sign in to Netfish again, then retry."));
+        if (response.StatusCode == HttpStatusCode.Forbidden) throw new Problem(L("Your account isn't allowed to download."));
+        if (!response.IsSuccessStatusCode) throw new Problem(L("The server said no ({status}).", ("status", (int)response.StatusCode)));
         var append = resumeFrom > 0 && response.StatusCode == HttpStatusCode.PartialContent;
         var start = append ? resumeFrom : 0;
         transfer.Total = response.Content.Headers.ContentLength is long length ? start + length : 0;

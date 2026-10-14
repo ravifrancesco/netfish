@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { TriangleAlert, CircleCheck, Download, LoaderCircle, Plus, X } from 'lucide-react';
 import type { Availability } from '@netfish/shared';
 import { percent } from '../lib/format';
+import { t } from '../i18n';
 
 // ---------- Image with fade-in and a graceful fallback ----------
 
@@ -58,16 +59,16 @@ export function StatusChip({ status, progress, compact }: { status: Availability
   }
   switch (status) {
     case 'processing':
-      return <span className="chip chip--processing">On its way</span>;
+      return <span className="chip chip--processing">{t('On its way')}</span>;
     case 'pending':
-      return <span className="chip chip--pending">Requested</span>;
+      return <span className="chip chip--pending">{t('Requested')}</span>;
     case 'partial':
-      return <span className="chip chip--partial">Partial</span>;
+      return <span className="chip chip--partial">{t('Partial')}</span>;
     case 'none':
       return compact ? null : (
         <span className="chip chip--none">
           <Plus size={12} aria-hidden="true" />
-          Request
+          {t('Request')}
         </span>
       );
     default:
@@ -109,7 +110,7 @@ export function Modal({
       <div className={`modal__panel${wide ? ' modal__panel--wide' : ''}`} ref={panel} tabIndex={-1}>
         <header className="modal__head">
           <h2>{title}</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
+          <button className="icon-btn" onClick={onClose} aria-label={t('Close')}>
             <X size={20} />
           </button>
         </header>
@@ -130,18 +131,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const push = useCallback((kind: Toast['kind'], text: string) => {
     const id = Date.now() + Math.random();
-    setToasts((t) => [...t.slice(-3), { id, kind, text }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), kind === 'error' ? 7000 : 4000);
+    setToasts((list) => [...list.slice(-3), { id, kind, text }]);
+    setTimeout(() => setToasts((list) => list.filter((x) => x.id !== id)), kind === 'error' ? 7000 : 4000);
   }, []);
   return (
     <ToastContext.Provider value={push}>
       {children}
       {createPortal(
         <div className="toasts" aria-live="polite">
-          {toasts.map((t) => (
-            <div key={t.id} className={`toast toast--${t.kind}`}>
-              {t.kind === 'ok' ? <CircleCheck size={18} /> : <TriangleAlert size={18} />}
-              <span>{t.text}</span>
+          {toasts.map((toast) => (
+            <div key={toast.id} className={`toast toast--${toast.kind}`}>
+              {toast.kind === 'ok' ? <CircleCheck size={18} /> : <TriangleAlert size={18} />}
+              <span>{toast.text}</span>
             </div>
           ))}
         </div>,
@@ -168,10 +169,10 @@ export function ErrorState({ error, retry }: { error: unknown; retry?: () => voi
   return (
     <div className="empty">
       <TriangleAlert size={28} />
-      <p>{error instanceof Error ? error.message : 'Something went wrong'}</p>
+      <p>{error instanceof Error ? error.message : t('Something went wrong')}</p>
       {retry && (
         <button className="btn btn--ghost" onClick={retry}>
-          Try again
+          {t('Try again')}
         </button>
       )}
     </div>

@@ -87,7 +87,7 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
 
     /// Play a film underneath the page, signed in with the page's session.
     func playVideo(_ request: [String: Any]) async throws {
-        guard let urlString = request["url"] as? String, let url = URL(string: urlString), Server.owns(url) else { throw Problem("Nothing to play") }
+        guard let urlString = request["url"] as? String, let url = URL(string: urlString), Server.owns(url) else { throw Problem(L("Nothing to play")) }
         let cookies = await WKWebsiteDataStore.default().httpCookieStore.allCookies().filter { cookie in
             guard let host = url.host else { return false }
             let domain = cookie.domain.hasPrefix(".") ? String(cookie.domain.dropFirst()) : cookie.domain
@@ -137,7 +137,9 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         if failed?.scheme == LocalScheme.scheme { return }
         // Away from home with films downloaded: straight to them, like Netflix.
         if store.hasDownloads { return showOffline([:]) }
-        showSetup(error: "Couldn't reach \(Server.url?.absoluteString ?? "the server") (\(err.localizedDescription)). Is it on, and are you on your home network?")
+        showSetup(error: L("Couldn't reach {server} ({error}). Is it on, and are you on your home network?", [
+            "server": Server.url?.absoluteString ?? L("the server"), "error": err.localizedDescription,
+        ]))
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
@@ -148,14 +150,14 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
 
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
         let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler() })
+        alert.addAction(UIAlertAction(title: L("OK"), style: .default) { _ in completionHandler() })
         present(alert, animated: true)
     }
 
     func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
         let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in completionHandler(false) })
-        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler(true) })
+        alert.addAction(UIAlertAction(title: L("Cancel"), style: .cancel) { _ in completionHandler(false) })
+        alert.addAction(UIAlertAction(title: L("OK"), style: .default) { _ in completionHandler(true) })
         present(alert, animated: true)
     }
 }

@@ -112,16 +112,34 @@
         </svg>
         <span><span class="net">net</span><span class="fish">fish</span></span>
       </div>
-      <p>Where is your Netfish server?</p>
+      <p data-t>Where is your Netfish server?</p>
       <label>
-        Server address
+        <span data-t>Server address</span>
         <input id="url" placeholder="192.168.1.50:7777" autocomplete="url" spellcheck="false" autofocus />
       </label>
-      <small>The address you open Netfish at in a browser, e.g. http://raspberrypi.local:7777</small>
+      <small data-t>The address you open Netfish at in a browser, e.g. http://raspberrypi.local:7777</small>
       <div class="error" id="error"></div>
-      <button id="go">Connect</button>
+      <button id="go" data-t>Connect</button>
     </form>
     <script>
+      // Italian when the system language is Italian, English otherwise. Keys are the exact English text.
+      const lang = (navigator.languages && navigator.languages[0]) || navigator.language || 'en';
+      const italian = /^it\b/i.test(lang);
+      const IT = {
+        'Where is your Netfish server?': "Dov'è il tuo server Netfish?",
+        'Server address': 'Indirizzo del server',
+        'The address you open Netfish at in a browser, e.g. http://raspberrypi.local:7777': "L'indirizzo con cui apri Netfish nel browser, ad es. http://raspberrypi.local:7777",
+        Connect: 'Connetti',
+        'Connecting…': 'Connessione in corso…',
+      };
+      /** t('Hello {name}', { name }) → the Italian (or the English) with {placeholders} filled in. */
+      const t = (text, values) =>
+        ((italian && IT[text]) || text).replace(/\{(\w+)\}/g, (match, name) => (values && name in values ? String(values[name]) : match));
+      if (italian) {
+        document.documentElement.lang = 'it';
+        for (const el of document.querySelectorAll('[data-t]')) el.textContent = t(el.textContent.replace(/\s+/g, ' ').trim());
+      }
+
       const form = document.getElementById('form');
       const input = document.getElementById('url');
       const error = document.getElementById('error');
@@ -132,13 +150,13 @@
         e.preventDefault();
         error.textContent = '';
         go.disabled = true;
-        go.textContent = 'Connecting…';
+        go.textContent = t('Connecting…');
         try {
           await window.netfishDesktop.connect(input.value);
         } catch (err) {
           error.textContent = String(err.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
           go.disabled = false;
-          go.textContent = 'Connect';
+          go.textContent = t('Connect');
         }
       });
     </script>

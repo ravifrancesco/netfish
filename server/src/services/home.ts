@@ -1,54 +1,41 @@
-import type { Card, HomeResponse, MediaType, Row } from '@netfish/shared';
+import type { Card, HomeResponse, Row } from '@netfish/shared';
 import type { SessionUser } from '../auth';
 import { has } from '../config';
 import { CARD_FIELDS, jellyfin, type JfItem, type JfItemsResult } from '../clients/jellyfin';
-import type { SeerrPage, SeerrResult } from '../clients/seerr';
+import type { SeerrPage } from '../clients/seerr';
 import { settle } from '../lib/async';
 import { jfPlayableCard, jfToCard, seerrCards, type ProgressMap } from './cards';
 import { catalog } from './catalog';
 import { allDownloads, progressByTitle } from './downloads';
 import { libraryIndex, type LibraryIndex } from './library';
 import { listRequests } from './requests';
+import { traktPicks } from './trakt';
+import { householdFavourites, noteWatched, syncHousehold } from './household';
+import { peopleRows, rankPicks, tasteOf, type PeopleRows, type Seed, type Taste } from './taste';
+import { t } from '../lib/i18n';
 
 const EMPTY: JfItemsResult = { Items: [], TotalRecordCount: 0 };
 const EMPTY_PAGE: SeerrPage = { page: 1, totalPages: 0, totalResults: 0, results: [] };
 
-interface Seed {
-  key: string;
-  mediaType: MediaType;
-  tmdbId: number;
-  name: string;
-}
-
-/** Titles the user watched recently, newest first: the raw material for suggestions. */
-function seedsFrom(items: JfItem[], index: LibraryIndex): { seeds: Seed[]; watched: Set<string> } {
+/**
+ * Titles the user watched recently, newest first: the raw material for suggestions.
+ * `watchedIds` are the Jellyfin movie/series ids, `watched` the TMDB keys.
+ */
+function seedsFrom(items: JfItem[], index: LibraryIndex): { seeds: Seed[]; watched: Set<string>; watchedIds: Set<string> } {
   const seeds: Seed[] = [];
   const watched = new Set<string>();
+  const watchedIds = new Set<string>();
   for (const item of items) {
-    const entry = index.byId.get(item.Type === 'Episode' ? (item.SeriesId ?? '') : item.Id);
+    const id = item.Type === 'Episode' ? (item.SeriesId ?? '') : item.Id;
+    watchedIds.add(id);
+    const entry = index.byId.get(id);
     if (!entry?.tmdbId) continue;
     const key = `${entry.mediaType}-${entry.tmdbId}`;
     if (watched.has(key)) continue;
     watched.add(key);
-    seeds.push({ key, mediaType: entry.mediaType, tmdbId: entry.tmdbId, name: entry.name });
+    seeds.push({ key, mediaType: entry.mediaType, tmdbId: entry.tmdbId, name: entry.name, weight: 1 / (1 + seeds.length / 5) });
   }
-  return { seeds, watched };
-}
-
-/** Blend recommendations from several recently watched titles, favouring newer seeds and higher ranks. */
-function personalPicks(pages: Array<SeerrPage | undefined>, exclude: Set<string>): SeerrResult[] {
-  const scored = new Map<string, { result: SeerrResult; score: number }>();
-  pages.forEach((page, seedRank) => {
-    page?.results.forEach((result, position) => {
-      if (result.mediaType !== 'movie' && result.mediaType !== 'tv') return;
-      const key = `${result.mediaType}-${result.id}`;
-      if (exclude.has(key)) return;
-      const weight = (1 / (seedRank + 1)) * (1 - position / 40);
-      const hit = scored.get(key);
-      scored.set(key, { result, score: (hit?.score ?? 0) + weight });
-    });
-  });
-  return [...scored.values()].sort((a, b) => b.score - a.score).map((s) => s.result);
+  return { seeds, watched, watchedIds };
 }
 
 function continueWatching(resume: JfItem[], nextUp: JfItem[], index: LibraryIndex): Card[] {
@@ -93,8 +80,22 @@ export async function buildHome(user: SessionUser): Promise<HomeResponse> {
     ),
   ]);
 
-  const { seeds, watched } = seedsFrom([...resume.Items, ...history.Items], index);
+  const { seeds, watched, watchedIds } = seedsFrom([...resume.Items, ...history.Items], index);
   const topSeeds = seeds.slice(0, 6);
+
+  // What everyone else here has been watching (and haven't seen yet), as library cards this person can open.
+  noteWatched(userId, [...resume.Items, ...history.Items]);
+  syncHousehold();
+  const favourites = householdFavourites(userId).filter((h) => !watchedIds.has(h.id)).slice(0, 40);
+  const householdKeys = new Set(
+    favourites.map((h) => index.byId.get(h.id)).flatMap((e) => (e?.tmdbId ? [`${e.mediaType}-${e.tmdbId}`] : [])),
+  );
+  const householdCards = favourites.length
+    ? settle(jfQuery({ ids: favourites.map((h) => h.id).join(','), limit: 40 }), EMPTY).then((res) => {
+        const byId = new Map(res.Items.map((i) => [i.Id, i]));
+        return favourites.flatMap((h) => (byId.has(h.id) ? [jfToCard(byId.get(h.id)!, index)] : []));
+      })
+    : Promise.resolve([] as Card[]);
 
   let picks: Card[] = [];
   const because: Row[] = [];
@@ -103,23 +104,40 @@ export async function buildHome(user: SessionUser): Promise<HomeResponse> {
   let popularTv: Card[] = [];
   let upcoming: Card[] = [];
   let requested: Card[] = [];
+  let traktMovies: Card[] = [];
+  let traktShows: Card[] = [];
+  let people: PeopleRows['rows'] = {};
 
   if (has.seerr()) {
-    const [recPages, trendingP, moviesP, tvP, upcomingP, myRequests] = await Promise.all([
+    const exclude = new Set([...watched, ...topSeeds.map((s) => s.key)]);
+    const tasteAndPeople = tasteOf(seeds).then(async (taste: Taste) => ({ taste, people: await peopleRows(taste, exclude, index, progress) }));
+    const [recPages, trendingP, moviesP, tvP, upcomingP, myRequests, traktM, traktS, mine] = await Promise.all([
       Promise.all(topSeeds.map((s) => settle(catalog.recommendations(s.mediaType, s.tmdbId), undefined))),
       settle(catalog.discover('trending'), EMPTY_PAGE),
       settle(catalog.discover('movies'), EMPTY_PAGE),
       settle(catalog.discover('tv'), EMPTY_PAGE),
       settle(catalog.discover('movies/upcoming'), EMPTY_PAGE),
       settle(listRequests(user, 'mine'), []),
+      settle(traktPicks('movie'), []),
+      settle(traktPicks('tv'), []),
+      settle(tasteAndPeople, undefined),
     ]);
+    traktMovies = seerrCards(traktM, index, progress);
+    traktShows = seerrCards(traktS, index, progress);
 
-    const exclude = new Set([...watched, ...topSeeds.map((s) => s.key)]);
-    picks = seerrCards(personalPicks(recPages, exclude), index, progress).slice(0, 24);
+    picks = mine
+      ? rankPicks({ seeds: topSeeds, recPages, taste: mine.taste, people: mine.people.candidates, household: householdKeys, exclude, index, progress })
+      : [];
     const shown = new Set(picks.slice(0, 12).map((c) => c.key));
+    // Rows about people skip what Top picks already shows up front, unless that would leave them nearly empty.
+    const notShown = (row?: Row) => {
+      const rest = row?.items.filter((c) => !shown.has(c.key));
+      return row && rest && rest.length >= 6 ? { ...row, items: rest } : row;
+    };
+    people = { director: notShown(mine?.people.rows.director), actor: notShown(mine?.people.rows.actor) };
     topSeeds.slice(0, 2).forEach((seed, i) => {
       const items = seerrCards(recPages[i]?.results ?? [], index, progress).filter((c) => !shown.has(c.key) && !exclude.has(c.key));
-      if (items.length >= 6) because.push({ id: `because-${seed.key}`, title: `Because you watched ${seed.name}`, style: 'poster', items });
+      if (items.length >= 6) because.push({ id: `because-${seed.key}`, title: t('Because you watched {name}', { name: seed.name }), style: 'poster', items });
     });
     trending = seerrCards(trendingP.results, index, progress);
     popularMovies = seerrCards(moviesP.results, index, progress);
@@ -140,19 +158,25 @@ export async function buildHome(user: SessionUser): Promise<HomeResponse> {
       }));
   }
 
+  const popularHere = await householdCards;
   const candidates: Row[] = [
-    { id: 'continue', title: 'Continue Watching', style: 'wide', items: continueWatching(resume.Items, nextUp.Items, index) },
-    { id: 'requested', title: 'Your requests', style: 'poster', items: requested, href: '/activity' },
-    { id: 'picks', title: `Top picks for ${user.name}`, style: 'poster', items: picks },
-    { id: 'latest-movies', title: 'Recently added movies', style: 'poster', items: latestMovies.Items.map((i) => jfToCard(i, index)), href: '/movies' },
-    { id: 'latest-shows', title: 'New episodes', style: 'poster', items: latestShows.Items.map((i) => jfToCard(i, index)), href: '/shows' },
+    { id: 'continue', title: t('Continue Watching'), style: 'wide', items: continueWatching(resume.Items, nextUp.Items, index) },
+    { id: 'requested', title: t('Your requests'), style: 'poster', items: requested, href: '/activity' },
+    { id: 'picks', title: t('Top picks for {name}', { name: user.name }), style: 'poster', items: picks },
+    { id: 'popular-here', title: t('Popular on this server'), style: 'poster', items: popularHere.length >= 3 ? popularHere : [] },
+    { id: 'latest-movies', title: t('Recently added movies'), style: 'poster', items: latestMovies.Items.map((i) => jfToCard(i, index)), href: '/movies' },
+    { id: 'latest-shows', title: t('New episodes'), style: 'poster', items: latestShows.Items.map((i) => jfToCard(i, index)), href: '/shows' },
+    { id: 'trakt-movies', title: t('Movies Trakt recommends'), style: 'poster', items: traktMovies },
     ...because.slice(0, 1),
-    { id: 'trending', title: 'Trending now', style: 'poster', items: trending },
+    ...(people.director && people.director.items.length >= 4 ? [people.director] : []),
+    { id: 'trakt-shows', title: t('Shows Trakt recommends'), style: 'poster', items: traktShows },
+    { id: 'trending', title: t('Trending now'), style: 'poster', items: trending },
+    ...(people.actor && people.actor.items.length >= 4 ? [people.actor] : []),
     ...because.slice(1),
-    { id: 'popular-movies', title: 'Popular movies', style: 'poster', items: popularMovies },
-    { id: 'popular-tv', title: 'Popular shows', style: 'poster', items: popularTv },
-    { id: 'unwatched', title: 'Waiting in your library', style: 'poster', items: unwatched.Items.map((i) => jfToCard(i, index)) },
-    { id: 'upcoming', title: 'Coming soon to cinemas', style: 'poster', items: upcoming },
+    { id: 'popular-movies', title: t('Popular movies'), style: 'poster', items: popularMovies },
+    { id: 'popular-tv', title: t('Popular shows'), style: 'poster', items: popularTv },
+    { id: 'unwatched', title: t('Waiting in your library'), style: 'poster', items: unwatched.Items.map((i) => jfToCard(i, index)) },
+    { id: 'upcoming', title: t('Coming soon to cinemas'), style: 'poster', items: upcoming },
   ];
   const rows = candidates.filter((row) => row.items.length > 0);
 

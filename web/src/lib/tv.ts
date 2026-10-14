@@ -1,7 +1,7 @@
 /**
- * TV mode (the Fire TV app, or any browser with ?tv=1): the remote's arrow
- * keys move focus to the nearest thing in that direction, Select presses it,
- * and Back closes whatever is open, then goes back a page.
+ * TV mode (the Fire TV app, Samsung and LG TVs, or any browser with ?tv=1): the
+ * remote's arrow keys move focus to the nearest thing in that direction,
+ * Select presses it, and Back closes whatever is open, then goes back a page.
  */
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea, [tabindex]:not([tabindex="-1"])';
@@ -19,7 +19,54 @@ export function isTV(): boolean {
   } catch {
     /* storage blocked */
   }
-  return /NetfishTV/.test(navigator.userAgent);
+  return /NetfishTV/.test(navigator.userAgent) || browserTV() !== null;
+}
+
+/** A TV whose own browser shows Netfish (Samsung's Tizen, LG's webOS), with no Netfish app around it. */
+export function browserTV(): 'tizen' | 'webos' | null {
+  const ua = navigator.userAgent;
+  if (/Tizen|SMART-TV/.test(ua)) return 'tizen';
+  if (/Web0S|webOS/.test(ua)) return 'webos';
+  return null;
+}
+
+/** Samsung's Tizen version (6.5 on 2022 TVs), or 0 elsewhere. */
+export function tizenVersion(): number {
+  const match = /Tizen\s?(\d+(?:\.\d+)?)/.exec(navigator.userAgent);
+  return match ? parseFloat(match[1]) : 0;
+}
+
+// Samsung and LG remotes: their Back and media keys, by key code (older TV browsers don't name them).
+const REMOTE_KEYS: Record<number, string> = {
+  10009: 'Back', // Samsung
+  461: 'Back', // LG
+  415: 'MediaPlay',
+  19: 'MediaPause',
+  10252: 'MediaPlayPause',
+  413: 'MediaStop',
+  417: 'MediaFastForward',
+  412: 'MediaRewind',
+};
+
+/**
+ * On a TV browser nobody else handles Back: close what's open, else go back a
+ * page. From Netfish's first page that returns to the TV app's start page,
+ * which closes the app, like any TV app.
+ */
+function onRemoteKey(e: KeyboardEvent) {
+  const name = REMOTE_KEYS[e.keyCode];
+  if (!name) return;
+  if (name === 'Back') {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (!back()) history.back();
+    return;
+  }
+  // Media keys: hand them on under their standard names, which the player understands.
+  if (e.key === name) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true }));
 }
 
 function visible(el: HTMLElement) {
@@ -147,6 +194,7 @@ declare global {
 export function startTV() {
   document.documentElement.classList.add('is-tv');
   document.addEventListener('keydown', onKey);
+  if (browserTV()) window.addEventListener('keydown', onRemoteKey, true);
   window.netfishBack = back;
 }
 

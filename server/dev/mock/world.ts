@@ -125,6 +125,7 @@ export interface MockUser {
 export const USERS: MockUser[] = [
   { name: 'admin', password: 'admin', admin: true, seerrId: 1, id: hex('user-admin') },
   { name: 'demo', password: 'demo', admin: false, seerrId: 2, id: hex('user-demo') },
+  { name: 'sam', password: 'sam', admin: false, seerrId: 3, id: hex('user-sam') },
 ];
 export const sessions = new Map<string, MockUser>();
 
@@ -284,6 +285,14 @@ export function seed() {
   setUd(demo.id, ids.episode(byN(101), 1, 4), { pos: 0.25 * RUNTIME_TICKS, lastPlayed: ago(3600_000) });
   for (let e = 1; e <= 8; e++) setUd(demo.id, ids.episode(byN(106), 1, e), { played: true, lastPlayed: ago(7 * DAY - e * 3600_000) });
   setUd(admin.id, ids.movie(byN(4)), { pos: 0.6 * RUNTIME_TICKS, lastPlayed: ago(2 * DAY) });
+  // The rest of the household, for "Popular on this server".
+  const sam = USERS[2];
+  [[admin, [1, 5, 10, 12]], [sam, [5, 12, 14, 3]]].forEach(([user, films]) =>
+    (films as number[]).forEach((n, i) => setUd((user as MockUser).id, ids.movie(byN(n)), { played: true, lastPlayed: ago((i + 1) * 2 * DAY) })),
+  );
+  for (let e = 1; e <= 6; e++) setUd(admin.id, ids.episode(byN(104), 1, e), { played: true, lastPlayed: ago(4 * DAY - e * 3600_000) });
+  for (let e = 1; e <= 5; e++) setUd(sam.id, ids.episode(byN(102), 1, e), { played: true, lastPlayed: ago(DAY - e * 3600_000) });
+  setUd(sam.id, ids.movie(byN(10)), { pos: 0.3 * RUNTIME_TICKS, lastPlayed: ago(3600_000) });
 
   const req = (type: 'movie' | 'tv', n: number, status: MockRequest['status'], user: MockUser, seasons: number[] = [], agoMs = DAY) =>
     requests.push({ id: newId(), type, tmdbId: byN(n).tmdbId, seasons, status, seerrUserId: user.seerrId, createdAt: new Date(ago(agoMs)).toISOString() });

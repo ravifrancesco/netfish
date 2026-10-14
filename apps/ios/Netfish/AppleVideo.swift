@@ -103,7 +103,7 @@ final class AppleVideo: NSObject {
                 begin()
             }
         case .failed:
-            onState?(["ended": true, "error": item.error?.localizedDescription ?? "This video couldn't play here"])
+            onState?(["ended": true, "error": item.error?.localizedDescription ?? L("This video couldn't play here")])
         default:
             break
         }

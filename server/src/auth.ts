@@ -4,6 +4,7 @@ import { jellyfin, type JfUser } from './clients/jellyfin';
 import { MINUTE, TTLCache } from './lib/cache';
 import { HttpError, UpstreamError } from './lib/upstream';
 import { onConnectionChange } from './connections';
+import { t } from './lib/i18n';
 
 /**
  * Netfish has no user database of its own (yet): signing in goes through
@@ -71,18 +72,18 @@ export async function requireUser(req: FastifyRequest, reply: FastifyReply) {
   const user = token ? await resolve(token) : null;
   if (!user) {
     if (token) reply.clearCookie(SESSION_COOKIE, { path: '/' });
-    throw new HttpError(401, 'Please sign in');
+    throw new HttpError(401, t('Please sign in'));
   }
   req.user = user;
 }
 
 export async function requireAdmin(req: FastifyRequest, reply: FastifyReply) {
   await requireUser(req, reply);
-  if (!req.user!.isAdmin) throw new HttpError(403, 'Admins only');
+  if (!req.user!.isAdmin) throw new HttpError(403, t('Admins only'));
 }
 
 /** For handlers registered behind requireUser. */
 export function userOf(req: FastifyRequest): SessionUser {
-  if (!req.user) throw new HttpError(401, 'Please sign in');
+  if (!req.user) throw new HttpError(401, t('Please sign in'));
   return req.user;
 }

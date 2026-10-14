@@ -12,6 +12,7 @@ import type {
   ServerSettings,
   ServiceConnectionUpdate,
   SubtitleRequest,
+  TraktStatus,
   User,
 } from '@netfish/shared';
 import {
@@ -40,8 +41,11 @@ import { titleRatings } from './services/ratings';
 import { grabRelease, grabbedKeys, searchReleases } from './services/releases';
 import { jobsFor, requestSubtitles } from './services/subtitles';
 import { offlineInfo, playInfo, reportProgress, startPlayback } from './services/playback';
+import { personDetail } from './services/people';
 import { createRequest, listRequests, myRequestKeys } from './services/requests';
+import { scrobble, setScrobble, startImport, startLink, traktStatus, unlink } from './services/trakt';
 import { jellyfinDetail, jellyfinSeason, movieDetail, seasonDetail, tvDetail } from './services/titles';
+import { t } from './lib/i18n';
 
 const publicUser = ({ token: _token, canDownload: _canDownload, ...user }: SessionUser): User => user;
 
@@ -82,7 +86,11 @@ const int = (v: unknown, fallback: number, min = 0, max = 1000) => {
 
 export async function apiRoutes(app: FastifyInstance) {
   // ---------- Public ----------
-  app.get('/health', async () => ({ ok: true, name: 'netfish', version: config.version }));
+  // Open to any page: TV apps check the address from their own start page before opening Netfish.
+  app.get('/health', async (_req, reply) => {
+    reply.header('access-control-allow-origin', '*');
+    return { ok: true, name: 'netfish', version: config.version };
+  });
   app.get('/config', async () => appConfig());
 
   // Nobody can sign in until Netfish knows where Jellyfin is, so this one setting can be
@@ -91,24 +99,24 @@ export async function apiRoutes(app: FastifyInstance) {
   app.post<{ Body: { url?: string; code?: string } }>('/setup/jellyfin', async (req) => {
     const code = clean(req.body?.code, 20).toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (has.jellyfin() && code !== SETUP_CODE) {
-      throw new HttpError(403, code ? "That setup code isn't right" : 'Netfish is already set up. Admins can change this in Settings → Connections.');
+      throw new HttpError(403, code ? t("That setup code isn't right") : t('Netfish is already set up. Admins can change this in Settings → Connections.'));
     }
     const test = await testConnection('jellyfin', { url: req.body?.url ?? '' });
-    if (!test.ok) throw new HttpError(400, test.error ?? "Couldn't reach Jellyfin at that address");
+    if (!test.ok) throw new HttpError(400, test.error ?? t("Couldn't reach Jellyfin at that address"));
     updateConnection('jellyfin', { url: req.body?.url ?? '' });
     return test;
   });
 
   app.post<{ Body: Partial<LoginRequest> & { returnToken?: boolean } }>('/auth/login', async (req, reply) => {
     const username = clean(req.body?.username, 200);
-    if (!username) throw new HttpError(400, 'Username is required');
+    if (!username) throw new HttpError(400, t('Username is required'));
     const device = { id: clean(req.body?.deviceId, 64) || randomUUID(), name: clean(req.body?.deviceName, 64) || 'Netfish' };
     let result;
     try {
       result = await jellyfin.authenticate(username, typeof req.body?.password === 'string' ? req.body.password : '', device);
     } catch (err) {
       if (err instanceof UpstreamError && (err.status === 401 || err.status === 400)) {
-        throw new HttpError(401, 'Wrong username or password');
+        throw new HttpError(401, t('Wrong username or password'));
       }
       throw err;
     }
@@ -142,7 +150,8 @@ export async function apiRoutes(app: FastifyInstance) {
     api.get('/home', async (req) => buildHome(userOf(req)));
     api.get('/languages', async () => publicLanguages());
 
-    api.get<{ Querystring: { q?: string } }>('/search', async (req) => ({ items: await search(userOf(req), clean(req.query.q, 200)) }));
+    api.get<{ Querystring: { q?: string } }>('/search', async (req) => search(userOf(req), clean(req.query.q, 200)));
+    api.get<{ Params: { id: string } }>('/person/:id', async (req) => personDetail(userOf(req), clean(req.params.id, 80)));
 
     api.get<{ Querystring: { type?: string; sort?: string; start?: string; limit?: string } }>('/library', async (req) => {
       const type: MediaType = req.query.type === 'tv' ? 'tv' : 'movie';
@@ -164,7 +173,7 @@ export async function apiRoutes(app: FastifyInstance) {
     api.get<{ Params: TitleParams & { n: string } }>('/title/:type/:id/season/:n', async (req) => {
       const user = userOf(req);
       const n = int(req.params.n, -1, 0, 500);
-      if (n < 0) throw new HttpError(400, 'Bad season number');
+      if (n < 0) throw new HttpError(400, t('Bad season number'));
       if (req.params.type === 'jf') return jellyfinSeason(user, clean(req.params.id, 64), n);
       const { tmdbId } = mediaTitle(req);
       return seasonDetail(user, tmdbId, n);
@@ -244,6 +253,7 @@ export async function apiRoutes(app: FastifyInstance) {
       return session;
     });
     api.post<{ Body: ProgressReport }>('/play/progress', async (req, reply) => {
+      if (req.body?.itemId && req.body.playSessionId) scrobble(userOf(req), req.body, req.log);
       await reportProgress(userOf(req), req.body);
       reply.code(204);
     });
@@ -259,6 +269,13 @@ export async function apiRoutes(app: FastifyInstance) {
     api.post<{ Params: { id: string }; Body: ServiceConnectionUpdate }>('/admin/connections/:id/test', { preHandler: requireAdmin }, async (req) =>
       testConnection(req.params.id, req.body ?? undefined),
     );
+
+    // The server's one Trakt account: linking, sending watches, importing past ones.
+    api.get('/admin/trakt', { preHandler: requireAdmin }, async (): Promise<TraktStatus> => traktStatus());
+    api.post('/admin/trakt/link', { preHandler: requireAdmin }, async () => startLink());
+    api.put<{ Body: { scrobble?: boolean } }>('/admin/trakt', { preHandler: requireAdmin }, async (req) => setScrobble(req.body?.scrobble !== false));
+    api.post('/admin/trakt/import', { preHandler: requireAdmin }, async (req) => startImport(userOf(req), req.log));
+    api.delete('/admin/trakt', { preHandler: requireAdmin }, async () => unlink());
 
     // Admin settings, stored on the server.
     api.get('/admin/settings', { preHandler: requireAdmin }, async () => getSettings());

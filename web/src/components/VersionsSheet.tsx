@@ -7,6 +7,7 @@ import { bytes } from '../lib/format';
 import { useLanguages, useMe, useRefreshTitle } from '../lib/hooks';
 import { LanguageSelect } from './LanguageSelect';
 import { ErrorState, Modal, Spinner, useToast } from './ui';
+import { t, tn } from '../i18n';
 
 /**
  * "Versions": Radarr/Sonarr's Interactive Search, inside Netfish. Every result
@@ -17,7 +18,7 @@ import { ErrorState, Modal, Spinner, useToast } from './ui';
 type Sort = 'best' | 'seeders' | 'size-asc' | 'size-desc' | 'newest';
 
 const RESOLUTIONS = [
-  { value: '', label: 'Any quality' },
+  { value: '', label: t('Any quality') },
   { value: '2160', label: '4K (2160p)' },
   { value: '1080', label: '1080p' },
   { value: '720', label: '720p' },
@@ -29,9 +30,9 @@ function resolutionOf(r: Release): number {
 }
 
 function age(hours: number): string {
-  if (hours < 24) return `${Math.max(1, Math.round(hours))} h`;
-  if (hours < 24 * 60) return `${Math.round(hours / 24)} d`;
-  return `${Math.round(hours / 24 / 30)} mo`;
+  if (hours < 24) return t('{n} h', { n: Math.max(1, Math.round(hours)) });
+  if (hours < 24 * 60) return t('{n} d', { n: Math.round(hours / 24) });
+  return t('{n} mo', { n: Math.round(hours / 24 / 30) });
 }
 
 export function VersionsSheet({
@@ -78,8 +79,8 @@ export function VersionsSheet({
 
   useEffect(() => {
     if (!confirming) return;
-    const t = setTimeout(() => setConfirming(undefined), 4000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setConfirming(undefined), 4000);
+    return () => clearTimeout(timer);
   }, [confirming]);
 
   const grab = useMutation({
@@ -87,7 +88,7 @@ export function VersionsSheet({
     onSuccess: (_, r) => {
       setGrabbed((g) => new Set(g).add(r.guid));
       setConfirming(undefined);
-      toast('ok', 'Sent to the downloader — follow it in Activity.');
+      toast('ok', t('Sent to the downloader — follow it in Activity.'));
       refresh(title.mediaType, title.tmdbId);
     },
     onError: (err) => toast('error', (err as Error).message),
@@ -134,31 +135,35 @@ export function VersionsSheet({
             <span className="badge badge--strong">{r.quality}</span>
             <span className="badge">
               {bytes(r.size)}
-              {r.sizePerEpisode && r.sizePerEpisode !== r.size ? ` · ${bytes(r.sizePerEpisode)}/ep` : ''}
+              {r.sizePerEpisode && r.sizePerEpisode !== r.size ? ` · ${t('{size}/ep', { size: bytes(r.sizePerEpisode) })}` : ''}
             </span>
-            {r.oversized && <span className="badge badge--bad">Over size limit</span>}
+            {r.oversized && <span className="badge badge--bad">{t('Over size limit')}</span>}
             {r.protocol === 'torrent' ? (
-              <span className={`badge${(r.seeders ?? 0) === 0 ? ' badge--bad' : ''}`}>{r.seeders ?? '?'} seeders</span>
+              <span className={`badge${(r.seeders ?? 0) === 0 ? ' badge--bad' : ''}`}>{t('{n} seeders', { n: r.seeders ?? '?' })}</span>
             ) : (
               <span className="badge">Usenet</span>
             )}
             <span className="badge">{age(r.ageHours)}</span>
             <span className="badge badge--dim">{r.indexer}</span>
-            {r.fullSeason && <span className="badge badge--dim">Season pack</span>}
+            {r.fullSeason && <span className="badge badge--dim">{t('Season pack')}</span>}
             {r.languageCodes.map((c) => (
               <span key={c} className={`badge badge--lang${c === language ? ' is-match' : ''}`}>
                 {langName(c)}
               </span>
             ))}
-            {r.multi && <span className="badge badge--lang">MULTi · languages unknown</span>}
-            {keepsOriginal && <span className="badge badge--good">Keeps {langName(original!)}</span>}
+            {r.multi && <span className="badge badge--lang">{t('MULTi · languages unknown')}</span>}
+            {keepsOriginal && <span className="badge badge--good">{t('Keeps {language}', { language: langName(original!) })}</span>}
           </div>
           {(r.rejected || (data?.current && !r.likelyImports)) && (
             <div className="release__warn">
               <TriangleAlert size={14} />
               <span>
-                {r.rejected && `Radarr/Sonarr wouldn't pick this automatically: ${r.rejections.join('; ') || 'rejected'}. `}
-                {data?.current && !r.likelyImports && `It may not replace your current ${data.current.quality ?? 'copy'} (lower quality).`}
+                {r.rejected && `${t("Radarr/Sonarr wouldn't pick this automatically: {reasons}.", { reasons: r.rejections.join('; ') || t('rejected') })} `}
+                {data?.current &&
+                  !r.likelyImports &&
+                  (data.current.quality
+                    ? t('It may not replace your current {quality} (lower quality).', { quality: data.current.quality })
+                    : t('It may not replace your current copy (lower quality).'))}
               </span>
             </div>
           )}
@@ -170,15 +175,15 @@ export function VersionsSheet({
         >
           {done ? (
             <>
-              <Check size={16} /> Sent
+              <Check size={16} /> {t('Sent')}
             </>
           ) : grab.isPending && grab.variables?.guid === r.guid ? (
             <Spinner size={16} />
           ) : confirming === r.guid ? (
-            'Confirm'
+            t('Confirm')
           ) : (
             <>
-              <ArrowDownToLine size={16} /> Get
+              <ArrowDownToLine size={16} /> {t('Get')}
             </>
           )}
         </button>
@@ -189,9 +194,14 @@ export function VersionsSheet({
   const total = data?.releases.length ?? 0;
   const shown = strong.length + maybe.length;
   const seasonInfo = seasons.find((s) => s.seasonNumber === season);
+  const oversizeLimit = data?.limit
+    ? data.limit.perEpisode
+      ? t('{size} per episode', { size: bytes(data.limit.bytes) })
+      : bytes(data.limit.bytes)
+    : '';
 
   return (
-    <Modal title={`Versions · ${title.title}`} onClose={onClose} wide>
+    <Modal title={`${t('Versions')} · ${title.title}`} onClose={onClose} wide>
       <div className="versions">
         {isTv && (
           <div className="versions__scope">
@@ -203,10 +213,10 @@ export function VersionsSheet({
               ))}
             </select>
             <select className="select" value={episode} onChange={(e) => setEpisode(e.target.value === '' ? '' : Number(e.target.value))}>
-              <option value="">Whole season</option>
+              <option value="">{t('Whole season')}</option>
               {Array.from({ length: seasonInfo?.episodeCount ?? 0 }, (_, i) => (
                 <option key={i + 1} value={i + 1}>
-                  Episode {i + 1}
+                  {t('Episode {n}', { n: i + 1 })}
                 </option>
               ))}
             </select>
@@ -215,18 +225,18 @@ export function VersionsSheet({
 
         {data?.current && (
           <p className="versions__current">
-            In your library: <strong>{data.current.quality ?? 'unknown quality'}</strong>
+            {t('In your library:')} <strong>{data.current.quality ?? t('unknown quality')}</strong>
             {data.current.languages.length > 0 && <> · {data.current.languages.join(', ')}</>}
           </p>
         )}
 
         <div className="filters">
           <label className="filters__field">
-            <span>Audio language</span>
-            <LanguageSelect value={language} onChange={setLanguage} anyLabel="Any language" />
+            <span>{t('Audio language')}</span>
+            <LanguageSelect value={language} onChange={setLanguage} anyLabel={t('Any language')} />
           </label>
           <label className="filters__field">
-            <span>Quality</span>
+            <span>{t('Quality')}</span>
             <select className="select" value={resolution} onChange={(e) => setResolution(e.target.value)}>
               {RESOLUTIONS.map((r) => (
                 <option key={r.value} value={r.value}>
@@ -236,77 +246,80 @@ export function VersionsSheet({
             </select>
           </label>
           <label className="filters__field">
-            <span>Sort</span>
+            <span>{t('Sort')}</span>
             <select className="select" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-              <option value="best">Best match</option>
-              <option value="seeders">Most seeders</option>
-              <option value="size-desc">Largest</option>
-              <option value="size-asc">Smallest</option>
-              <option value="newest">Newest</option>
+              <option value="best">{t('Best match')}</option>
+              <option value="seeders">{t('Most seeders')}</option>
+              <option value="size-desc">{t('Largest')}</option>
+              <option value="size-asc">{t('Smallest')}</option>
+              <option value="newest">{t('Newest')}</option>
             </select>
           </label>
           <label className="filters__field filters__field--grow">
-            <span>Filter</span>
+            <span>{t('Filter')}</span>
             <span className="input-icon">
               <Search size={16} />
-              <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. remux, x265, group name" />
+              <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder={t('e.g. remux, x265, group name')} />
             </span>
           </label>
         </div>
         <div className="filters__toggles">
           <label className="check">
             <input type="checkbox" checked={hideRejected} onChange={(e) => setHideRejected(e.target.checked)} />
-            <span>Hide releases Radarr/Sonarr would skip</span>
+            <span>{t('Hide releases Radarr/Sonarr would skip')}</span>
           </label>
           {language && (
             <label className="check">
               <input type="checkbox" checked={includeMulti} onChange={(e) => setIncludeMulti(e.target.checked)} />
-              <span>Include MULTi releases that might have {langName(language)}</span>
+              <span>{t('Include MULTi releases that might have {language}', { language: langName(language) })}</span>
             </label>
           )}
           {language && presentCodes.length > 0 && !presentCodes.includes(language) && (
-            <span className="muted">No release is tagged {langName(language)} yet.</span>
+            <span className="muted">{t('No release is tagged {language} yet.', { language: langName(language) })}</span>
           )}
           {me?.isAdmin && data?.limit && (
             <label className="check">
               <input type="checkbox" checked={showOversized} onChange={(e) => setShowOversized(e.target.checked)} />
-              <span>Show releases over the size limit</span>
+              <span>{t('Show releases over the size limit')}</span>
             </label>
           )}
         </div>
         {data && data.hiddenOversized > 0 && data.limit && (
           <p className="versions__limit">
-            {data.hiddenOversized} release{data.hiddenOversized === 1 ? ' is' : 's are'} hidden for being over the{' '}
-            {bytes(data.limit.bytes)}
-            {data.limit.perEpisode ? ' per episode' : ''} limit{me?.isAdmin ? '.' : ' set by your admin.'}
+            {me?.isAdmin
+              ? tn(data.hiddenOversized, '{n} release is hidden for being over the {limit} limit.', '{n} releases are hidden for being over the {limit} limit.', { limit: oversizeLimit })
+              : tn(
+                  data.hiddenOversized,
+                  '{n} release is hidden for being over the {limit} limit set by your admin.',
+                  '{n} releases are hidden for being over the {limit} limit set by your admin.',
+                  { limit: oversizeLimit },
+                )}
           </p>
         )}
 
         {search.isLoading || search.isFetching ? (
           <div className="versions__loading">
             <Spinner size={26} />
-            <p>Asking your indexers… this can take up to a minute.</p>
+            <p>{t('Asking your indexers… this can take up to a minute.')}</p>
           </div>
         ) : search.isError ? (
           <ErrorState error={search.error} retry={() => void search.refetch()} />
         ) : (
           <>
             <div className="versions__count">
-              <span>
-                {shown} of {total} releases
-              </span>
+              <span>{t('{shown} of {total} releases', { shown, total })}</span>
               <button className="btn btn--ghost btn--sm" onClick={() => void search.refetch()}>
-                <RefreshCw size={14} /> Search again
+                <RefreshCw size={14} /> {t('Search again')}
               </button>
             </div>
             {shown === 0 ? (
               <div className="empty">
-                <p>Nothing matches these filters.</p>
+                <p>{t('Nothing matches these filters.')}</p>
               </div>
             ) : (
               <ul className="releases">
                 {strong.map(renderRelease)}
-                {maybe.length > 0 && <li className="releases__divider">Might include {langName(language)} (MULTi)</li>}
+                {maybe.length > 0 && <li className="releases__divider">{t('Might include {language} (MULTi)', { language: langName(language) })}</li>}
                 {maybe.map(renderRelease)}
               </ul>
             )}

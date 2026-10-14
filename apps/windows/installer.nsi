@@ -1,6 +1,7 @@
-; The Netfish for Windows installer (made by build.sh with NSIS).
+﻿; The Netfish for Windows installer (made by build.sh with NSIS).
 ; Installs for the current person only (no administrator rights needed) into
 ; %LOCALAPPDATA%\Programs\Netfish, with Start menu and desktop shortcuts.
+; Saved as UTF-8 with a BOM, so makensis reads the Italian text right on any system.
 
 Unicode true
 !include "MUI2.nsh"
@@ -25,16 +26,27 @@ VIAddVersionKey "LegalCopyright" "Netfish"
 !define MUI_ICON "build/Netfish.ico"
 !define MUI_UNICON "build/Netfish.ico"
 !define MUI_FINISHPAGE_RUN "$INSTDIR\Netfish.exe"
-!define MUI_FINISHPAGE_RUN_TEXT "Open Netfish"
+!define MUI_FINISHPAGE_RUN_TEXT "$(OpenNetfish)"
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
+
+; In Italian on Italian Windows, otherwise English (picked automatically).
 !insertmacro MUI_LANGUAGE "English"
+!insertmacro MUI_LANGUAGE "Italian"
+LangString OpenNetfish ${LANG_ENGLISH} "Open Netfish"
+LangString OpenNetfish ${LANG_ITALIAN} "Apri Netfish"
+LangString Needs64Bit ${LANG_ENGLISH} "Netfish needs 64-bit Windows 10 or 11."
+LangString Needs64Bit ${LANG_ITALIAN} "Netfish richiede Windows 10 o 11 a 64 bit."
+LangString NetfishOpen ${LANG_ENGLISH} "Netfish is open. It will be closed to continue."
+LangString NetfishOpen ${LANG_ITALIAN} "Netfish è aperto. Verrà chiuso per continuare."
+LangString DeleteDownloads ${LANG_ENGLISH} "Also delete the movies and episodes downloaded in Netfish, and its settings?"
+LangString DeleteDownloads ${LANG_ITALIAN} "Vuoi eliminare anche i film e gli episodi scaricati in Netfish e le sue impostazioni?"
 
 Function .onInit
   ${IfNot} ${RunningX64}
-    MessageBox MB_OK|MB_ICONSTOP "Netfish needs 64-bit Windows 10 or 11." /SD IDOK
+    MessageBox MB_OK|MB_ICONSTOP "$(Needs64Bit)" /SD IDOK
     Abort
   ${EndIf}
 FunctionEnd
@@ -47,7 +59,7 @@ FunctionEnd
   Pop $0 ; 0: it's running
   Pop $1
   ${If} $0 == 0
-    MessageBox MB_OKCANCEL|MB_ICONINFORMATION "Netfish is open. It will be closed to continue." /SD IDOK IDOK +2
+    MessageBox MB_OKCANCEL|MB_ICONINFORMATION "$(NetfishOpen)" /SD IDOK IDOK +2
     Abort
     nsExec::Exec 'taskkill /IM Netfish.exe'
     Pop $0
@@ -83,7 +95,7 @@ Section "Uninstall"
   RMDir /r "$LOCALAPPDATA\Programs\Netfish"
   DeleteRegKey HKCU "${UNINSTALL_KEY}"
   ; Downloads and settings (%LOCALAPPDATA%\Netfish) stay unless asked.
-  MessageBox MB_YESNO|MB_ICONQUESTION "Also delete the movies and episodes downloaded in Netfish, and its settings?" /SD IDNO IDNO keep
+  MessageBox MB_YESNO|MB_ICONQUESTION "$(DeleteDownloads)" /SD IDNO IDNO keep
   RMDir /r "$LOCALAPPDATA\Netfish"
   keep:
 SectionEnd

@@ -107,13 +107,30 @@
         </svg>
         <span><span class="net">net</span><span class="fish">fish</span></span>
       </div>
-      <p>Where is your Netfish server?</p>
+      <p data-t>Where is your Netfish server?</p>
       <input id="url" placeholder="192.168.1.50" inputmode="url" autocomplete="off" spellcheck="false" aria-label="Server address" />
-      <small>The address you open Netfish at in a browser. Just the numbers is enough, e.g. 192.168.1.50</small>
+      <small data-t>The address you open Netfish at in a browser. Just the numbers is enough, e.g. 192.168.1.50</small>
       <div class="error" id="error"></div>
-      <button id="go">Connect</button>
+      <button id="go" data-t>Connect</button>
     </form>
     <script>
+      // Italian when the device's language is Italian (same wording as the other apps' setup page).
+      const italian = /^it\b/i.test((navigator.languages && navigator.languages[0]) || navigator.language || '');
+      const IT = {
+        'Where is your Netfish server?': "Dov'è il tuo server Netfish?",
+        'Server address': 'Indirizzo del server',
+        'The address you open Netfish at in a browser. Just the numbers is enough, e.g. 192.168.1.50':
+          "L'indirizzo con cui apri Netfish nel browser. Bastano i numeri, ad es. 192.168.1.50",
+        Connect: 'Connetti',
+        'Connecting…': 'Connessione in corso…',
+        'Open this page in the Netfish TV app': "Apri questa pagina nell'app Netfish",
+      };
+      const t = (text) => (italian && IT[text]) || text;
+      if (italian) {
+        document.documentElement.lang = 'it';
+        for (const el of document.querySelectorAll('[data-t]')) el.textContent = t(el.textContent.replace(/\s+/g, ' ').trim());
+        document.getElementById('url').setAttribute('aria-label', t('Server address'));
+      }
       const form = document.getElementById('form');
       const input = document.getElementById('url');
       const error = document.getElementById('error');
@@ -137,14 +154,14 @@
         e.preventDefault();
         error.textContent = '';
         go.disabled = true;
-        go.textContent = 'Connecting…';
+        go.textContent = t('Connecting…');
         // Let "Connecting…" paint before the (blocking) check.
         setTimeout(() => {
-          const problem = window.NetfishTV ? NetfishTV.connect(input.value) : 'Open this page in the Netfish TV app';
+          const problem = window.NetfishTV ? NetfishTV.connect(input.value) : t('Open this page in the Netfish TV app');
           if (problem) {
             error.textContent = problem;
             go.disabled = false;
-            go.textContent = 'Connect';
+            go.textContent = t('Connect');
             go.focus();
           }
         }, 50);

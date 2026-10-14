@@ -10,6 +10,7 @@ import { HttpError } from '../lib/upstream';
 import { radarrMovie } from './arrLookup';
 import { findInLibrary, libraryIndex } from './library';
 import { seriesFor } from './releases';
+import { t } from '../lib/i18n';
 
 /**
  * Subtitles in any language, fetched by Bazarr. Its download endpoint searches
@@ -50,13 +51,13 @@ const hasLang = (subs: Array<{ code2?: string }> | undefined, lang: LangDef) => 
 
 export async function requestSubtitles(user: SessionUser, mediaType: MediaType, tmdbId: number, body: SubtitleRequest): Promise<Job> {
   const lang = findLanguage(body?.language);
-  if (!lang) throw new HttpError(400, `Unknown language "${body?.language}"`);
+  if (!lang) throw new HttpError(400, t('Unknown language "{language}"', { language: body?.language }));
   const key = `${mediaType}-${tmdbId}`;
   const hi = Boolean(body.hearingImpaired);
 
   if (mediaType === 'movie') {
     const movie = await radarrMovie(tmdbId);
-    if (!movie) throw new HttpError(404, "Radarr doesn't manage this movie, so Bazarr can't fetch subtitles for it");
+    if (!movie) throw new HttpError(404, t("Radarr doesn't manage this movie, so Bazarr can't fetch subtitles for it"));
     return startJob(key, `${lang.name} subtitles`, 1, async (job) => {
       await bazarr.downloadMovie(movie.id, lang.bazarr, hi);
       job.done = 1;
@@ -74,12 +75,12 @@ export async function requestSubtitles(user: SessionUser, mediaType: MediaType, 
   } else if (Number.isInteger(body.seasonNumber)) {
     target = { season: body.seasonNumber! };
   } else {
-    throw new HttpError(400, 'Pick a season or an episode');
+    throw new HttpError(400, t('Pick a season or an episode'));
   }
   const episodes = (await bazarr.episodes(series.id)).filter(
     (e) => e.season === target.season && (target.episode === undefined || e.episode === target.episode),
   );
-  if (!episodes.length) throw new HttpError(404, 'Bazarr has no episode files for that yet');
+  if (!episodes.length) throw new HttpError(404, t('Bazarr has no episode files for that yet'));
 
   const label =
     target.episode !== undefined

@@ -10,6 +10,7 @@ import type {
   LoginRequest,
   MediaType,
   OfflineDescriptor,
+  PersonDetail,
   PlayInfo,
   PlaybackRequest,
   PlaybackSession,
@@ -19,14 +20,17 @@ import type {
   ReleasesResponse,
   RequestSummary,
   RequestsResponse,
+  SearchResponse,
   SeasonDetail,
   ServerSettings,
   ServiceConnection,
   ServiceConnectionUpdate,
   ServiceStatus,
   TitleDetail,
+  TraktStatus,
   User,
 } from '@netfish/shared';
+import { language, t } from './i18n';
 
 export class ApiError extends Error {
   constructor(
@@ -48,13 +52,14 @@ async function call<T>(path: string, init: { method?: string; body?: unknown; ke
   try {
     res = await fetch(`/api${path}`, {
       method: init.method ?? (init.body !== undefined ? 'POST' : 'GET'),
-      headers: { 'x-netfish': '1', ...(init.body !== undefined ? { 'content-type': 'application/json' } : {}) },
+      // The server answers in the interface's language (error messages, track names…).
+      headers: { 'x-netfish': '1', 'x-netfish-lang': language, ...(init.body !== undefined ? { 'content-type': 'application/json' } : {}) },
       body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
       credentials: 'same-origin',
       keepalive: init.keepalive,
     });
   } catch {
-    throw new ApiError(0, "Can't reach the Netfish server");
+    throw new ApiError(0, t("Can't reach the Netfish server"));
   }
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => ({}));
@@ -75,7 +80,8 @@ export const api = {
   logout: () => call<{ ok: true }>('/auth/logout', { method: 'POST' }),
 
   home: () => call<HomeResponse>('/home'),
-  search: (q: string) => call<{ items: Card[] }>(`/search?q=${enc(q)}`),
+  search: (q: string) => call<SearchResponse>(`/search?q=${enc(q)}`),
+  person: (id: string) => call<PersonDetail>(`/person/${enc(id)}`),
   library: (type: MediaType, sort: string, start: number, limit = 60) =>
     call<{ items: Card[]; total: number }>(`/library?type=${type}&sort=${sort}&start=${start}&limit=${limit}`),
   discover: (kind: string, page = 1) => call<{ items: Card[]; page: number; totalPages: number }>(`/discover/${kind}?page=${page}`),
@@ -102,6 +108,11 @@ export const api = {
   testConnection: (id: string, update: ServiceConnectionUpdate) => call<ConnectionTest>(`/admin/connections/${id}/test`, { body: update }),
   setupJellyfin: (url: string, code?: string) => call<ConnectionTest>('/setup/jellyfin', { body: { url, code } }),
   saveAdminSettings: (patch: Partial<ServerSettings>) => call<ServerSettings>('/admin/settings', { method: 'PUT', body: patch }),
+  trakt: () => call<TraktStatus>('/admin/trakt'),
+  traktLink: () => call<TraktStatus>('/admin/trakt/link', { method: 'POST' }),
+  traktScrobble: (scrobble: boolean) => call<TraktStatus>('/admin/trakt', { method: 'PUT', body: { scrobble } }),
+  traktImport: () => call<TraktStatus>('/admin/trakt/import', { method: 'POST' }),
+  traktUnlink: () => call<TraktStatus>('/admin/trakt', { method: 'DELETE' }),
 
   playInfo: (itemId: string) => call<PlayInfo>(`/play/${enc(itemId)}`),
   /** apple: MP4 for Apple's player; mp4: MP4 with AAC/Opus/FLAC sound (Android); desktop takes MKV too. */

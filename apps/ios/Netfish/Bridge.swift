@@ -57,13 +57,13 @@ final class BridgeHandler: NSObject, WKScriptMessageHandlerWithReply {
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping (Any?, String?) -> Void) {
-        guard let body = message.body as? [String: Any], let cmd = body["cmd"] as? String else { return replyHandler(nil, "Bad request") }
+        guard let body = message.body as? [String: Any], let cmd = body["cmd"] as? String else { return replyHandler(nil, L("Bad request")) }
         let args = body["args"]
         let origin = message.frameInfo.securityOrigin
         let local = origin.protocol == LocalScheme.scheme
         let server = Server.url
         let fromServer = server.map { origin.protocol == $0.scheme && origin.host == $0.host && origin.port == ($0.port ?? 0) } ?? false
-        guard message.frameInfo.isMainFrame, local || fromServer else { return replyHandler(nil, "Not allowed here") }
+        guard message.frameInfo.isMainFrame, local || fromServer else { return replyHandler(nil, L("Not allowed here")) }
 
         Task { @MainActor in
             do {
@@ -105,14 +105,14 @@ final class BridgeHandler: NSObject, WKScriptMessageHandlerWithReply {
             controller?.video.command(command["name"] as? String ?? "", command["value"])
             return nil
         case "connect":
-            guard local else { throw Problem("Not allowed here") }
+            guard local else { throw Problem(L("Not allowed here")) }
             let url = try Server.normalize(args as? String ?? "")
             try await Server.probe(url)
             Server.url = url
             controller?.showServer(fresh: true)
             return url.absoluteString
         default:
-            throw Problem("Unknown request")
+            throw Problem(L("Unknown request"))
         }
     }
 }

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Netfish for Samsung TVs (Tizen). Packaged by scripts/build-tizen.sh; __VERSION__ comes from package.json. -->
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="https://github.com/ravifrancesco/netfish" version="__VERSION__" viewmodes="maximized">
+    <tizen:application id="NetfishTzn.Netfish" package="NetfishTzn" required_version="3.0"/>
+    <content src="index.html"/>
+    <name>Netfish</name>
+    <icon src="icon.png"/>
+    <feature name="http://tizen.org/feature/screen.size.all"/>
+    <!-- The interface comes from your Netfish server, wherever it is. -->
+    <access origin="*" subdomains="true"/>
+    <tizen:allow-navigation>*</tizen:allow-navigation>
+    <tizen:privilege name="http://tizen.org/privilege/internet"/>
+    <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+    <tizen:profile name="tv-samsung"/>
+    <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable"/>
+</widget>

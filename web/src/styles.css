@@ -1410,6 +1410,7 @@ p {
 .person {
   flex: 0 0 104px;
   display: grid;
+  align-content: start;
   gap: 2px;
   text-align: center;
 }
@@ -1430,6 +1431,85 @@ p {
   color: var(--text-3);
   font-size: 0.76rem;
   line-height: 1.25;
+}
+.person--link {
+  color: inherit;
+  text-decoration: none;
+  border-radius: 12px;
+  outline: none;
+}
+.person--link .person__img {
+  transition: box-shadow 0.15s ease;
+}
+.person--link:hover .person__img,
+.person--link:focus-visible .person__img {
+  box-shadow: 0 0 0 3px var(--text);
+}
+.person--link:hover .person__name,
+.person--link:focus-visible .person__name {
+  color: var(--accent);
+}
+.name-link {
+  color: inherit;
+  text-decoration: none;
+}
+.name-link:hover,
+.name-link:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ---------- People: search and their own page ---------- */
+
+.search-block + .search-block {
+  margin-top: clamp(24px, 3vw, 36px);
+}
+.search-block > h2 {
+  font-size: 1.15rem;
+  margin-bottom: 14px;
+}
+.ph {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: clamp(18px, 3vw, 36px);
+  align-items: start;
+}
+.ph__img {
+  width: clamp(120px, 16vw, 210px);
+  height: calc(clamp(120px, 16vw, 210px) * 1.5);
+  border-radius: var(--radius);
+  object-fit: cover;
+  font-size: 3rem;
+}
+.ph__text {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+.ph__text .page__title {
+  margin-bottom: 0;
+}
+.ph__bio {
+  color: var(--text-2);
+  line-height: 1.6;
+  max-width: 72ch;
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-line;
+}
+.ph__bio.is-open {
+  display: block;
+}
+@media (max-width: 720px) {
+  .ph {
+    grid-template-columns: 1fr;
+  }
+  .ph__img {
+    width: 132px;
+    height: 198px;
+  }
 }
 
 /* ---------- Scores ---------- */
@@ -1976,6 +2056,42 @@ a.item__link:hover {
 .input-unit__btn {
   position: absolute;
   right: 4px;
+}
+.trakt {
+  display: grid;
+  gap: 10px;
+  margin: 0 14px 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.trakt p {
+  margin: 0;
+}
+.trakt__code {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.trakt__code code {
+  font: 600 1.6rem/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.12em;
+  color: var(--text);
+}
+.trakt__wait {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.trakt__import {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.trakt__import > div {
+  flex: 1;
+  display: grid;
+  gap: 4px;
 }
 .nudge {
   display: flex;
@@ -2766,5 +2882,48 @@ html.is-tv ::-webkit-scrollbar {
   }
   .splash__word .wordmark {
     transform: none;
+  }
+}
+
+/* ---------- Older TV browsers ---------- */
+
+/* Samsung TVs from 2022 (Chromium 85) don't know aspect-ratio: posters and stills
+   get their height from padding instead, with the picture laid over it. */
+@supports not (aspect-ratio: 1 / 1) {
+  .card__frame,
+  .tp__poster {
+    height: 0;
+    padding-top: 150%;
+  }
+  .wide__frame,
+  .episode__thumb {
+    height: 0;
+    padding-top: 56.25%;
+  }
+  .tp__poster {
+    position: relative;
+  }
+  .card__img,
+  .card__fallback,
+  .wide__img,
+  .episode__img,
+  .tp__poster > * {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .skeleton--poster {
+    height: calc(var(--card-w) * 1.5);
+  }
+  .skeleton--wide {
+    height: calc(var(--wide-w) * 9 / 16);
+  }
+  .trailer__frame {
+    height: calc(min(1280px, 100vw - 48px, (100vh - 120px) * 16 / 9) * 9 / 16);
+  }
+  .item__poster {
+    height: 96px;
   }
 }

@@ -8,6 +8,7 @@ import { findLanguage, languageLabel } from '../lib/languages';
 import { HttpError, buildQuery } from '../lib/upstream';
 import { episodeLabel } from './cards';
 import { libraryIndex } from './library';
+import { t } from '../lib/i18n';
 
 const SEGMENT_TYPES = new Set(['Intro', 'Outro', 'Recap', 'Preview', 'Commercial']);
 /** Streaming limit when the viewer picked "Auto": everything on a home network. */
@@ -59,8 +60,10 @@ function proxied(url: string): string {
 
 function trackLabel(s: JfMediaStream): string {
   const lang = languageLabel(s.Language);
-  const extra = [s.Title && s.Title !== lang ? s.Title : undefined, s.IsForced ? 'Forced' : undefined].filter(Boolean);
-  return [lang ?? s.DisplayTitle ?? `Track ${s.Index}`, ...extra].join(' · ');
+  const english = findLanguage(s.Language)?.name;
+  const sameAsLanguage = s.Title === lang || s.Title === english;
+  const extra = [s.Title && !sameAsLanguage ? s.Title : undefined, s.IsForced ? t('Forced') : undefined].filter(Boolean);
+  return [lang ?? s.DisplayTitle ?? t('Track {n}', { n: s.Index }), ...extra].join(' · ');
 }
 
 function tracks(itemId: string, source: JfMediaSource) {
@@ -69,7 +72,7 @@ function tracks(itemId: string, source: JfMediaSource) {
     .filter((s) => s.Type === 'Audio')
     .map((s) => {
       const label = trackLabel(s);
-      const channels = s.Channels ? (s.Channels > 2 ? `${s.Channels - 1}.1` : s.Channels === 2 ? 'Stereo' : 'Mono') : undefined;
+      const channels = s.Channels ? (s.Channels > 2 ? `${s.Channels - 1}.1` : s.Channels === 2 ? t('Stereo') : t('Mono')) : undefined;
       // Skip "(Stereo)" when the track's own name already says so.
       return { index: s.Index, label: channels && !label.toLowerCase().includes(channels.toLowerCase()) ? `${label} (${channels})` : label, s };
     })
@@ -157,9 +160,9 @@ export async function startPlayback(user: SessionUser, itemId: string, body: Pla
       AutoOpenLiveStream: true,
     });
   let info = await ask(body.audioStreamIndex);
-  if (info.ErrorCode) throw new HttpError(415, `Jellyfin can't play this here (${info.ErrorCode})`);
+  if (info.ErrorCode) throw new HttpError(415, t("Jellyfin can't play this here ({code})", { code: info.ErrorCode }));
   let source = info.MediaSources.find((s) => s.Id === body.mediaSourceId) ?? info.MediaSources[0];
-  if (!source) throw new HttpError(404, 'No playable file found');
+  if (!source) throw new HttpError(404, t('No playable file found'));
 
   // Nobody chose an audio track and the default one needs converting: try a same-language track that plays as-is.
   if (body.audioStreamIndex === undefined && !(allowDirectPlay && source.SupportsDirectPlay) && reasonsOf(source).some((r) => /^Audio/i.test(r))) {
@@ -190,7 +193,7 @@ export async function startPlayback(user: SessionUser, itemId: string, body: Pla
     method = 'DirectStream';
     url = proxied(`/Videos/${itemId}/stream.${source.Container ?? 'mp4'}?static=true&mediaSourceId=${source.Id}&playSessionId=${info.PlaySessionId}`);
   } else {
-    throw new HttpError(415, "This file can't be played in this app yet");
+    throw new HttpError(415, t("This file can't be played in this app yet"));
   }
 
   return {
@@ -247,11 +250,11 @@ const safeName = (s: string) => s.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g,
  * per-user "Allow media downloading".
  */
 export async function offlineInfo(user: SessionUser, itemId: string, target: OfflineTarget = 'desktop'): Promise<OfflineDescriptor> {
-  if (!user.canDownload) throw new HttpError(403, "Your Jellyfin account isn't allowed to download. An admin can turn on \"Allow media downloading\" for you in Jellyfin.");
+  if (!user.canDownload) throw new HttpError(403, t('Your Jellyfin account isn\'t allowed to download. An admin can turn on "Allow media downloading" for you in Jellyfin.'));
   const [item, info] = await Promise.all([jellyfin.item(user.token, user.id, itemId), playInfo(user, itemId)]);
-  if (item.Type !== 'Movie' && item.Type !== 'Episode') throw new HttpError(400, 'Only movies and episodes can be downloaded');
+  if (item.Type !== 'Movie' && item.Type !== 'Episode') throw new HttpError(400, t('Only movies and episodes can be downloaded'));
   const source = item.MediaSources?.[0];
-  if (!source) throw new HttpError(404, 'No file to download');
+  if (!source) throw new HttpError(404, t('No file to download'));
 
   const streams = source.MediaStreams ?? item.MediaStreams ?? [];
   const playable = PLAYABLE[target];

@@ -4,6 +4,7 @@ import type { ServerSettings } from '@netfish/shared';
 import { config } from './config';
 import { writeJson } from './lib/storage';
 import { HttpError } from './lib/upstream';
+import { t } from './lib/i18n';
 
 /**
  * Settings admins change from the app, kept in a small JSON file in the data
@@ -16,7 +17,7 @@ const DEFAULTS: ServerSettings = { maxMovieSizeGb: null, maxEpisodeSizeGb: null,
 function size(value: unknown, field: string): number | null {
   if (value === null || value === '' || value === 0) return null;
   const n = Number(value);
-  if (!Number.isFinite(n) || n < 0 || n > 10_000) throw new HttpError(400, `${field} must be a size in GB, or empty for no limit`);
+  if (!Number.isFinite(n) || n < 0 || n > 10_000) throw new HttpError(400, t('{field} must be a size in GB, or empty for no limit', { field: t(field) }));
   return Math.round(n * 100) / 100;
 }
 

@@ -7,6 +7,7 @@ import { useRefreshTitle } from '../lib/hooks';
 import { getPrefs } from '../lib/prefs';
 import { LanguageSelect } from './LanguageSelect';
 import { Modal, Progress, Spinner, useToast } from './ui';
+import { t } from '../i18n';
 
 /** Ask Bazarr for subtitles in any language, for a movie, a season or one episode. */
 export function SubtitlesSheet({ title, onClose, seasonNumber }: { title: TitleDetail; onClose: () => void; seasonNumber?: number }) {
@@ -49,29 +50,29 @@ export function SubtitlesSheet({ title, onClose, seasonNumber }: { title: TitleD
 
   return (
     <Modal
-      title={`Subtitles · ${title.title}`}
+      title={`${t('Subtitles')} · ${title.title}`}
       onClose={onClose}
       footer={
         <button className="btn btn--accent" disabled={start.isPending || !language} onClick={() => start.mutate()}>
           {start.isPending ? <Spinner size={18} /> : <Captions size={18} />}
-          Find subtitles
+          {t('Find subtitles')}
         </button>
       }
     >
       <div className="stack">
         {title.subtitles.length > 0 && (
           <p className="muted">
-            Already available: {title.subtitles.map((s) => s.label + (s.forced ? ' (forced)' : '')).join(', ')}
+            {t('Already available: {list}', { list: title.subtitles.map((s) => (s.forced ? t('{label} (forced)', { label: s.label }) : s.label)).join(', ') })}
           </p>
         )}
         <label className="field">
-          <span>Language</span>
+          <span>{t('Language')}</span>
           <LanguageSelect value={language} onChange={setLanguage} />
         </label>
         {isTv && (
           <div className="field-row">
             <label className="field">
-              <span>Season</span>
+              <span>{t('Season')}</span>
               <select className="select" value={season} onChange={(e) => (setSeason(Number(e.target.value)), setEpisodeId(''))}>
                 {seasons.map((s) => (
                   <option key={s.seasonNumber} value={s.seasonNumber}>
@@ -81,9 +82,9 @@ export function SubtitlesSheet({ title, onClose, seasonNumber }: { title: TitleD
               </select>
             </label>
             <label className="field">
-              <span>Episodes</span>
+              <span>{t('Episodes')}</span>
               <select className="select" value={episodeId} onChange={(e) => setEpisodeId(e.target.value)}>
-                <option value="">All in this season</option>
+                <option value="">{t('All in this season')}</option>
                 {(episodes.data?.episodes ?? [])
                   .filter((e) => e.jellyfinId)
                   .map((e) => (
@@ -97,9 +98,9 @@ export function SubtitlesSheet({ title, onClose, seasonNumber }: { title: TitleD
         )}
         <label className="check">
           <input type="checkbox" checked={hi} onChange={(e) => setHi(e.target.checked)} />
-          <span>Hearing-impaired (SDH) subtitles</span>
+          <span>{t('Hearing-impaired (SDH) subtitles')}</span>
         </label>
-        <p className="muted small">Bazarr searches your subtitle providers; Netfish refreshes the library when they arrive.</p>
+        <p className="muted small">{t('Bazarr searches your subtitle providers; Netfish refreshes the library when they arrive.')}</p>
 
         {(jobs.data?.items.length ?? 0) > 0 && (
           <ul className="jobs">
@@ -112,7 +113,7 @@ export function SubtitlesSheet({ title, onClose, seasonNumber }: { title: TitleD
                     <>
                       <Progress value={j.total ? j.done / j.total : 0} />
                       <span className="muted small">
-                        {j.done} of {j.total} searched…
+                        {t('{done} of {total} searched…', { done: j.done, total: j.total })}
                       </span>
                     </>
                   ) : (

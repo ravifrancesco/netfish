@@ -24,6 +24,7 @@ import { allDownloads, downloadsFor, progressByTitle } from './downloads';
 import { findInLibrary, libraryIndex } from './library';
 import { toSummary } from './requests';
 import { maybeSeerrUserId } from './seerrUsers';
+import { t } from '../lib/i18n';
 
 const EMPTY: JfItemsResult = { Items: [], TotalRecordCount: 0 };
 const EMPTY_PAGE: SeerrPage = { page: 1, totalPages: 0, totalResults: 0, results: [] };
@@ -63,8 +64,8 @@ function playOf(item: JfItem | undefined): TitleDetail['play'] {
   const pos = item.UserData?.PlaybackPositionTicks ?? 0;
   const progress = pos && item.RunTimeTicks ? pos / item.RunTimeTicks : undefined;
   const ep = item.Type === 'Episode' ? episodeLabel(item) : undefined;
-  const verb = pos > 0 ? 'Resume' : 'Play';
-  return { itemId: item.Id, label: ep ? `${verb} ${ep}` : verb, progress };
+  const label = pos > 0 ? (ep ? t('Resume {episode}', { episode: ep }) : t('Resume')) : ep ? t('Play {episode}', { episode: ep }) : t('Play');
+  return { itemId: item.Id, label, progress };
 }
 
 /** The episode the Play button should start: in-progress or next unwatched, else the first. */
@@ -83,18 +84,29 @@ function castFromTmdb(credits?: SeerrMovie['credits']): Person[] {
   return [...(credits?.cast ?? [])]
     .sort((a, b) => (a.order ?? 99) - (b.order ?? 99))
     .slice(0, 16)
-    .map((c) => ({ name: c.name, role: c.character, photo: tmdbImage(c.profilePath, 'w185') }));
+    .map((c) => ({ id: c.id ? String(c.id) : undefined, name: c.name, role: c.character, photo: tmdbImage(c.profilePath, 'w185') }));
+}
+
+/** Directors and writers, each once even when they did both. */
+function crewFromTmdb(credits?: SeerrMovie['credits']): Person[] {
+  const seen = new Set<string>();
+  return (credits?.crew ?? [])
+    .filter((c) => c.job === 'Director' || c.job === 'Screenplay' || c.job === 'Writer')
+    .filter((c) => !seen.has(c.name) && Boolean(seen.add(c.name)))
+    .slice(0, 4)
+    .map((c) => ({ id: c.id ? String(c.id) : undefined, name: c.name, role: c.job }));
 }
 
 function castFromJellyfin(item: JfItem): { cast: Person[]; crew: Person[] } {
   const people = item.People ?? [];
   const photo = (p: (typeof people)[number]) => jfImage(p.Id, 'Primary', p.PrimaryImageTag, { maxWidth: 185 });
   return {
-    cast: people.filter((p) => p.Type === 'Actor').slice(0, 16).map((p) => ({ name: p.Name, role: p.Role, photo: photo(p) })),
+    cast: people.filter((p) => p.Type === 'Actor').slice(0, 16).map((p) => ({ id: `jf-${p.Id}`, name: p.Name, role: p.Role, photo: photo(p) })),
     crew: people
       .filter((p) => p.Type === 'Director' || p.Type === 'Writer')
+      .filter((p, i, all) => all.findIndex((q) => q.Name === p.Name) === i)
       .slice(0, 4)
-      .map((p) => ({ name: p.Name, role: p.Type })),
+      .map((p) => ({ id: `jf-${p.Id}`, name: p.Name, role: p.Type })),
   };
 }
 
@@ -113,7 +125,7 @@ export async function movieDetail(user: SessionUser, tmdbId: number): Promise<Ti
   const index = await libraryIndex(user);
   const entry = findInLibrary(index, 'movie', tmdbId);
   if (!has.seerr()) {
-    if (!entry) throw new HttpError(404, 'Not in your library');
+    if (!entry) throw new HttpError(404, t('Not in your library'));
     return jellyfinDetail(user, entry.id);
   }
 
@@ -149,10 +161,7 @@ export async function movieDetail(user: SessionUser, tmdbId: number): Promise<Ti
     originalLanguage: movie.originalLanguage,
     status,
     cast: castFromTmdb(movie.credits),
-    crew: (movie.credits?.crew ?? [])
-      .filter((c) => c.job === 'Director' || c.job === 'Screenplay' || c.job === 'Writer')
-      .slice(0, 4)
-      .map((c) => ({ name: c.name, role: c.job })),
+    crew: crewFromTmdb(movie.credits),
     trailerYoutubeKey: trailerOf(movie.relatedVideos),
     play: playOf(item),
     ...tracksFrom(streamsOf(item)),
@@ -177,7 +186,7 @@ export async function tvDetail(user: SessionUser, tmdbId: number): Promise<Title
   const index = await libraryIndex(user);
   if (!has.seerr()) {
     const entry = findInLibrary(index, 'tv', tmdbId);
-    if (!entry) throw new HttpError(404, 'Not in your library');
+    if (!entry) throw new HttpError(404, t('Not in your library'));
     return jellyfinDetail(user, entry.id);
   }
 
@@ -227,7 +236,7 @@ export async function tvDetail(user: SessionUser, tmdbId: number): Promise<Title
     originalLanguage: tv.originalLanguage,
     status,
     cast: castFromTmdb(tv.credits),
-    crew: (tv.createdBy ?? []).map((c) => ({ name: c.name, role: 'Creator' })),
+    crew: (tv.createdBy ?? []).map((c) => ({ id: c.id ? String(c.id) : undefined, name: c.name, role: 'Creator' })),
     trailerYoutubeKey: trailerOf(tv.relatedVideos),
     play: playOf(playItem),
     ...tracksFrom(streamsOf(playItem)),
@@ -272,7 +281,7 @@ export async function seasonDetail(user: SessionUser, tmdbId: number, seasonNumb
   const tv = has.seerr() ? await catalog.tv(tmdbId) : undefined;
   const tvdbId = tv?.externalIds?.tvdbId;
   const entry = findInLibrary(index, 'tv', tmdbId, tvdbId);
-  if (!tv && !entry) throw new HttpError(404, 'Not in your library');
+  if (!tv && !entry) throw new HttpError(404, t('Not in your library'));
 
   const [season, jfEps, downloads] = await Promise.all([
     tv ? settle(catalog.season(tmdbId, seasonNumber), undefined) : Promise.resolve(undefined),
@@ -313,7 +322,7 @@ export async function seasonDetail(user: SessionUser, tmdbId: number, seasonNumb
 
 export async function jellyfinDetail(user: SessionUser, itemId: string): Promise<TitleDetail> {
   const [item, downloads] = await Promise.all([jellyfin.item(user.token, user.id, itemId), settle(allDownloads(), [])]);
-  if (item.Type !== 'Movie' && item.Type !== 'Series') throw new HttpError(400, `Can't show details for a ${item.Type}`);
+  if (item.Type !== 'Movie' && item.Type !== 'Series') throw new HttpError(400, t("Can't show details for a {type}", { type: item.Type }));
   const mediaType: MediaType = item.Type === 'Series' ? 'tv' : 'movie';
   const tmdbId = Number(item.ProviderIds?.Tmdb) || undefined;
   const tvdbId = Number(item.ProviderIds?.Tvdb) || undefined;

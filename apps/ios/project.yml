@@ -6,10 +6,11 @@ options:
   deploymentTarget:
     iOS: "16.0"
   createIntermediateGroups: true
+  developmentLanguage: en
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.1.0"
+    MARKETING_VERSION: "0.2.0"
     CURRENT_PROJECT_VERSION: "1"
 targets:
   Netfish:
@@ -37,6 +38,11 @@ targets:
       path: Netfish/Info.plist
       properties:
         CFBundleDisplayName: Netfish
+        # English, plus Italian (Netfish/it.lproj, and Strings.swift for the app's own words).
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations:
+          - en
+          - it
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSRequiresIPhoneOS: true

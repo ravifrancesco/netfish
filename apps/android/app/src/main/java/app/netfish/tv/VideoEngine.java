@@ -126,7 +126,7 @@ final class VideoEngine {
             @Override
             public void onPlayerError(PlaybackException error) {
                 Log.w(TAG, "playback failed", error);
-                if (active) push(json("ended", true, "error", "The TV couldn't play this (" + error.getErrorCodeName() + ")"));
+                if (active) push(json("ended", true, "error", activity.getString(R.string.error_cant_play, error.getErrorCodeName())));
             }
         });
         player.addAnalyticsListener(new AnalyticsListener() {

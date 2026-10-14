@@ -52,7 +52,7 @@ final class LocalScheme: NSObject, WKURLSchemeHandler {
     private func fail(_ task: WKURLSchemeTask) {
         let response = HTTPURLResponse(url: task.request.url ?? URL(string: "\(Self.scheme)://app/")!, statusCode: 404, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "text/plain"])!
         task.didReceive(response)
-        task.didReceive(Data("Not found".utf8))
+        task.didReceive(Data(L("Not found").utf8))
         task.didFinish()
     }
 

@@ -3,7 +3,7 @@ plugins {
 }
 
 // Version shown in Settings; keep in step with the root package.json.
-def netfishVersion = '0.1.0'
+def netfishVersion = '0.2.0'
 
 android {
     namespace 'app.netfish.tv'
@@ -14,7 +14,8 @@ android {
         // Fire OS 6 (Fire TV Stick 2nd gen) and newer.
         minSdk 25
         targetSdk 35
-        versionCode 1
+        // 0.2.0 → 200: always higher for a newer release, so Android installs it as an update.
+        versionCode netfishVersion.tokenize('.').collect { it as int }.with { it[0] * 10000 + it[1] * 100 + it[2] }
         versionName netfishVersion
         buildConfigField 'String', 'NETFISH_VERSION', "\"${netfishVersion}\""
     }

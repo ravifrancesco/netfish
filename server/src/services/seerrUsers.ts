@@ -3,6 +3,7 @@ import { seerr } from '../clients/seerr';
 import { onConnectionChange } from '../connections';
 import { MINUTE, TTLCache } from '../lib/cache';
 import { HttpError } from '../lib/upstream';
+import { t } from '../lib/i18n';
 
 /**
  * Seerr keeps its own users. To file requests as the right person we find the
@@ -42,7 +43,7 @@ export function seerrUserId(user: SessionUser): Promise<number> {
     if (afterImport) return afterImport;
     throw new HttpError(
       403,
-      `Your account (${user.name}) isn't linked in Seerr yet. An admin can fix this with "Import Jellyfin Users" in Seerr.`,
+      t('Your account ({name}) isn\'t linked in Seerr yet. An admin can fix this with "Import Jellyfin Users" in Seerr.', { name: user.name }),
     );
   });
 }

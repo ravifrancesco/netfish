@@ -7,6 +7,7 @@ import { api } from '../api';
 import { appKind, desktop } from '../lib/desktop';
 import { useConfig } from '../lib/hooks';
 import { Logo } from './Logo';
+import { t } from '../i18n';
 
 function useActiveDownloads() {
   const { data: config } = useConfig();
@@ -37,18 +38,18 @@ function SearchBox() {
 
   useEffect(() => {
     if (!open) return;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       const q = value.trim();
       if (q) navigate(`/search?q=${encodeURIComponent(q)}`, { replace: onSearch });
     }, 300);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className={`search${open ? ' is-open' : ''}`}>
       <button
         className="icon-btn"
-        aria-label="Search"
+        aria-label={t('Search')}
         onClick={() => {
           setOpen(true);
           setTimeout(() => input.current?.focus(), 0);
@@ -59,15 +60,15 @@ function SearchBox() {
       <input
         ref={input}
         className="search__input"
-        placeholder="Titles, people, anything"
+        placeholder={t('Titles, people, anything')}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onBlur={() => !value && setOpen(false)}
         onKeyDown={(e) => e.key === 'Escape' && (setValue(''), setOpen(false), input.current?.blur())}
-        aria-label="Search"
+        aria-label={t('Search')}
       />
       {open && value && (
-        <button className="icon-btn icon-btn--sm" aria-label="Clear search" onClick={() => (setValue(''), input.current?.focus())}>
+        <button className="icon-btn icon-btn--sm" aria-label={t('Clear search')} onClick={() => (setValue(''), input.current?.focus())}>
           <X size={16} />
         </button>
       )}
@@ -100,25 +101,25 @@ function ProfileMenu({ user }: { user: User }) {
 
   return (
     <div className="profile" ref={ref}>
-      <button className="avatar" onClick={() => setOpen((o) => !o)} aria-label="Account menu" aria-expanded={open}>
+      <button className="avatar" onClick={() => setOpen((o) => !o)} aria-label={t('Account menu')} aria-expanded={open}>
         {user.avatar ? <img src={user.avatar} alt="" /> : <span>{user.name[0]?.toUpperCase()}</span>}
       </button>
       {open && (
         <div className="menu" role="menu">
           <div className="menu__head">
             <strong>{user.name}</strong>
-            {user.isAdmin && <span className="badge badge--dim">Admin</span>}
+            {user.isAdmin && <span className="badge badge--dim">{t('Admin')}</span>}
           </div>
           {desktop()?.openOffline && (
             <button className="menu__item" onClick={() => desktop()?.openOffline?.()} role="menuitem">
-              <HardDriveDownload size={16} /> Downloads on {appKind().device}
+              <HardDriveDownload size={16} /> {t('Downloads on {device}', { device: appKind().device })}
             </button>
           )}
           <Link to="/settings" className="menu__item" onClick={() => setOpen(false)} role="menuitem">
-            <Settings size={16} /> Settings
+            <Settings size={16} /> {t('Settings')}
           </Link>
           <button className="menu__item" onClick={() => logout.mutate()} role="menuitem">
-            <LogOut size={16} /> Sign out
+            <LogOut size={16} /> {t('Sign out')}
           </button>
         </div>
       )}
@@ -127,10 +128,10 @@ function ProfileMenu({ user }: { user: User }) {
 }
 
 const LINKS = [
-  { to: '/', label: 'Home', icon: House, end: true },
-  { to: '/shows', label: 'Shows', icon: Tv },
-  { to: '/movies', label: 'Movies', icon: Film },
-  { to: '/activity', label: 'Activity', icon: Activity },
+  { to: '/', label: t('Home'), icon: House, end: true },
+  { to: '/shows', label: t('Shows'), icon: Tv },
+  { to: '/movies', label: t('Movies'), icon: Film },
+  { to: '/activity', label: t('Activity'), icon: Activity },
 ];
 
 export function Nav({ user }: { user: User }) {
@@ -146,7 +147,7 @@ export function Nav({ user }: { user: User }) {
   return (
     <>
       <header className={`nav${scrolled ? ' is-scrolled' : ''}`}>
-        <Link to="/" className="nav__logo" aria-label="Netfish home">
+        <Link to="/" className="nav__logo" aria-label={t('Netfish home')}>
           <Logo />
         </Link>
         <nav className="nav__links">
@@ -162,7 +163,7 @@ export function Nav({ user }: { user: User }) {
           <ProfileMenu user={user} />
         </div>
       </header>
-      <nav className="tabbar" aria-label="Main">
+      <nav className="tabbar" aria-label={t('Main')}>
         {LINKS.slice(0, 3).map(({ to, label, icon: Icon, end }) => (
           <NavLink key={to} to={to} end={end} className="tabbar__item">
             <Icon size={22} />
@@ -171,11 +172,11 @@ export function Nav({ user }: { user: User }) {
         ))}
         <NavLink to="/search" className="tabbar__item">
           <Search size={22} />
-          <span>Search</span>
+          <span>{t('Search')}</span>
         </NavLink>
         <NavLink to="/activity" className="tabbar__item">
           <Clapperboard size={22} />
-          <span>Activity</span>
+          <span>{t('Activity')}</span>
           {active > 0 && <span className="nav__count nav__count--tab">{active}</span>}
         </NavLink>
       </nav>

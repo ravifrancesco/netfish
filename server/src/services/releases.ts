@@ -10,6 +10,7 @@ import { LANGUAGES, findLanguage, releaseTokens, titleHasLanguage, titleIsMulti 
 import { radarrMovie, sonarrSeries } from './arrLookup';
 import { catalog } from './catalog';
 import { findInLibrary, libraryIndex } from './library';
+import { t } from '../lib/i18n';
 
 /**
  * "Versions": the same results Radarr/Sonarr's Interactive Search shows (every
@@ -37,7 +38,7 @@ function sizeLimit(mediaType: MediaType): ReleasesResponse['limit'] {
 const shown = new TTLCache<Map<string, number>>(500);
 
 function assertAllowed(user: SessionUser) {
-  if (!canChooseVersion(user)) throw new HttpError(403, 'On this server only admins can pick specific versions');
+  if (!canChooseVersion(user)) throw new HttpError(403, t('On this server only admins can pick specific versions'));
 }
 
 /** Rough cross-profile quality ordering: resolution first, then source. */
@@ -119,7 +120,7 @@ async function tvdbFor(user: SessionUser, tmdbId: number): Promise<number | unde
 
 export async function seriesFor(user: SessionUser, tmdbId: number) {
   const series = await sonarrSeries(await tvdbFor(user, tmdbId));
-  if (!series) throw new HttpError(404, "Sonarr doesn't manage this show yet — request it first");
+  if (!series) throw new HttpError(404, t("Sonarr doesn't manage this show yet — request it first"));
   return series;
 }
 
@@ -137,12 +138,12 @@ export async function searchReleases(
   let seasonEpisodes: number | undefined;
   if (mediaType === 'movie') {
     const movie = await radarrMovie(tmdbId);
-    if (!movie) throw new HttpError(404, "Radarr doesn't manage this movie yet — request it first");
+    if (!movie) throw new HttpError(404, t("Radarr doesn't manage this movie yet — request it first"));
     current = movie.movieFile ? describeFiles([movie.movieFile]) : undefined;
     raw = await radarr.releases(movie.id);
   } else {
     const season = body.seasonNumber;
-    if (!Number.isInteger(season)) throw new HttpError(400, 'Pick a season');
+    if (!Number.isInteger(season)) throw new HttpError(400, t('Pick a season'));
     const series = await seriesFor(user, tmdbId);
     const files = (await settle(sonarr.episodeFiles(series.id), [])).filter((f) => f.seasonNumber === season);
     current = describeFiles(files);
@@ -150,7 +151,7 @@ export async function searchReleases(
     seasonEpisodes = episodes.length || undefined;
     if (Number.isInteger(body.episodeNumber)) {
       const episode = episodes.find((e) => e.episodeNumber === body.episodeNumber);
-      if (!episode) throw new HttpError(404, "Sonarr doesn't know that episode");
+      if (!episode) throw new HttpError(404, t("Sonarr doesn't know that episode"));
       raw = await sonarr.episodeReleases(episode.id);
     } else {
       raw = await sonarr.releases(series.id, season!);
@@ -199,8 +200,13 @@ export async function grabRelease(user: SessionUser, mediaType: MediaType, tmdbI
   const limit = sizeLimit(mediaType);
   if (limit && !user.isAdmin) {
     const measured = shown.get(`${mediaType}-${tmdbId}`)?.get(body.guid);
-    if (measured === undefined) throw new HttpError(409, 'That search has expired. Search again and pick the release.');
-    if (measured > limit.bytes) throw new HttpError(403, `That release is over the ${limit.bytes / GB} GB${limit.perEpisode ? ' per episode' : ''} limit set by your admin`);
+    if (measured === undefined) throw new HttpError(409, t('That search has expired. Search again and pick the release.'));
+    if (measured > limit.bytes) throw new HttpError(
+        403,
+        limit.perEpisode
+          ? t('That release is over the {size} GB per episode limit set by your admin', { size: limit.bytes / GB })
+          : t('That release is over the {size} GB limit set by your admin', { size: limit.bytes / GB }),
+      );
   }
   await (mediaType === 'movie' ? radarr : sonarr).grab(body.guid, body.indexerId);
   const mine = grabs.get(user.id) ?? new Map<string, number>();

@@ -1,4 +1,5 @@
 import type { Language } from '@netfish/shared';
+import { languageName } from './i18n';
 
 /**
  * One table to translate between the language "dialects" of each service:
@@ -97,14 +98,15 @@ export function findLanguage(code: string | undefined): LangDef | undefined {
   return byCode.get(c) ?? LANGUAGES.find((l) => l.iso3.includes(c) || l.bazarr === c || l.name.toLowerCase() === c);
 }
 
-/** "spa" → "Spanish", "eng" → "English"; unknown codes are returned as-is. */
+/** "spa" → "Spanish" ("Spagnolo" for Italian requests), "eng" → "English"; unknown codes are returned as-is. */
 export function languageLabel(code: string | undefined): string | undefined {
   if (!code) return undefined;
-  return findLanguage(code)?.name ?? code;
+  const lang = findLanguage(code);
+  return lang ? languageName(lang.code, lang.name) : code;
 }
 
 export const publicLanguages = (): Language[] =>
-  LANGUAGES.map(({ code, name, native }) => ({ code, name, native }));
+  LANGUAGES.map(({ code, name, native }) => ({ code, name: languageName(code, name), native }));
 
 // ---------- Release title parsing ----------
 

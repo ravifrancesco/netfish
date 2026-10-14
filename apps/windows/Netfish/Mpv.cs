@@ -26,7 +26,7 @@ sealed class MpvPlayer : IDisposable
     {
         ui = SynchronizationContext.Current ?? throw new InvalidOperationException("Create the player on the UI thread");
         mpv = Lib.mpv_create();
-        if (mpv == IntPtr.Zero) throw new InvalidOperationException("mpv didn't start");
+        if (mpv == IntPtr.Zero) throw new InvalidOperationException(L("mpv didn't start"));
         long wid = window.ToInt64();
         Lib.mpv_set_option(mpv, "wid", Lib.FORMAT_INT64, ref wid);
         // A player inside an app: no mpv window of its own, no config files, no mpv controls, keys or mouse.
@@ -41,7 +41,7 @@ sealed class MpvPlayer : IDisposable
         {
             Lib.mpv_set_option_string(mpv, name, value); // options this mpv doesn't know are simply skipped
         }
-        Check(Lib.mpv_initialize(mpv), "mpv didn't start");
+        Check(Lib.mpv_initialize(mpv), L("mpv didn't start"));
         ulong id = 0;
         foreach (var (name, format) in new[]
         {
@@ -186,7 +186,7 @@ sealed class MpvPlayer : IDisposable
                     var end = Marshal.PtrToStructure<Lib.EventEndFile>(e.data);
                     if (end.reason == Lib.END_EOF) Post(new() { ["ended"] = true, ["finished"] = true });
                     else if (end.reason == Lib.END_ERROR)
-                        Post(new() { ["ended"] = true, ["finished"] = false, ["error"] = Marshal.PtrToStringUTF8(Lib.mpv_error_string(end.error)) ?? "mpv couldn't play this" });
+                        Post(new() { ["ended"] = true, ["finished"] = false, ["error"] = Marshal.PtrToStringUTF8(Lib.mpv_error_string(end.error)) ?? L("mpv couldn't play this") });
                     break;
                 }
             }
