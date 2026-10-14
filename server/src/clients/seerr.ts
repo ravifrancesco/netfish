@@ -1,0 +1,197 @@
+import { config, has } from '../config';
+import { NotConfiguredError, request, type RequestOptions } from '../lib/upstream';
+
+/**
+ * Seerr (Jellyseerr / Overseerr lineage) gives us TMDB discovery,
+ * recommendations and the request workflow. We call it with the API key and,
+ * where it matters, `X-API-User` so requests are filed as the right person.
+ */
+
+export const MediaStatus = { UNKNOWN: 1, PENDING: 2, PROCESSING: 3, PARTIALLY_AVAILABLE: 4, AVAILABLE: 5, BLOCKLISTED: 6, DELETED: 7 } as const;
+export const RequestStatusCode = { PENDING: 1, APPROVED: 2, DECLINED: 3, FAILED: 4, COMPLETED: 5 } as const;
+
+export interface SeerrUser {
+  id: number;
+  displayName?: string;
+  username?: string;
+  jellyfinUsername?: string;
+  jellyfinUserId?: string;
+  email?: string;
+}
+
+export interface SeerrRequest {
+  id: number;
+  status: number;
+  type: 'movie' | 'tv';
+  createdAt: string;
+  is4k?: boolean;
+  media: SeerrMediaInfo & { mediaType: 'movie' | 'tv' };
+  requestedBy?: SeerrUser;
+  seasons?: Array<{ seasonNumber: number; status: number }>;
+}
+
+export interface SeerrMediaInfo {
+  id: number;
+  tmdbId: number;
+  tvdbId?: number;
+  status: number;
+  status4k?: number;
+  externalServiceId?: number | null;
+  jellyfinMediaId?: string | null;
+  requests?: SeerrRequest[];
+  seasons?: Array<{ seasonNumber: number; status: number }>;
+}
+
+export interface SeerrResult {
+  id: number;
+  mediaType: 'movie' | 'tv' | 'person' | 'collection';
+  title?: string;
+  name?: string;
+  posterPath?: string | null;
+  backdropPath?: string | null;
+  overview?: string;
+  releaseDate?: string;
+  firstAirDate?: string;
+  voteAverage?: number;
+  originalLanguage?: string;
+  mediaInfo?: SeerrMediaInfo;
+}
+
+export interface SeerrPage {
+  page: number;
+  totalPages: number;
+  totalResults: number;
+  results: SeerrResult[];
+}
+
+interface Credits {
+  cast?: Array<{ name: string; character?: string; profilePath?: string | null; order?: number }>;
+  crew?: Array<{ name: string; job?: string; department?: string; profilePath?: string | null }>;
+}
+
+interface Video {
+  site?: string;
+  key?: string;
+  type?: string;
+  name?: string;
+}
+
+export interface SeerrMovie {
+  id: number;
+  title: string;
+  originalTitle?: string;
+  overview?: string;
+  tagline?: string;
+  posterPath?: string | null;
+  backdropPath?: string | null;
+  releaseDate?: string;
+  runtime?: number;
+  genres?: Array<{ id: number; name: string }>;
+  voteAverage?: number;
+  originalLanguage?: string;
+  credits?: Credits;
+  relatedVideos?: Video[];
+  releases?: { results?: Array<{ iso_3166_1: string; release_dates?: Array<{ certification?: string }> }> };
+  externalIds?: { imdbId?: string };
+  mediaInfo?: SeerrMediaInfo;
+}
+
+export interface SeerrTv {
+  id: number;
+  name: string;
+  originalName?: string;
+  overview?: string;
+  tagline?: string;
+  posterPath?: string | null;
+  backdropPath?: string | null;
+  firstAirDate?: string;
+  episodeRunTime?: number[];
+  genres?: Array<{ id: number; name: string }>;
+  voteAverage?: number;
+  originalLanguage?: string;
+  credits?: Credits;
+  createdBy?: Array<{ name: string; profilePath?: string | null }>;
+  networks?: Array<{ name: string }>;
+  relatedVideos?: Video[];
+  contentRatings?: { results?: Array<{ iso_3166_1: string; rating?: string }> };
+  externalIds?: { tvdbId?: number; imdbId?: string };
+  seasons?: Array<{ id: number; seasonNumber: number; name: string; episodeCount: number; airDate?: string | null; posterPath?: string | null; overview?: string }>;
+  mediaInfo?: SeerrMediaInfo;
+}
+
+export interface SeerrRT {
+  title: string;
+  year?: number;
+  url: string;
+  criticsScore?: number;
+  criticsRating?: string;
+  audienceScore?: number;
+  audienceRating?: string;
+}
+
+export interface SeerrIMDb {
+  title: string;
+  url: string;
+  criticsScore: number;
+  criticsScoreCount?: number;
+}
+
+export interface SeerrSeason {
+  id: number;
+  seasonNumber: number;
+  name?: string;
+  overview?: string;
+  episodes: Array<{
+    id: number;
+    episodeNumber: number;
+    seasonNumber: number;
+    name: string;
+    overview?: string;
+    stillPath?: string | null;
+    airDate?: string | null;
+    runtime?: number;
+  }>;
+}
+
+interface Options extends RequestOptions {
+  /** Seerr user id to act as. */
+  asUser?: number;
+}
+
+function seerrRequest<T>(path: string, opts: Options = {}) {
+  if (!has.seerr()) throw new NotConfiguredError('Seerr');
+  const headers: Record<string, string> = { 'x-api-key': config.seerr.apiKey! };
+  if (opts.asUser) headers['x-api-user'] = String(opts.asUser);
+  return request<T>('Seerr', `${config.seerr.url}/api/v1`, path, { ...opts, headers });
+}
+
+const lang = () => ({ language: config.metadataLanguage });
+
+export type DiscoverKind = 'trending' | 'movies' | 'tv' | 'movies/upcoming' | 'tv/upcoming';
+
+export const seerr = {
+  status: () => seerrRequest<{ version: string }>('/status', { timeoutMs: 5000 }),
+
+  search: (query: string, page = 1) => seerrRequest<SeerrPage>('/search', { query: { query, page, ...lang() } }),
+  discover: (kind: DiscoverKind, page = 1, extra: Record<string, string | number> = {}) =>
+    seerrRequest<SeerrPage>(`/discover/${kind}`, { query: { page, ...lang(), ...extra } }),
+  movie: (id: number) => seerrRequest<SeerrMovie>(`/movie/${id}`, { query: lang() }),
+  tv: (id: number) => seerrRequest<SeerrTv>(`/tv/${id}`, { query: lang() }),
+  season: (id: number, season: number) => seerrRequest<SeerrSeason>(`/tv/${id}/season/${season}`, { query: lang() }),
+  movieRatings: (id: number) => seerrRequest<{ rt?: SeerrRT; imdb?: SeerrIMDb }>(`/movie/${id}/ratingscombined`, { timeoutMs: 20_000 }),
+  tvRatings: (id: number) => seerrRequest<SeerrRT>(`/tv/${id}/ratings`, { timeoutMs: 20_000 }),
+  recommendations: (type: 'movie' | 'tv', id: number, page = 1) =>
+    seerrRequest<SeerrPage>(`/${type}/${id}/recommendations`, { query: { page, ...lang() } }),
+
+  createRequest: (
+    body: { mediaType: 'movie' | 'tv'; mediaId: number; tvdbId?: number; seasons?: number[] | 'all'; is4k?: boolean },
+    asUser: number,
+  ) => seerrRequest<SeerrRequest>('/request', { method: 'POST', body, asUser }),
+  requests: (query: Record<string, string | number | undefined>, asUser?: number) =>
+    seerrRequest<{ pageInfo: { results: number }; results: SeerrRequest[] }>('/request', { query, asUser }),
+
+  userByJellyfinId: (jellyfinUserId: string) => seerrRequest<SeerrUser>(`/user/jellyfin/${jellyfinUserId}`),
+  users: () => seerrRequest<{ results: SeerrUser[] }>('/user', { query: { take: 1000, skip: 0 } }),
+  importJellyfinUsers: (jellyfinUserIds: string[]) =>
+    seerrRequest<SeerrUser[]>('/user/import-from-jellyfin', { method: 'POST', body: { jellyfinUserIds } }),
+};

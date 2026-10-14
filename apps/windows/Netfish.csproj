@@ -1,0 +1,43 @@
+<!-- Netfish for Windows: build with ./build.sh (on a Mac or PC with the .NET 8 SDK). -->
+<Project>
+  <PropertyGroup>
+    <!-- Everything the build makes stays in build/ (kept out of git and iCloud). -->
+    <BaseIntermediateOutputPath>build/obj/</BaseIntermediateOutputPath>
+    <BaseOutputPath>build/bin/</BaseOutputPath>
+  </PropertyGroup>
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>Netfish</AssemblyName>
+    <RootNamespace>Netfish</RootNamespace>
+    <Product>Netfish</Product>
+    <Company>Netfish</Company>
+    <Version>0.1.0</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <ApplicationIcon Condition="Exists('build/Netfish.ico')">build/Netfish.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
+  </ItemGroup>
+
+  <!-- Only WebView2's core is used (hosted by hand, see MainWindow.cs), not its WPF or WinForms controls. -->
+  <Target Name="UseWebView2CoreOnly" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <Reference Remove="@(Reference)" Condition="'%(Filename)' == 'Microsoft.Web.WebView2.Wpf' Or '%(Filename)' == 'Microsoft.Web.WebView2.WinForms'" />
+    </ItemGroup>
+  </Target>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+</Project>

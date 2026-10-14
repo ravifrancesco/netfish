@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Netfish" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+    <color name="background">#06080b</color>
+    <color name="accent">#36e2c6</color>
+</resources>

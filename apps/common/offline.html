@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'" />
+    <title>Netfish · Downloads</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --surface: #12171e;
+        --line: rgba(255, 255, 255, 0.08);
+        --text: #eef3f6;
+        --text-2: #b5c0ca;
+        --text-3: #7c8996;
+        --accent: #36e2c6;
+        --warn: #ffb547;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif; -webkit-font-smoothing: antialiased; }
+      button { font: inherit; color: inherit; cursor: pointer; }
+      .bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 16px; height: 64px; padding: 0 32px; background: rgba(6, 8, 11, 0.94); border-bottom: 1px solid var(--line); -webkit-app-region: drag; }
+      .mac .bar { padding-left: 92px; }
+      .bar button, .bar a { -webkit-app-region: no-drag; }
+      .logo { display: flex; align-items: center; gap: 8px; font-size: 22px; letter-spacing: -0.035em; }
+      .logo .net { font-weight: 300; color: var(--text-2); }
+      .logo .fish { font-weight: 800; margin-left: 0.04em; }
+      .bar h1 { margin: 0 0 0 8px; font-size: 15px; font-weight: 600; color: var(--text-3); }
+      .spacer { flex: 1; }
+      .usage { color: var(--text-3); font-size: 13px; }
+      .btn { height: 34px; padding: 0 14px; border-radius: 6px; border: 0; background: rgba(130, 145, 160, 0.22); font-weight: 600; font-size: 14px; }
+      .btn:hover { background: rgba(130, 145, 160, 0.34); }
+      .btn--accent { background: var(--accent); color: #03221c; }
+      main { padding: 28px 32px 60px; }
+      .note { color: var(--text-3); margin: 0 0 22px; font-size: 14px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 22px; }
+      .item { display: grid; gap: 8px; }
+      .poster { position: relative; aspect-ratio: 2 / 3; border-radius: 8px; overflow: hidden; background: linear-gradient(140deg, #1a212a, #12171e); border: 0; padding: 0; }
+      .poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .poster .play { position: absolute; inset: 0; margin: auto; width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; background: rgba(6, 8, 11, 0.6); border: 2px solid #fff; opacity: 0; transition: opacity 0.2s; }
+      .poster:hover .play { opacity: 1; }
+      .poster[disabled] { cursor: default; }
+      .bar-progress { position: absolute; left: 8px; right: 8px; bottom: 8px; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, 0.2); overflow: hidden; }
+      .bar-progress > div { height: 100%; background: var(--accent); transition: width 0.4s; }
+      .title { font-weight: 700; font-size: 14px; line-height: 1.3; }
+      .meta { color: var(--text-3); font-size: 12.5px; }
+      .meta.warn { color: var(--warn); }
+      .actions { display: flex; gap: 12px; font-size: 12.5px; }
+      .link { border: 0; background: none; padding: 0; color: var(--text-2); }
+      .link:hover { color: var(--text); text-decoration: underline; }
+      h2 { margin: 30px 0 14px; font-size: 18px; letter-spacing: -0.02em; }
+      h2:first-of-type { margin-top: 0; }
+      .crumbs { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+      .crumbs h2 { margin: 0; flex: 1; }
+      .episodes { display: grid; gap: 6px; max-width: 900px; }
+      .episode { display: grid; grid-template-columns: 54px 1fr auto; gap: 14px; align-items: center; padding: 10px 12px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); }
+      .episode .num { color: var(--text-3); font-size: 13px; font-weight: 700; }
+      .episode .play-btn { width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid #fff; background: none; }
+      .episode .play-btn[disabled] { opacity: 0.3; }
+      .episode .info { display: grid; min-width: 0; }
+      .episode .row { display: flex; gap: 14px; align-items: center; }
+      .empty { display: grid; justify-items: center; gap: 12px; padding: 90px 20px; color: var(--text-3); text-align: center; }
+      #player { position: fixed; inset: 0; z-index: 5; background: #000; display: grid; }
+      #player[hidden] { display: none; }
+      #player video { width: 100%; height: 100vh; object-fit: contain; background: #000; }
+      #player .back { position: absolute; top: 18px; left: 18px; z-index: 2; transition: opacity 0.3s; }
+      /* Beside the Mac window buttons, not underneath them. */
+      .mac #player .back { top: 13px; left: 92px; }
+      .mac.fullscreen #player .back { top: 18px; left: 18px; }
+      #player .drag { position: absolute; top: 0; left: 0; right: 0; height: 56px; -webkit-app-region: drag; }
+      #player .back { -webkit-app-region: no-drag; }
+      #player.idle .back { opacity: 0; pointer-events: none; }
+      #player.idle { cursor: none; }
+      video::cue { background: rgba(0, 0, 0, 0.55); font-size: clamp(18px, 2.4vw, 34px); }
+      /* Windows app: mpv draws the film underneath the page; these are its controls. */
+      html.overlay-playing, html.overlay-playing body, html.overlay-playing #player { background: transparent; }
+      html.overlay-playing .bar, html.overlay-playing main { visibility: hidden; }
+      .controls { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; display: grid; gap: 6px; padding: 48px clamp(16px, 3vw, 40px) 18px; background: linear-gradient(transparent, rgba(0, 0, 0, 0.78)); transition: opacity 0.3s; }
+      .controls[hidden] { display: none; }
+      #player.idle .controls { opacity: 0; pointer-events: none; }
+      .controls .row { display: flex; align-items: center; gap: 12px; }
+      .controls input[type='range'] { width: 100%; margin: 0; accent-color: var(--accent); cursor: pointer; }
+      .icon { width: 42px; height: 42px; border: 0; border-radius: 50%; background: none; color: #fff; display: grid; place-items: center; padding: 0; }
+      .icon:hover { background: rgba(255, 255, 255, 0.12); }
+      .icon svg { width: 24px; height: 24px; fill: currentColor; }
+      .clock { font-size: 13px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+      .controls select { height: 32px; max-width: 220px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--line); background: rgba(18, 23, 30, 0.92); color: var(--text); font: inherit; font-size: 13px; }
+      .controls select[hidden] { display: none; }
+      /* iPhone / iPad: stay clear of the notch, the home bar and rounded corners. */
+      .ios .bar { height: auto; min-height: 56px; padding: env(safe-area-inset-top) max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); }
+      .ios main { padding: 20px max(16px, env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+      .ios #player .back { top: calc(env(safe-area-inset-top) + 10px); left: calc(env(safe-area-inset-left) + 12px); }
+      /* The system's video controls take the taps on phones, so Back never comes back once hidden: keep it. */
+      .ios #player.idle .back { opacity: 1; pointer-events: auto; }
+      .ios #player.idle { cursor: auto; }
+      .ios .poster .play { opacity: 1; background: rgba(6, 8, 11, 0.45); }
+      @media (max-width: 640px) {
+        .bar { gap: 10px; }
+        .bar h1, .usage { display: none; }
+        .grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 16px; }
+        .episode { grid-template-columns: 40px 1fr; }
+        .episode .actions { grid-column: 2; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="bar">
+      <span class="logo" aria-label="Netfish">
+        <svg viewBox="0 0 64 64" width="26" height="26" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8cf8e6" /><stop offset="1" stop-color="#13b89c" /></linearGradient></defs><path d="M15 32 L6 23 L6 41 Z" fill="url(#g)" stroke="url(#g)" stroke-width="4" stroke-linejoin="round" /><path d="M23 15 L52 32 L23 49 Z" fill="url(#g)" stroke="url(#g)" stroke-width="6" stroke-linejoin="round" /><circle cx="38" cy="27.5" r="2.5" fill="#03140f" /></svg>
+        <span><span class="net">net</span><span class="fish">fish</span></span>
+      </span>
+      <h1 id="heading">Downloads on this computer</h1>
+      <span class="spacer"></span>
+      <span class="usage" id="usage"></span>
+      <button class="btn btn--accent" id="home">Back to Netfish</button>
+    </header>
+    <main>
+      <p class="note">These play without a connection to your server. Download more from any movie or episode page.</p>
+      <div id="view"></div>
+    </main>
+    <div id="player" hidden>
+      <div class="drag"></div>
+      <button class="btn back" id="close">← Back</button>
+      <video id="video" controls autoplay playsinline></video>
+      <div class="controls" id="controls" hidden>
+        <input type="range" id="seek" min="0" max="0" step="1" value="0" aria-label="Position" />
+        <div class="row">
+          <button class="icon" id="toggle" aria-label="Pause"></button>
+          <span class="clock" id="clock"></span>
+          <span class="spacer"></span>
+          <select id="audio" aria-label="Audio" hidden></select>
+          <select id="subs" aria-label="Subtitles" hidden></select>
+          <button class="icon" id="fs" aria-label="Full screen"><svg viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4V4zm10 0h6v6h-2V6h-4V4zM4 14h2v4h4v2H4v-6zm14 0h2v6h-6v-2h4v-4z" /></svg></button>
+        </div>
+      </div>
+    </div>
+    <script>
+      const desktop = window.netfishDesktop;
+      if (desktop.platform === 'darwin') document.documentElement.classList.add('mac');
+      // Phones and tablets (iPhone, iPad, Android): touch-friendly, clear of notches.
+      const mobile = desktop.platform === 'ios' || desktop.platform === 'android';
+      if (mobile) document.documentElement.classList.add('ios');
+      const device = mobile ? 'this device' : 'this computer';
+      document.getElementById('heading').textContent = `Downloads on ${device}`;
+      const view = document.getElementById('view');
+      const player = document.getElementById('player');
+      const video = document.getElementById('video');
+      let current;
+      // Opened from the app's Offline tab: straight into a show, or straight into playback.
+      const query = new URLSearchParams(location.search);
+      let openShow = query.get('show') || undefined; // series key when looking at one show's episodes
+      let autoplay = query.get('play') || undefined;
+
+      const gb = (n) => (n ? (n / 1024 ** 3 >= 1 ? `${(n / 1024 ** 3).toFixed(1)} GB` : `${Math.round(n / 1024 ** 2)} MB`) : '');
+      const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+      const showKey = (i) => i.seriesId || i.seriesTitle || i.title;
+      const pctOf = (i) => (i.size ? Math.min(100, (i.received / i.size) * 100) : 0);
+
+      function status(i) {
+        if (i.state === 'done') return `<span class="meta">Ready · ${gb(i.size)}</span>`;
+        if (i.state === 'downloading') {
+          const pct = i.size ? Math.min(99, Math.round((i.received / i.size) * 100)) : null;
+          return `<span class="meta">Downloading${pct !== null ? ` ${pct}%` : ''} · ${gb(i.received)}${i.size ? ` of ${i.converted ? '~' : ''}${gb(i.size)}` : ''}</span>`;
+        }
+        if (i.state === 'paused') return '<span class="meta">Paused</span>';
+        return `<span class="meta warn">${i.state === 'failed' ? 'Failed' : 'Interrupted'}: try again at home</span>`;
+      }
+
+      const actions = (i) => `<span class="actions">
+          ${i.state === 'interrupted' || i.state === 'failed' ? `<button class="link" data-retry="${esc(i.itemId)}">Retry</button>` : ''}
+          <button class="link" data-remove="${esc(i.itemId)}">${i.state === 'done' ? 'Delete' : 'Cancel'}</button>
+        </span>`;
+
+      function posterTile(attrs, poster, ready, pct, label) {
+        return `<button class="poster" ${attrs} ${ready ? '' : ''} aria-label="${esc(label)}">
+          ${poster ? `<img src="${esc(poster)}" alt="">` : ''}
+          ${ready ? '<span class="play">▶</span>' : `<span class="bar-progress"><div style="width:${pct}%"></div></span>`}
+        </button>`;
+      }
+
+      function homeView(list) {
+        const movies = list.filter((i) => i.kind !== 'Episode');
+        const shows = new Map();
+        for (const ep of list.filter((i) => i.kind === 'Episode')) shows.set(showKey(ep), [...(shows.get(showKey(ep)) ?? []), ep]);
+
+        const movieTiles = movies.map((i) => `<div class="item">
+            ${posterTile(`data-play="${esc(i.itemId)}" ${i.state === 'done' ? '' : 'disabled'}`, i.poster, i.state === 'done', pctOf(i), `Play ${i.title}`)}
+            <span class="title">${esc(i.title)}</span>
+            ${i.subtitle ? `<span class="meta">${esc(i.subtitle)}</span>` : ''}
+            ${status(i)}
+            ${actions(i)}
+          </div>`);
+
+        const showTiles = [...shows.entries()].map(([key, eps]) => {
+          const ready = eps.filter((e) => e.state === 'done');
+          const busy = eps.filter((e) => e.state === 'downloading');
+          const size = eps.reduce((n, e) => n + (e.state === 'done' ? e.size : e.received), 0);
+          return `<div class="item">
+            ${posterTile(`data-show="${esc(key)}"`, eps[0].poster, true, 0, `Open ${eps[0].seriesTitle}`)}
+            <span class="title">${esc(eps[0].seriesTitle || 'Show')}</span>
+            <span class="meta">${eps.length} episode${eps.length === 1 ? '' : 's'} · ${gb(size)}${busy.length ? ` · ${busy.length} downloading` : ''}</span>
+            <span class="actions">
+              <button class="link" data-show="${esc(key)}">Episodes</button>
+              <button class="link" data-remove-show="${esc(key)}">Delete all</button>
+            </span>
+          </div>`;
+        });
+
+        if (!list.length) {
+          return '<div class="empty"><strong>Nothing downloaded yet</strong><span>Open a movie or episode in Netfish and press Download.</span></div>';
+        }
+        return `${movieTiles.length ? `<h2>Movies</h2><div class="grid">${movieTiles.join('')}</div>` : ''}
+          ${showTiles.length ? `<h2>Shows</h2><div class="grid">${showTiles.join('')}</div>` : ''}`;
+      }
+
+      function showView(list, key) {
+        const eps = list
+          .filter((i) => i.kind === 'Episode' && showKey(i) === key)
+          .sort((a, b) => (a.seasonNumber ?? 0) - (b.seasonNumber ?? 0) || (a.episodeNumber ?? 0) - (b.episodeNumber ?? 0));
+        if (!eps.length) {
+          openShow = undefined;
+          return homeView(list);
+        }
+        return `<div class="crumbs">
+            <button class="btn" data-home>← All downloads</button>
+            <h2>${esc(eps[0].seriesTitle)}</h2>
+            <button class="btn" data-remove-show="${esc(key)}">Delete all episodes</button>
+          </div>
+          <div class="episodes">${eps
+            .map(
+              (e) => `<div class="episode">
+                <button class="play-btn" data-play="${esc(e.itemId)}" ${e.state === 'done' ? '' : 'disabled'} aria-label="Play">▶</button>
+                <div class="info">
+                  <span class="title">${esc(e.subtitle || e.title)}</span>
+                  ${status(e)}
+                </div>
+                ${actions(e)}
+              </div>`,
+            )
+            .join('')}</div>`;
+      }
+
+      let items = [];
+      const usage = document.getElementById('usage');
+      function render() {
+        view.innerHTML = openShow ? showView(items, openShow) : homeView(items);
+        desktop.offlineUsage().then((bytes) => (usage.textContent = items.length ? `${items.length} download${items.length === 1 ? '' : 's'} · ${gb(bytes) || '0 MB'} used` : ''));
+      }
+      const update = (list) => {
+        items = list;
+        render();
+        if (autoplay) {
+          const item = items.find((i) => i.itemId === autoplay && i.state === 'done');
+          autoplay = undefined;
+          if (item) {
+            launchedToPlay = true;
+            play(item);
+          }
+        }
+      };
+      let launchedToPlay = false;
+      desktop.offlineList().then(update);
+      desktop.onOfflineChange(update);
+
+      view.addEventListener('click', async (e) => {
+        const el = e.target.closest('[data-play],[data-remove],[data-retry],[data-show],[data-remove-show],[data-home]');
+        if (!el) return;
+        if (el.dataset.play) return play(items.find((i) => i.itemId === el.dataset.play));
+        if (el.dataset.show) {
+          openShow = el.dataset.show;
+          return render();
+        }
+        if ('home' in el.dataset) {
+          openShow = undefined;
+          return render();
+        }
+        if (el.dataset.retry) return update(await desktop.retryOffline(el.dataset.retry));
+        if (el.dataset.remove) {
+          const item = items.find((i) => i.itemId === el.dataset.remove);
+          const name = item?.kind === 'Episode' ? `${item.seriesTitle} ${item.subtitle ?? ''}` : item?.title;
+          if (confirm(`Delete "${name}" from ${device}?`)) update(await desktop.removeOffline(el.dataset.remove));
+          return;
+        }
+        if (el.dataset.removeShow) {
+          const eps = items.filter((i) => i.kind === 'Episode' && showKey(i) === el.dataset.removeShow);
+          if (confirm(`Delete all ${eps.length} downloaded episode${eps.length === 1 ? '' : 's'} of "${eps[0]?.seriesTitle}"?`)) {
+            update(await desktop.removeOfflineSeries(el.dataset.removeShow));
+          }
+        }
+      });
+
+      // Remember where you stopped, per download.
+      const posKey = (id) => `netfish.offline.pos.${id}`;
+
+      // The Windows app keeps downloads exactly as they are and plays them with mpv,
+      // underneath this page (every format, every audio and subtitle track).
+      const engine = desktop.offlineFormat === 'original' ? desktop.videoOverlay : undefined;
+      const controls = document.getElementById('controls');
+      const seek = document.getElementById('seek');
+      const toggle = document.getElementById('toggle');
+      const clock = document.getElementById('clock');
+      const audioPick = document.getElementById('audio');
+      const subsPick = document.getElementById('subs');
+      const ICONS = {
+        play: '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>',
+        pause: '<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zm8 0h4v14h-4z" /></svg>',
+      };
+      let film = { time: 0, duration: 0, paused: false, aid: null, sid: null, tracks: [] };
+      let stopListening;
+      let seeking = false;
+      const hms = (t) => {
+        t = Math.max(0, Math.floor(t || 0));
+        const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), sec = String(t % 60).padStart(2, '0');
+        return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+      };
+      let names;
+      const language = (code) => {
+        try {
+          names ??= new Intl.DisplayNames(['en'], { type: 'language' });
+          return code && code !== 'und' ? names.of(code) : '';
+        } catch {
+          return code || '';
+        }
+      };
+      const trackName = (t) => [language(t.lang), t.title && t.title !== language(t.lang) ? t.title : ''].filter(Boolean).join(' · ') || `Track ${t.id}`;
+      function showFilm() {
+        toggle.innerHTML = film.paused ? ICONS.play : ICONS.pause;
+        toggle.setAttribute('aria-label', film.paused ? 'Play' : 'Pause');
+        if (!seeking) {
+          seek.max = String(Math.floor(film.duration || 0));
+          seek.value = String(Math.floor(film.time));
+        }
+        clock.textContent = `${hms(seeking ? Number(seek.value) : film.time)} / ${hms(film.duration)}`;
+      }
+      function showTracks() {
+        const audio = film.tracks.filter((t) => t.type === 'audio');
+        const subs = film.tracks.filter((t) => t.type === 'sub');
+        audioPick.hidden = audio.length < 2;
+        audioPick.innerHTML = audio.map((t) => `<option value="${t.id}">${esc(trackName(t))}</option>`).join('');
+        audioPick.value = String(film.aid ?? audio.find((t) => t.selected)?.id ?? '');
+        subsPick.hidden = !subs.length;
+        subsPick.innerHTML = '<option value="">Subtitles off</option>' + subs.map((t) => `<option value="${t.id}">${esc(trackName(t))}</option>`).join('');
+        subsPick.value = film.sid ? String(film.sid) : '';
+      }
+      function filmState(state) {
+        if (typeof state['time-pos'] === 'number') film.time = state['time-pos'];
+        if (typeof state.duration === 'number') film.duration = state.duration;
+        if (typeof state.pause === 'boolean') film.paused = state.pause;
+        if ('aid' in state) film.aid = state.aid;
+        if ('sid' in state) film.sid = state.sid;
+        if (Array.isArray(state.tracks)) film.tracks = state.tracks;
+        if ('aid' in state || 'sid' in state || Array.isArray(state.tracks)) showTracks();
+        if (state.ended) {
+          if (typeof state.error === 'string') alert(`This download couldn't play: ${state.error}`);
+          else if (state.finished && current) localStorage.removeItem(posKey(current.itemId));
+          close();
+          return;
+        }
+        showFilm();
+        if ('pause' in state) wake();
+      }
+      function playWithEngine(item, start) {
+        document.documentElement.classList.add('overlay-playing');
+        video.hidden = true;
+        controls.hidden = false;
+        film = { time: start, duration: item.durationSeconds || 0, paused: false, aid: null, sid: null, tracks: [] };
+        showFilm();
+        showTracks();
+        stopListening = engine.onState(filmState);
+        const request = {
+          url: item.video,
+          isHls: false,
+          title: item.title,
+          subtitle: item.subtitle,
+          startSeconds: start,
+          subtitles: { mode: 'off' },
+          externalSubtitles: item.subtitles.map((s) => ({ url: s.url, label: s.label, language: s.code })),
+          segments: [],
+        };
+        engine.load(request).catch((err) => {
+          alert(`This download couldn't play: ${err.message || err}`);
+          close();
+        });
+      }
+      const filmTime = () => (engine ? film.time : video.currentTime);
+      const filmPaused = () => (engine ? film.paused : video.paused);
+      const playPause = () => engine.command(film.paused ? 'play' : 'pause');
+      const jump = (by) => engine.command('seek', Math.max(0, Math.min(film.duration || Infinity, film.time + by)));
+      toggle.onclick = playPause;
+      document.getElementById('fs').onclick = () => desktop.toggleFullscreen?.();
+      seek.addEventListener('input', () => {
+        seeking = true;
+        showFilm();
+      });
+      seek.addEventListener('change', () => {
+        seeking = false;
+        film.time = Number(seek.value);
+        engine.command('seek', film.time);
+        showFilm();
+      });
+      audioPick.onchange = () => engine.command('audio', Number(audioPick.value));
+      subsPick.onchange = () => engine.command('subtitle', subsPick.value ? Number(subsPick.value) : null);
+      player.addEventListener('click', (e) => engine && current && e.target === player && playPause());
+      player.addEventListener('dblclick', (e) => engine && current && e.target === player && desktop.toggleFullscreen?.());
+      document.addEventListener('keydown', (e) => {
+        if (!engine || !current || e.target.closest?.('select, input')) return;
+        if (e.key === ' ' || e.key === 'k') playPause();
+        else if (e.key === 'ArrowLeft') jump(-10);
+        else if (e.key === 'ArrowRight') jump(10);
+        else if (e.key === 'f') desktop.toggleFullscreen?.();
+        else return;
+        e.preventDefault();
+        wake();
+      });
+
+      function play(item) {
+        if (!item) return;
+        current = item;
+        if (engine) {
+          const pos = Number(localStorage.getItem(posKey(item.itemId)) || 0);
+          player.hidden = false;
+          playWithEngine(item, pos > 0 && (!item.durationSeconds || pos < item.durationSeconds - 30) ? pos : 0);
+          return;
+        }
+        video.innerHTML = item.subtitles.map((s, n) => `<track kind="subtitles" src="${esc(s.url)}" srclang="${esc(s.code || '')}" label="${esc(s.label)}"${n === 0 ? '' : ''}>`).join('');
+        video.src = item.video;
+        const pos = Number(localStorage.getItem(posKey(item.itemId)) || 0);
+        video.addEventListener('loadedmetadata', () => { if (pos > 0 && pos < video.duration - 30) video.currentTime = pos; }, { once: true });
+        player.hidden = false;
+        video.focus();
+        desktop.filmShowing?.(true); // phones: full screen, sideways
+      }
+      function close() {
+        if (current) localStorage.setItem(posKey(current.itemId), String(filmTime()));
+        if (engine) {
+          stopListening?.();
+          stopListening = undefined;
+          engine.command('stop');
+          document.documentElement.classList.remove('overlay-playing');
+          controls.hidden = true;
+          if (document.documentElement.classList.contains('fullscreen')) desktop.toggleFullscreen?.();
+        } else {
+          video.pause();
+          video.removeAttribute('src');
+          video.load();
+        }
+        player.hidden = true;
+        current = undefined;
+        desktop.filmShowing?.(false);
+        // Came straight from the app to watch this? Go back there.
+        if (launchedToPlay) desktop.openServer();
+      }
+      setInterval(() => current && !filmPaused() && localStorage.setItem(posKey(current.itemId), String(filmTime())), 5000);
+      video.addEventListener('ended', () => { if (current) localStorage.removeItem(posKey(current.itemId)); close(); });
+      document.getElementById('close').onclick = close;
+      // Like the app's own player: Back fades away while watching, comes back when the mouse moves.
+      let idleTimer;
+      const wake = () => {
+        player.classList.remove('idle');
+        engine?.command('controls', true); // subtitles move up, clear of the controls
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          if (filmPaused() || player.hidden) return;
+          player.classList.add('idle');
+          engine?.command('controls', false);
+        }, 2500);
+      };
+      for (const type of ['mousemove', 'mousedown', 'touchstart', 'keydown']) player.addEventListener(type, wake);
+      video.addEventListener('play', wake);
+      video.addEventListener('pause', wake);
+      const fullscreen = () => document.documentElement.classList.toggle('fullscreen', Boolean(document.fullscreenElement) || window.innerHeight === screen.height);
+      document.addEventListener('fullscreenchange', fullscreen);
+      window.addEventListener('resize', fullscreen);
+      // The app's full screen (Windows) tells the page, so Escape leaves it before closing the film.
+      engine?.onState((state) => typeof state.fullscreen === 'boolean' && document.documentElement.classList.toggle('fullscreen', state.fullscreen));
+      document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape' || player.hidden) return;
+        if (engine && document.documentElement.classList.contains('fullscreen')) desktop.toggleFullscreen?.();
+        else close();
+      });
+      document.getElementById('home').onclick = () => desktop.openServer();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,11 @@
+Netfish for Windows includes:
+
+- mpv (libmpv-2.dll), the film player: https://mpv.io
+  Licensed under the GNU GPL version 2 or later; this build (with FFmpeg and other
+  libraries) is from https://github.com/shinchiro/mpv-winbuild-cmake, where its
+  source and build scripts are published.
+
+- The Vulkan loader (vulkan-1.dll), from the Khronos Group / LunarG Vulkan Runtime:
+  https://vulkan.lunarg.com. MIT and Apache 2.0 licences; see vulkan.txt.
+
+- .NET (Microsoft, MIT licence) and the Microsoft Edge WebView2 SDK (Microsoft, BSD-style licence).

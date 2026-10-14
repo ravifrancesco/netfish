@@ -1,0 +1,66 @@
+# Netfish for iPhone and iPad. Generate the Xcode project with:  xcodegen generate
+# (the generated Netfish.xcodeproj is checked in, so you can also just open it).
+name: Netfish
+options:
+  bundleIdPrefix: app.netfish
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  Netfish:
+    type: application
+    platform: iOS
+    sources:
+      - path: Netfish
+      # Shared with the other apps (apps/common): the setup page and the downloads page.
+      - path: ../common/setup.html
+        buildPhase: resources
+      - path: ../common/offline.html
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.netfish.ios
+        PRODUCT_NAME: Netfish
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_STYLE: Automatic
+        # Pick your Apple ID's team in Xcode → Netfish target → Signing & Capabilities.
+        DEVELOPMENT_TEAM: NTCXDFHQC3
+        ENABLE_PREVIEWS: NO
+        SUPPORTS_MACCATALYST: NO
+    info:
+      path: Netfish/Info.plist
+      properties:
+        CFBundleDisplayName: Netfish
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIStatusBarStyle: UIStatusBarStyleLightContent
+        UIUserInterfaceStyle: Dark
+        # Your server is on your home network, usually over plain http.
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: Netfish connects to your Netfish server on your home network.
+        # Picture in picture and sound keep going when you leave the app mid-film.
+        UIBackgroundModes:
+          - audio
+        ITSAppUsesNonExemptEncryption: false

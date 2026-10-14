@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+    <title>Netfish</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --accent: #36e2c6;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(ellipse 70% 55% at 50% 30%, #0a1a1c 0%, var(--bg) 70%);
+        color: #eef3f6;
+        font: 15px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif;
+        -webkit-app-region: drag;
+      }
+      form {
+        width: min(420px, calc(100vw - 48px));
+        display: grid;
+        gap: 16px;
+        -webkit-app-region: no-drag;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+      .brand span {
+        font-size: 34px;
+        letter-spacing: -0.035em;
+      }
+      .brand .net {
+        font-weight: 300;
+        color: #b5c0ca;
+      }
+      .brand .fish {
+        margin-left: 0.04em;
+        font-weight: 800;
+      }
+      p {
+        margin: 0;
+        color: #93a1ae;
+      }
+      label {
+        display: grid;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #b5c0ca;
+      }
+      input {
+        height: 44px;
+        padding: 0 14px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: #12171e;
+        color: inherit;
+        font: inherit;
+        font-size: 16px; /* iPhone zooms into smaller fields */
+        outline: none;
+      }
+      input:focus {
+        border-color: var(--accent);
+      }
+      button {
+        height: 46px;
+        border: 0;
+        border-radius: 8px;
+        background: var(--accent);
+        color: #03221c;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button[disabled] {
+        opacity: 0.6;
+      }
+      .error {
+        min-height: 20px;
+        color: #ff6b6b;
+        font-size: 14px;
+      }
+      small {
+        color: #7c8996;
+      }
+    </style>
+  </head>
+  <body>
+    <form id="form">
+      <div class="brand">
+        <svg viewBox="0 0 64 64" width="44" height="44" aria-hidden="true">
+          <defs>
+            <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#8cf8e6" />
+              <stop offset="1" stop-color="#13b89c" />
+            </linearGradient>
+          </defs>
+          <path d="M15 32 L6 23 L6 41 Z" fill="url(#g)" stroke="url(#g)" stroke-width="4" stroke-linejoin="round" />
+          <path d="M23 15 L52 32 L23 49 Z" fill="url(#g)" stroke="url(#g)" stroke-width="6" stroke-linejoin="round" />
+          <circle cx="38" cy="27.5" r="2.5" fill="#03140f" />
+        </svg>
+        <span><span class="net">net</span><span class="fish">fish</span></span>
+      </div>
+      <p>Where is your Netfish server?</p>
+      <label>
+        Server address
+        <input id="url" placeholder="192.168.1.50:7777" autocomplete="url" spellcheck="false" autofocus />
+      </label>
+      <small>The address you open Netfish at in a browser, e.g. http://raspberrypi.local:7777</small>
+      <div class="error" id="error"></div>
+      <button id="go">Connect</button>
+    </form>
+    <script>
+      const form = document.getElementById('form');
+      const input = document.getElementById('url');
+      const error = document.getElementById('error');
+      const go = document.getElementById('go');
+      error.textContent = new URLSearchParams(location.search).get('error') ?? '';
+      window.netfishDesktop.currentServer().then((url) => url && (input.value = url));
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        error.textContent = '';
+        go.disabled = true;
+        go.textContent = 'Connecting…';
+        try {
+          await window.netfishDesktop.connect(input.value);
+        } catch (err) {
+          error.textContent = String(err.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+          go.disabled = false;
+          go.textContent = 'Connect';
+        }
+      });
+    </script>
+  </body>
+</html>

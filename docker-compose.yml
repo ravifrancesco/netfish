@@ -1,0 +1,50 @@
+# Netfish — Portainer stack
+#
+# Portainer → Stacks → Add stack → paste this → Deploy.
+# Then open http://<your-pi>:7777: Netfish asks for your Jellyfin address, you
+# sign in with a Jellyfin admin account, and connect everything else in
+# Settings → Connections. No variables needed.
+#
+# Image: GitHub builds it (Raspberry Pi and PCs); "Pull and redeploy" updates it.
+# Built it on the Pi yourself instead? Set NETFISH_IMAGE=netfish:latest.
+#
+# Netfish only talks to your existing services through their APIs; it never
+# changes their settings.
+
+services:
+  netfish:
+    image: ${NETFISH_IMAGE:-ghcr.io/ravifrancesco/netfish:latest}
+    container_name: netfish
+    restart: unless-stopped
+    ports:
+      - "7777:7777"
+    extra_hosts:
+      # Lets Netfish reach services on the Pi itself as http://host.docker.internal:<port>
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # Settings and connections made in the app live here and survive updates.
+      # The folder is created (and given to PUID:PGID) automatically.
+      - /docker-data-volumes/netfish-data:/config
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: ${TZ:-America/Los_Angeles}
+      # Everything below is optional: it's easier to set it all in the app
+      # (Settings → Connections). Values here are only starting points; once
+      # saved in the app, the app's version wins.
+      JELLYFIN_URL: ${JELLYFIN_URL:-}
+      JELLYFIN_API_KEY: ${JELLYFIN_API_KEY:-}
+      SEERR_URL: ${SEERR_URL:-}
+      SEERR_API_KEY: ${SEERR_API_KEY:-}
+      RADARR_URL: ${RADARR_URL:-}
+      RADARR_API_KEY: ${RADARR_API_KEY:-}
+      SONARR_URL: ${SONARR_URL:-}
+      SONARR_API_KEY: ${SONARR_API_KEY:-}
+      BAZARR_URL: ${BAZARR_URL:-}
+      BAZARR_API_KEY: ${BAZARR_API_KEY:-}
+      QBITTORRENT_URL: ${QBITTORRENT_URL:-}
+      QBITTORRENT_USERNAME: ${QBITTORRENT_USERNAME:-}
+      QBITTORRENT_PASSWORD: ${QBITTORRENT_PASSWORD:-}
+      MDBLIST_API_KEY: ${MDBLIST_API_KEY:-}
+      MANUAL_GRABS: ${MANUAL_GRABS:-all}
+      METADATA_LANGUAGE: ${METADATA_LANGUAGE:-en}

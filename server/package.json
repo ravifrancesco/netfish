@@ -1,0 +1,23 @@
+{
+  "name": "@netfish/server",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/index.ts",
+    "dev:mock": "NETFISH_ENV_FILE=dev/mock.env tsx watch --clear-screen=false src/index.ts",
+    "mock": "tsx watch --clear-screen=false dev/mock.ts",
+    "build": "node build.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.3",
+    "@fastify/static": "^10.1.6",
+    "fastify": "^5.12.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

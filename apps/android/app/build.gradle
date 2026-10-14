@@ -1,0 +1,68 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Version shown in Settings; keep in step with the root package.json.
+def netfishVersion = '0.1.0'
+
+android {
+    namespace 'app.netfish.tv'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'app.netfish.tv'
+        // Fire OS 6 (Fire TV Stick 2nd gen) and newer.
+        minSdk 25
+        targetSdk 35
+        versionCode 1
+        versionName netfishVersion
+        buildConfigField 'String', 'NETFISH_VERSION', "\"${netfishVersion}\""
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    buildTypes {
+        // A separate test copy (own settings, page inspectable from a computer) next to the real app.
+        debug {
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-debug'
+        }
+        release {
+            minifyEnabled false
+            // Signed with the local debug key so the APK can be sideloaded as-is.
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // The downloads page is shared with the other apps (apps/common).
+    sourceSets {
+        main {
+            assets.srcDirs += [layout.buildDirectory.dir('generated/commonAssets').get().asFile]
+        }
+    }
+}
+
+tasks.register('copyCommonPages', Copy) {
+    from('../../common') { include 'offline.html' }
+    into layout.buildDirectory.dir('generated/commonAssets')
+}
+tasks.named('preBuild') { dependsOn 'copyCommonPages' }
+
+// The player: ExoPlayer (Media3) with Jellyfin's FFmpeg audio decoders, the same
+// combination Jellyfin's Android TV app uses, so DTS/TrueHD/AC3 play without the
+// server converting anything.
+def media3 = '1.8.0'
+dependencies {
+    implementation "androidx.media3:media3-exoplayer:$media3"
+    implementation "androidx.media3:media3-exoplayer-hls:$media3"
+    implementation "androidx.media3:media3-ui:$media3"
+    implementation "org.jellyfin.media3:media3-ffmpeg-decoder:$media3+1"
+    compileOnly 'androidx.annotation:annotation:1.6.0'
+}

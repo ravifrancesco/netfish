@@ -1,0 +1,184 @@
+import { useEffect, useRef, useState } from 'react';
+import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Activity, Clapperboard, Film, HardDriveDownload, House, LogOut, Search, Settings, Tv, X } from 'lucide-react';
+import type { User } from '@netfish/shared';
+import { api } from '../api';
+import { appKind, desktop } from '../lib/desktop';
+import { useConfig } from '../lib/hooks';
+import { Logo } from './Logo';
+
+function useActiveDownloads() {
+  const { data: config } = useConfig();
+  const { data } = useQuery({
+    queryKey: ['downloads'],
+    queryFn: api.downloads,
+    enabled: Boolean(config?.features.downloads),
+    refetchInterval: 10_000,
+  });
+  return (data?.items ?? []).filter((d) => d.state !== 'failed').length;
+}
+
+function SearchBox() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [params] = useSearchParams();
+  const onSearch = location.pathname === '/search';
+  const [open, setOpen] = useState(onSearch);
+  const [value, setValue] = useState(onSearch ? (params.get('q') ?? '') : '');
+  const input = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!onSearch) {
+      setOpen(false);
+      setValue('');
+    }
+  }, [onSearch]);
+
+  useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(() => {
+      const q = value.trim();
+      if (q) navigate(`/search?q=${encodeURIComponent(q)}`, { replace: onSearch });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className={`search${open ? ' is-open' : ''}`}>
+      <button
+        className="icon-btn"
+        aria-label="Search"
+        onClick={() => {
+          setOpen(true);
+          setTimeout(() => input.current?.focus(), 0);
+        }}
+      >
+        <Search size={20} />
+      </button>
+      <input
+        ref={input}
+        className="search__input"
+        placeholder="Titles, people, anything"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => !value && setOpen(false)}
+        onKeyDown={(e) => e.key === 'Escape' && (setValue(''), setOpen(false), input.current?.blur())}
+        aria-label="Search"
+      />
+      {open && value && (
+        <button className="icon-btn icon-btn--sm" aria-label="Clear search" onClick={() => (setValue(''), input.current?.focus())}>
+          <X size={16} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ProfileMenu({ user }: { user: User }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const logout = useMutation({
+    mutationFn: api.logout,
+    onSettled: () => {
+      qc.clear();
+      qc.setQueryData(['me'], null);
+    },
+  });
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', close);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="profile" ref={ref}>
+      <button className="avatar" onClick={() => setOpen((o) => !o)} aria-label="Account menu" aria-expanded={open}>
+        {user.avatar ? <img src={user.avatar} alt="" /> : <span>{user.name[0]?.toUpperCase()}</span>}
+      </button>
+      {open && (
+        <div className="menu" role="menu">
+          <div className="menu__head">
+            <strong>{user.name}</strong>
+            {user.isAdmin && <span className="badge badge--dim">Admin</span>}
+          </div>
+          {desktop()?.openOffline && (
+            <button className="menu__item" onClick={() => desktop()?.openOffline?.()} role="menuitem">
+              <HardDriveDownload size={16} /> Downloads on {appKind().device}
+            </button>
+          )}
+          <Link to="/settings" className="menu__item" onClick={() => setOpen(false)} role="menuitem">
+            <Settings size={16} /> Settings
+          </Link>
+          <button className="menu__item" onClick={() => logout.mutate()} role="menuitem">
+            <LogOut size={16} /> Sign out
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const LINKS = [
+  { to: '/', label: 'Home', icon: House, end: true },
+  { to: '/shows', label: 'Shows', icon: Tv },
+  { to: '/movies', label: 'Movies', icon: Film },
+  { to: '/activity', label: 'Activity', icon: Activity },
+];
+
+export function Nav({ user }: { user: User }) {
+  const [scrolled, setScrolled] = useState(false);
+  const active = useActiveDownloads();
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  return (
+    <>
+      <header className={`nav${scrolled ? ' is-scrolled' : ''}`}>
+        <Link to="/" className="nav__logo" aria-label="Netfish home">
+          <Logo />
+        </Link>
+        <nav className="nav__links">
+          {LINKS.map(({ to, label, end }) => (
+            <NavLink key={to} to={to} end={end} className="nav__link">
+              {label}
+              {to === '/activity' && active > 0 && <span className="nav__count">{active}</span>}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="nav__right">
+          <SearchBox />
+          <ProfileMenu user={user} />
+        </div>
+      </header>
+      <nav className="tabbar" aria-label="Main">
+        {LINKS.slice(0, 3).map(({ to, label, icon: Icon, end }) => (
+          <NavLink key={to} to={to} end={end} className="tabbar__item">
+            <Icon size={22} />
+            <span>{label}</span>
+          </NavLink>
+        ))}
+        <NavLink to="/search" className="tabbar__item">
+          <Search size={22} />
+          <span>Search</span>
+        </NavLink>
+        <NavLink to="/activity" className="tabbar__item">
+          <Clapperboard size={22} />
+          <span>Activity</span>
+          {active > 0 && <span className="nav__count nav__count--tab">{active}</span>}
+        </NavLink>
+      </nav>
+    </>
+  );
+}

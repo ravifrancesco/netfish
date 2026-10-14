@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Netfish</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --accent: #36e2c6;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(ellipse 70% 55% at 50% 30%, #0a1a1c 0%, var(--bg) 70%);
+        color: #eef3f6;
+        font: 18px/1.5 sans-serif;
+      }
+      form {
+        width: min(520px, calc(100vw - 96px));
+        display: grid;
+        gap: 18px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 6px;
+      }
+      .brand span {
+        font-size: 40px;
+        letter-spacing: -0.035em;
+      }
+      .brand .net {
+        font-weight: 300;
+        color: #b5c0ca;
+      }
+      .brand .fish {
+        margin-left: 0.04em;
+        font-weight: 800;
+      }
+      p {
+        margin: 0;
+        color: #93a1ae;
+      }
+      input {
+        height: 56px;
+        padding: 0 18px;
+        border-radius: 10px;
+        border: 2px solid rgba(255, 255, 255, 0.14);
+        background: #12171e;
+        color: inherit;
+        font: inherit;
+        font-size: 22px;
+        outline: none;
+      }
+      button {
+        height: 56px;
+        border: 2px solid transparent;
+        border-radius: 10px;
+        background: rgba(54, 226, 198, 0.75);
+        color: #03221c;
+        font: inherit;
+        font-weight: 700;
+      }
+      input:focus,
+      button:focus {
+        border-color: #fff;
+        outline: 3px solid var(--accent);
+        outline-offset: 2px;
+      }
+      button:focus {
+        background: var(--accent);
+      }
+      button[disabled] {
+        opacity: 0.6;
+      }
+      .error {
+        min-height: 24px;
+        color: #ff6b6b;
+      }
+      small {
+        color: #7c8996;
+        font-size: 15px;
+      }
+    </style>
+  </head>
+  <body>
+    <form id="form">
+      <div class="brand">
+        <svg viewBox="0 0 64 64" width="52" height="52" aria-hidden="true">
+          <defs>
+            <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#8cf8e6" />
+              <stop offset="1" stop-color="#13b89c" />
+            </linearGradient>
+          </defs>
+          <path d="M15 32 L6 23 L6 41 Z" fill="url(#g)" stroke="url(#g)" stroke-width="4" stroke-linejoin="round" />
+          <path d="M23 15 L52 32 L23 49 Z" fill="url(#g)" stroke="url(#g)" stroke-width="6" stroke-linejoin="round" />
+          <circle cx="38" cy="27.5" r="2.5" fill="#03140f" />
+        </svg>
+        <span><span class="net">net</span><span class="fish">fish</span></span>
+      </div>
+      <p>Where is your Netfish server?</p>
+      <input id="url" placeholder="192.168.1.50" inputmode="url" autocomplete="off" spellcheck="false" aria-label="Server address" />
+      <small>The address you open Netfish at in a browser. Just the numbers is enough, e.g. 192.168.1.50</small>
+      <div class="error" id="error"></div>
+      <button id="go">Connect</button>
+    </form>
+    <script>
+      const form = document.getElementById('form');
+      const input = document.getElementById('url');
+      const error = document.getElementById('error');
+      const go = document.getElementById('go');
+      error.textContent = new URLSearchParams(location.search).get('error') || '';
+      input.value = (window.NetfishTV && NetfishTV.currentServer()) || '';
+      // Start on the button when there's already an address (Retry), otherwise on the field.
+      (input.value && error.textContent ? go : input).focus();
+
+      // The remote's up/down move between the field and the button.
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown' && document.activeElement === input) (e.preventDefault(), go.focus());
+        if (e.key === 'ArrowUp' && document.activeElement === go) (e.preventDefault(), input.focus());
+      });
+      input.addEventListener('keydown', (e) => {
+        // The on-screen keyboard's Done/Enter connects straight away.
+        if (e.key === 'Enter') (e.preventDefault(), form.requestSubmit());
+      });
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        error.textContent = '';
+        go.disabled = true;
+        go.textContent = 'Connecting…';
+        // Let "Connecting…" paint before the (blocking) check.
+        setTimeout(() => {
+          const problem = window.NetfishTV ? NetfishTV.connect(input.value) : 'Open this page in the Netfish TV app';
+          if (problem) {
+            error.textContent = problem;
+            go.disabled = false;
+            go.textContent = 'Connect';
+            go.focus();
+          }
+        }, 50);
+      });
+    </script>
+  </body>
+</html>
