@@ -105,3 +105,41 @@ export function useOtherScreens() {
   const me = screenId();
   return (q.data?.screens ?? []).filter((s) => s.id !== me);
 }
+
+// ---------- Connected to a screen (like casting on YouTube) ----------
+
+/** The screen Play sends things to, while this device is connected to one. */
+export interface CastTarget {
+  id: string;
+  name: string;
+}
+const CAST_KEY = 'netfish.castTo';
+const CAST_EVENT = 'netfish:cast';
+
+export function castTarget(): CastTarget | undefined {
+  try {
+    return JSON.parse(localStorage.getItem(CAST_KEY) ?? 'null') ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function setCastTarget(target: CastTarget | undefined) {
+  try {
+    if (target) localStorage.setItem(CAST_KEY, JSON.stringify(target));
+    else localStorage.removeItem(CAST_KEY);
+  } catch {
+    /* private window: only for now */
+  }
+  window.dispatchEvent(new Event(CAST_EVENT));
+}
+
+export function useCastTarget() {
+  const [target, setTarget] = useState(castTarget);
+  useEffect(() => {
+    const update = () => setTarget(castTarget());
+    window.addEventListener(CAST_EVENT, update);
+    return () => window.removeEventListener(CAST_EVENT, update);
+  }, []);
+  return target;
+}

@@ -4,6 +4,7 @@ import { Cast, MonitorSmartphone, Pause, Play, RotateCcw, RotateCw, Square } fro
 import { api } from '../api';
 import { Img, Spinner } from '../components/ui';
 import { rememberRemote } from '../components/PlayOn';
+import { setCastTarget } from '../lib/screens';
 import { clock } from '../lib/format';
 import { useTick, useTogether } from '../lib/together';
 import { t } from '../i18n';
@@ -147,6 +148,7 @@ export default function Remote() {
           onClick={() => {
             const at = Math.floor(together.expected() ?? 0);
             void stop();
+            setCastTarget(undefined); // playing here now, not on the TV
             navigate(`/watch/${room.playback.itemId}?t=${at}`, { replace: true });
           }}
         >

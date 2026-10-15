@@ -21,8 +21,8 @@ A Netflix-style front door for a home media server. One app to browse, discover,
 ### Watching
 - **Home like a streaming service:** Continue Watching, *Ready to watch*, *Top picks for you*, *Because you watched…*, new arrivals, trending and coming soon.
 - **A real player:** plays the file as it is when it can; otherwise Jellyfin repackages it (cheap on a Pi) and only transcodes as a last resort. Audio and subtitle switching, resume, skip intro, next episode, keyboard shortcuts.
-- **Play on TV:** send a film from your phone to the TV, or to any device with Netfish open. Your phone becomes the remote: pause, skip, audio and subtitles. Works mid-film too.
-- **Watch together:** a room for any film or episode. Play, pause, skipping and the next episode stay in step on every device, and the room shows up for everyone on your server right away.
+- **Play on TV:** connect to the TV (or any device with Netfish open) with the cast button next to your profile picture, like YouTube; then Play plays there and your phone becomes the remote: pause, skip, audio and subtitles. A film you're already watching can be handed over mid-way.
+- **Watch together:** turn what you're watching into a room from the player (or from a title's **⋯** menu). Play, pause, skipping and the next episode stay in step on every device, and the room shows up for everyone on your server right away.
 - **Mark as watched:** a film, an episode or a whole season; take anything off *Continue Watching* with one click.
 - **Offline:** download movies and episodes in the Mac, Windows, iPhone/iPad and Android phone apps.
 
@@ -75,7 +75,9 @@ Guide in italiano: [docs/install/it](docs/install/it/README.md).
 | | |
 |---|---|
 | ![Rows of films and shows](docs/screenshots/rows.jpg) | ![A film's page with scores, audio and subtitles](docs/screenshots/title.jpg) |
-| Home: your picks, what's popular on your server, more from directors you like | A film's page: scores, audio and subtitle languages, Versions, Trailer |
+| Home: rooms to join, Continue Watching, your picks | A film's page: scores, who's watching it together, audio and subtitles |
+| ![Watch together: a room on Home and in the top bar](docs/screenshots/together.jpg) | <img src="docs/screenshots/remote.jpg" alt="Play on TV: the phone as the remote" width="260"> |
+| Watch together: rooms show up for everyone, right away | Play on TV: the film plays on the TV, your phone is the remote |
 | ![Searching a director's name](docs/screenshots/search.jpg) | ![A director's page](docs/screenshots/person.jpg) |
 | Search a director or actor: their work comes up first | Their page: everything they made, what's in your library first |
 | ![Versions: every release from every indexer](docs/screenshots/versions.jpg) | ![Live download progress](docs/screenshots/activity.jpg) |
@@ -125,7 +127,7 @@ The apps show the interface from your server, so most new features arrive by upd
 
 **1. Portainer → Stacks → Add stack**, name it `netfish`, paste [`docker-compose.yml`](docker-compose.yml), and **Deploy**. No variables are needed: Portainer pulls the ready-made image `ghcr.io/ravifrancesco/netfish:latest` (built by GitHub for Raspberry Pi and PCs).
 
-**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.5.0`.
+**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.5.1`.
 
 <details>
 <summary>Or build the image on the Pi yourself</summary>
@@ -271,7 +273,7 @@ The Android and Windows builds run from a copy in `~/Library/Caches/netfish-buil
 - **Raspberry Pi and transcoding:** Netfish asks Jellyfin to direct-play or repackage whenever possible. Burned-in (image) subtitles or very high bitrates force real transcoding, which is slow on a Pi.
 - **Popular on this server** shows what the other people on your server watched lately (titles only, never who). Each person counts once they open Netfish; with `JELLYFIN_API_KEY` set, people who watch in other Jellyfin apps count too.
 - **Trakt needs VIP.** Since August 2026 Trakt only lets VIP accounts create the API app whose Client ID and secret Netfish needs, and a free account can connect only one outside app. Netfish works the same without Trakt: its own suggestions (*Top picks*, *Because you watched…*) come from TMDB through Seerr.
-- **Play on TV** lists your own devices (signed in as you) and every TV on your server, since a TV is usually the household's. The film plays under the profile signed in on that TV. Name each device in **Settings → Playback on this device**.
+- **Play on TV** lists your own devices (signed in as you) and every TV on your server, since a TV is usually the household's. The film plays under the profile signed in on that TV. Name each device in **Settings → Playback on this device**. While you're connected, the cast button shows the device's name; pick **This device** to play here again.
 - **Watch together** keeps a live connection to the server open while you watch (server-sent events). Behind a reverse proxy that buffers responses, turn buffering off for `/api/together/`; Netfish already tells nginx not to.
 - **Letterboxd** has no public API; its score comes from MDBList when a key is set, otherwise Netfish links to the film's page.
 - **Artwork cache:** Netfish keeps a copy of every poster it has shown (and fetches library posters ahead of time) in `/config/cache/images`, up to 1 GB by default (`IMAGE_CACHE_MB` to change). Covers load instantly after the first time, and apps keep them too.

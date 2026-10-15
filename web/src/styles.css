@@ -3879,3 +3879,146 @@ html.is-ios-app {
   justify-content: center;
   gap: 10px;
 }
+
+/* ---------- Title page: round icon buttons and the ⋯ menu ---------- */
+.tp__icons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.round-btn {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex: none;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  background: rgba(18, 23, 30, 0.6);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+.round-btn:hover,
+.round-btn.is-active,
+.round-btn:focus-visible,
+html.is-tv .round-btn:focus {
+  border-color: var(--text);
+  background: rgba(255, 255, 255, 0.12);
+  outline: none;
+}
+.round-btn.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.round-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+/* Its name, on hover (or when the TV remote is on it). */
+.round-btn[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 0.78rem;
+  font-weight: 650;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 5;
+}
+.round-btn[data-tip]:hover::after,
+.round-btn[data-tip]:focus-visible::after,
+html.is-tv .round-btn[data-tip]:focus::after {
+  opacity: 1;
+}
+.round-btn[aria-expanded='true']::after {
+  opacity: 0 !important;
+}
+.more {
+  position: relative;
+}
+.more__menu {
+  left: 0;
+  right: auto;
+  min-width: 220px;
+  z-index: 6;
+}
+.more__menu[hidden] {
+  display: none;
+}
+.menu__item {
+  color: var(--text);
+}
+.menu__item--danger {
+  color: var(--danger);
+}
+@media (max-width: 600px) {
+  /* Phones: the menu opens leftwards from the ⋯ at the end of the row. */
+  .more__menu {
+    left: auto;
+    right: 0;
+  }
+}
+
+/* ---------- The top bar's cast button ---------- */
+.cast-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0 8px;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+.cast-btn:hover,
+.cast-btn[aria-expanded='true'] {
+  background: rgba(255, 255, 255, 0.1);
+}
+.cast-btn.is-on {
+  color: var(--accent);
+  border-color: var(--accent-soft);
+  background: rgba(14, 18, 24, 0.6);
+  padding: 0 12px 0 10px;
+}
+.cast-btn__name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  .cast-btn__name {
+    display: none;
+  }
+  .cast-btn.is-on {
+    padding: 0 8px;
+  }
+}
+.play-on__tick {
+  color: var(--accent);
+  flex: none;
+}
+.play-on__hint {
+  margin: 4px 12px 8px;
+  max-width: 260px;
+}

@@ -13,12 +13,13 @@ import {
   RotateCcw,
   RotateCw,
   SkipForward,
+  Users,
   Volume2,
   VolumeX,
 } from 'lucide-react';
 import type { PlaybackSession, ProgressReport, StreamTrack, TogetherCommand } from '@netfish/shared';
 import { api } from '../api';
-import { Spinner } from '../components/ui';
+import { Spinner, useToast } from '../components/ui';
 import { clock } from '../lib/format';
 import { getPrefs, setPrefs, usePrefs } from '../lib/prefs';
 import { desktop } from '../lib/desktop';
@@ -29,7 +30,8 @@ import { parseVtt, type Cue } from '../player/vtt';
 import { explainReasons } from '../player/reasons';
 import { useTogether } from '../lib/together';
 import { TogetherChip, TogetherNotes, TogetherPanel } from '../components/Together';
-import { PlayOnButton } from '../components/PlayOn';
+import { PlayOnButton, SendToScreen } from '../components/PlayOn';
+import { castTarget, screenKind } from '../lib/screens';
 import { t } from '../i18n';
 
 const REPORT_EVERY = 10;
@@ -84,7 +86,25 @@ interface LoadOptions {
  * The player. In the apps, the app's own engine (mpv, ExoPlayer, Apple's) draws
  * the film underneath these controls, so the server sends files as they are.
  */
+/**
+ * Play, while this device is connected to another screen (the top bar's cast button): the
+ * film plays there and this page becomes its remote. Otherwise, the player.
+ */
 export default function Watch() {
+  const { itemId = '' } = useParams();
+  const [params] = useSearchParams();
+  // Decided once, when the player opens: handing the film over from inside the player also
+  // connects to that screen, and that mustn't send it a second time.
+  const [target] = useState(castTarget);
+  const [here, setHere] = useState(false);
+  if (target && !here && !params.get('room') && screenKind() !== 'tv') {
+    const at = params.get('t');
+    return <SendToScreen key={itemId} target={target} itemId={itemId} position={at !== null ? Number(at) : undefined} onFailed={() => setHere(true)} />;
+  }
+  return <Player />;
+}
+
+function Player() {
   const { itemId = '' } = useParams();
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -145,7 +165,10 @@ export default function Watch() {
   const together = useTogether(roomId, { onCommand: (command) => commandRef.current(command) });
   const togetherRef = useRef(together);
   togetherRef.current = together;
-  const inRoom = () => Boolean(roomId && togetherRef.current.room && !togetherRef.current.ended);
+  // Through a ref: a film can become a room while it plays (Watch together from the player).
+  const roomIdRef = useRef(roomId);
+  roomIdRef.current = roomId;
+  const inRoom = () => Boolean(roomIdRef.current && togetherRef.current.room && !togetherRef.current.ended);
   const itemRef = useRef(itemId);
   itemRef.current = itemId;
   /** Loaded far enough to be moved around. */
@@ -159,6 +182,9 @@ export default function Watch() {
   const startPaused = useRef(false);
   const [needsTap, setNeedsTap] = useState(false);
   const [roomPanel, setRoomPanel] = useState(false);
+  /** Turning this film into a Watch together room: the stream keeps playing, nothing reloads. */
+  const becomingRoom = useRef(false);
+  const toast = useToast();
 
   // ---------- reporting ----------
 
@@ -291,6 +317,10 @@ export default function Watch() {
   const roomKnown = !roomId || Boolean(together.room) || together.ended;
   useEffect(() => {
     if (!info.data || !roomKnown) return;
+    if (becomingRoom.current) {
+      becomingRoom.current = false;
+      return;
+    }
     fallbackTried.current = false;
     const d = info.data;
     const room = inRoom() ? togetherRef.current.room : undefined;
@@ -846,6 +876,27 @@ export default function Watch() {
           <span className="player__title">{heading}</span>
           {subheading && <span className="player__subtitle">{subheading}</span>}
         </div>
+        {!roomId && d && (
+          // Watch together, from here: this film becomes a room, from where it is now.
+          <button
+            className="icon-btn icon-btn--lg"
+            aria-label={t('Watch together')}
+            title={t('Watch together')}
+            onClick={() => {
+              const at = video.current?.currentTime ?? 0;
+              api.createRoom(itemId, at).then(
+                (room) => {
+                  becomingRoom.current = true;
+                  setRoomPanel(true);
+                  navigate(`/watch/${itemId}?room=${room.id}`, { replace: true });
+                },
+                (err: Error) => toast('error', err.message),
+              );
+            }}
+          >
+            <Users size={24} />
+          </button>
+        )}
         {!roomId && d && (
           // Hand the film over to another screen, from where it is now.
           <PlayOnButton

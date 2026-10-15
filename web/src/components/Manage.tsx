@@ -79,7 +79,7 @@ export function StopDownload({ d, small }: { d: DownloadItem; small?: boolean })
 }
 
 /** Admins: delete the files to free space; the title stays listed as "Not on disk". */
-export function DeleteFromDisk({ d }: { d: TitleDetail }) {
+export function DeleteFromDisk({ d, menu }: { d: TitleDetail; menu?: boolean }) {
   const [open, setOpen] = useState(false);
   const seasonsOnDisk = d.disk?.seasons ?? [];
   const [chosen, setChosen] = useState<number[]>([]);
@@ -100,13 +100,14 @@ export function DeleteFromDisk({ d }: { d: TitleDetail }) {
   return (
     <>
       <button
-        className="btn btn--ghost btn--lg"
+        className={menu ? 'menu__item menu__item--danger' : 'btn btn--ghost btn--lg'}
+        role={menu ? 'menuitem' : undefined}
         onClick={() => {
           setChosen(seasonsOnDisk.map((s) => s.seasonNumber));
           setOpen(true);
         }}
       >
-        <Trash2 size={20} /> {t('Delete from disk')}
+        <Trash2 size={menu ? 18 : 20} /> {t('Delete from disk')}
       </button>
       {open && (
         <Modal

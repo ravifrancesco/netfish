@@ -14,7 +14,7 @@ import { t, tn } from '../i18n';
 const inviteLink = (id: string) => `${location.origin}/together/${id}`;
 
 /** Title page: start a room for what Play would play, and go straight into it. */
-export function WatchTogetherButton({ itemId, className = 'btn btn--ghost btn--lg' }: { itemId: string; className?: string }) {
+export function WatchTogetherButton({ itemId, menu }: { itemId: string; menu?: boolean }) {
   const navigate = useNavigate();
   const toast = useToast();
   const start = useMutation({
@@ -23,8 +23,14 @@ export function WatchTogetherButton({ itemId, className = 'btn btn--ghost btn--l
     onError: (err) => toast('error', (err as Error).message),
   });
   return (
-    <button className={className} disabled={start.isPending} onClick={() => start.mutate()} title={t('Watch in sync with others on this server')}>
-      {start.isPending ? <Spinner size={18} /> : <Users size={20} />} {t('Watch together')}
+    <button
+      className={menu ? 'menu__item' : 'btn btn--ghost btn--lg'}
+      role={menu ? 'menuitem' : undefined}
+      disabled={start.isPending}
+      onClick={() => start.mutate()}
+      title={t('Watch in sync with others on this server')}
+    >
+      {start.isPending ? <Spinner size={16} /> : <Users size={menu ? 18 : 20} />} {t('Watch together')}
     </button>
   );
 }

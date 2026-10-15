@@ -1,14 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { TriangleAlert, CalendarClock, Check, CircleCheck, Clock, Layers, Play, Plus, Star, Clapperboard, Undo2 } from 'lucide-react';
+import { TriangleAlert, CalendarClock, Check, CircleCheck, Clock, Ellipsis, Layers, Play, Plus, Star, Clapperboard } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { DownloadItem, MediaType, SeasonSummary, TitleDetail } from '@netfish/shared';
 import { api, type TitleRef } from '../api';
 import { Row } from '../components/Cards';
 import { DownloadButton } from '../components/DownloadButton';
 import { TogetherOnTitle, WatchTogetherButton } from '../components/Together';
-import { PlayOnButton } from '../components/PlayOn';
 import { NameLinks, PeopleRow } from '../components/People';
 import { isNotAvailable, notOutText } from '../components/NotOut';
 import { DeleteFromDisk, DownloadAgain, RemovedNote, StopDownload } from '../components/Manage';
@@ -43,10 +42,46 @@ function useSetWatched() {
 function WatchedButton({ d }: { d: TitleDetail }) {
   const set = useSetWatched();
   if (!d.jellyfinId || d.watched === undefined) return null;
+  const label = d.watched ? t('Watched · mark as unwatched') : t('Mark as watched');
   return (
-    <button className="btn btn--ghost btn--lg" disabled={set.isPending} onClick={() => set.mutate({ itemId: d.jellyfinId!, watched: !d.watched })}>
-      {d.watched ? <Undo2 size={20} /> : <CircleCheck size={20} />} {d.watched ? t('Mark as unwatched') : t('Mark as watched')}
+    <button
+      className={`round-btn${d.watched ? ' is-on' : ''}`}
+      data-tip={label}
+      aria-label={label}
+      aria-pressed={d.watched}
+      disabled={set.isPending}
+      onClick={() => set.mutate({ itemId: d.jellyfinId!, watched: !d.watched })}
+    >
+      {d.watched ? <Check size={20} /> : <CircleCheck size={20} />}
     </button>
+  );
+}
+
+/** "⋯": the title's less used actions, in a menu instead of a row of buttons. */
+function MoreMenu({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', close);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  return (
+    <div className="more" ref={ref}>
+      <button className={`round-btn${open ? ' is-active' : ''}`} data-tip={t('More')} aria-label={t('More')} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <Ellipsis size={20} />
+      </button>
+      {/* Stays mounted while hidden, so what an item opens (a confirmation) outlives the menu. */}
+      <div className="menu more__menu" role="menu" hidden={!open} onClick={() => setOpen(false)}>
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -378,26 +413,31 @@ export default function Title() {
                 <Play size={22} fill="currentColor" /> {d.play.label}
               </Link>
             )}
-            {d.play && <PlayOnButton itemId={d.play.itemId} title={d.title} />}
-            {d.play && <WatchTogetherButton itemId={d.play.itemId} />}
-            {d.play && d.mediaType === 'movie' && <DownloadButton itemId={d.play.itemId} />}
             {d.removed && !d.removed.seasons && d.canManage ? (
               <DownloadAgain d={d} className="btn btn--accent btn--lg" />
             ) : (
               <RequestButton title={d} className={d.play ? 'btn btn--ghost btn--lg' : 'btn btn--accent btn--lg'} />
-            )}
-            {d.canChooseVersion && (
-              <button className="btn btn--ghost btn--lg" onClick={() => setSheet({ kind: 'versions' })}>
-                <Layers size={20} /> {t('Versions')}
-              </button>
             )}
             {d.trailerYoutubeKey && (
               <button className="btn btn--ghost btn--lg" onClick={() => setTrailer(true)}>
                 <Clapperboard size={20} /> {t('Trailer')}
               </button>
             )}
-            <WatchedButton d={d} />
-            <DeleteFromDisk d={d} />
+            <div className="tp__icons">
+              <WatchedButton d={d} />
+              {d.play && d.mediaType === 'movie' && <DownloadButton itemId={d.play.itemId} round />}
+              {(d.play || d.canChooseVersion || (d.canManage && d.disk && d.tmdbId)) && (
+                <MoreMenu>
+                  {d.play && <WatchTogetherButton itemId={d.play.itemId} menu />}
+                  {d.canChooseVersion && (
+                    <button className="menu__item" role="menuitem" onClick={() => setSheet({ kind: 'versions' })}>
+                      <Layers size={18} /> {t('Versions')}
+                    </button>
+                  )}
+                  <DeleteFromDisk d={d} menu />
+                </MoreMenu>
+              )}
+            </div>
           </div>
           {d.play?.progress !== undefined && <Progress value={d.play.progress} tone="watch" className="tp__progress" />}
           <TogetherOnTitle titleId={d.jellyfinId} />

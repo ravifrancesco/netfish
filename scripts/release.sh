@@ -56,4 +56,7 @@ gh release create "$TAG" --title "Netfish $VERSION" --notes-file "$STAGE/notes.m
   "$STAGE/Netfish-server.tar.gz" "$STAGE/Netfish-mac.dmg" "$STAGE/Netfish-mac.zip" "$STAGE/Netfish-windows.exe" "$STAGE/Netfish-android.apk" \
   "$STAGE/Netfish-samsung.wgt" "$STAGE/Netfish-ios.ipa"
 rm -rf "$STAGE"
+# Every version's files are on GitHub: only this one's stay here, so old copies don't pile
+# up (or show up in Spotlight next to the installed app).
+find release -maxdepth 1 -name 'Netfish-*' ! -name "Netfish-$VERSION-*" -delete
 echo "Published https://github.com/$OWNER/netfish/releases/tag/$TAG"

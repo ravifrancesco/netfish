@@ -30,31 +30,51 @@ export const roomHref = (room: TogetherRoom) => `/watch/${room.playback.itemId}?
  */
 export function useLive() {
   const qc = useQueryClient();
+  // The router hands out a new navigate function on every page change: kept in a ref, so
+  // the line isn't closed and reopened each time (browsers allow only six connections to
+  // a server, and closed ones take a while to be freed).
   const navigate = useNavigate();
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
   const name = useScreenName();
   useEffect(() => {
     if (typeof EventSource === 'undefined') return;
     const query = new URLSearchParams({ screen: screenId(), name, kind: screenKind() });
-    const source = new EventSource(`/api/together/live?${query}`);
-    source.onmessage = (e) => {
-      let event: LiveEvent;
-      try {
-        event = JSON.parse(e.data);
-      } catch {
-        return;
-      }
-      roomsClock = event.now - Date.now();
-      if (event.rooms) qc.setQueryData(['rooms'], { rooms: event.rooms });
-      if (event.screens) qc.setQueryData(['screens'], { screens: event.screens });
-      if (event.open) navigate(event.open.path);
+    let source: EventSource | undefined;
+    const open = () => {
+      source?.close();
+      source = new EventSource(`/api/together/live?${query}`);
+      source.onmessage = (e) => {
+        let event: LiveEvent;
+        try {
+          event = JSON.parse(e.data);
+        } catch {
+          return;
+        }
+        roomsClock = event.now - Date.now();
+        if (event.rooms) qc.setQueryData(['rooms'], { rooms: event.rooms });
+        if (event.screens) qc.setQueryData(['screens'], { screens: event.screens });
+        if (event.open) navigateRef.current(event.open.path);
+      };
+      // Back from a dropped line: catch up on what was missed.
+      source.onopen = () => {
+        void qc.invalidateQueries({ queryKey: ['rooms'] });
+        void qc.invalidateQueries({ queryKey: ['screens'] });
+      };
     };
-    // Back from a dropped line: catch up on what was missed.
-    source.onopen = () => {
-      void qc.invalidateQueries({ queryKey: ['rooms'] });
-      void qc.invalidateQueries({ queryKey: ['screens'] });
+    // Leaving the page (it may be kept for the Back button): close the line, or a few such
+    // pages would hold every connection the browser allows to the server.
+    const hide = () => source?.close();
+    const show = (e: PageTransitionEvent) => e.persisted && open();
+    open();
+    addEventListener('pagehide', hide);
+    addEventListener('pageshow', show);
+    return () => {
+      removeEventListener('pagehide', hide);
+      removeEventListener('pageshow', show);
+      source?.close();
     };
-    return () => source.close();
-  }, [name, qc, navigate]);
+  }, [name, qc]);
 }
 
 /** Re-renders every so often (for things that move with time, like a room's progress). */
@@ -145,10 +165,17 @@ export function useTogether(roomId: string | undefined, options: { controller?: 
         );
       };
     };
+    // Leaving the page (it may be kept for the Back button): close, and reconnect on return.
+    const hide = () => source?.close();
+    const show = (e: PageTransitionEvent) => e.persisted && !stopped && connect();
     connect();
+    addEventListener('pagehide', hide);
+    addEventListener('pageshow', show);
     return () => {
       stopped = true;
       clearTimeout(retry);
+      removeEventListener('pagehide', hide);
+      removeEventListener('pageshow', show);
       source?.close();
     };
   }, [roomId, clientId]);

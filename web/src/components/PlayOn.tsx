@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { useMutation } from '@tanstack/react-query';
-import { Cast, Globe, Laptop, Pause, Play, Smartphone, Tablet, Tv, X } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Cast, Check, Globe, Laptop, Pause, Play, Smartphone, Tablet, Tv, X } from 'lucide-react';
 import type { Screen, ScreenKind } from '@netfish/shared';
 import { api } from '../api';
-import { useOtherScreens } from '../lib/screens';
+import { screenId, screenKind, setCastTarget, useCastTarget, useOtherScreens, type CastTarget } from '../lib/screens';
 import { useTogether } from '../lib/together';
 import { Spinner, useToast } from './ui';
 import { t } from '../i18n';
@@ -48,6 +48,115 @@ function useRemoteSession() {
 
 const ICONS: Record<ScreenKind, typeof Tv> = { tv: Tv, computer: Laptop, phone: Smartphone, tablet: Tablet, browser: Globe };
 
+/** Closes a menu on a click elsewhere or Escape. */
+function useCloseOutside(open: boolean, setOpen: (open: boolean) => void) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', close);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open, setOpen]);
+  return ref;
+}
+
+/**
+ * The top bar's cast button, like YouTube's: connect to a TV (or any device with Netfish
+ * open), and every Play then plays there, with this device as its remote. Not on TVs.
+ */
+export function CastButton() {
+  const target = useCastTarget();
+  const q = useQuery({ queryKey: ['screens'], queryFn: api.screens, refetchInterval: 60_000, staleTime: 30_000 });
+  const me = screenId();
+  const screens = (q.data?.screens ?? []).filter((s) => s.id !== me);
+  const [open, setOpen] = useState(false);
+  const ref = useCloseOutside(open, setOpen);
+  // The device was turned off or closed Netfish: back to playing here.
+  const gone = Boolean(target && q.data && !screens.some((s) => s.id === target.id));
+  useEffect(() => {
+    if (gone) setCastTarget(undefined);
+  }, [gone]);
+  if (screenKind() === 'tv' || (!screens.length && !target)) return null;
+
+  const pick = (next: CastTarget | undefined) => {
+    setCastTarget(next);
+    setOpen(false);
+  };
+  const label = target ? t('Connected to {screen}', { screen: target.name }) : t('Play on another device');
+  return (
+    <div className="play-on" ref={ref}>
+      <button className={`cast-btn${target ? ' is-on' : ''}`} onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label={label} title={label}>
+        <Cast size={20} />
+        {target && <span className="cast-btn__name">{target.name}</span>}
+      </button>
+      {open && (
+        <div className="menu play-on__menu" role="menu">
+          <div className="menu__head">
+            <strong>{t('Play on')}</strong>
+          </div>
+          <button className="menu__item" role="menuitemradio" aria-checked={!target} onClick={() => pick(undefined)}>
+            <Smartphone size={18} />
+            <span className="play-on__name">{t('This device')}</span>
+            {!target && <Check size={16} className="play-on__tick" />}
+          </button>
+          {screens.map((screen) => {
+            const Icon = ICONS[screen.kind];
+            const on = target?.id === screen.id;
+            return (
+              <button key={screen.id} className="menu__item" role="menuitemradio" aria-checked={on} onClick={() => pick({ id: screen.id, name: screen.name })}>
+                <Icon size={18} />
+                <span className="play-on__name">
+                  {screen.name}
+                  {!screen.mine && <span className="muted small"> · {screen.userName}</span>}
+                </span>
+                {on && <Check size={16} className="play-on__tick" />}
+              </button>
+            );
+          })}
+          <p className="play-on__hint muted small">{target ? t('Play sends films to {screen}; this device is the remote.', { screen: target.name }) : t('Pick a device, then Play plays there.')}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Pressed Play while connected to another screen: the film goes there and this page becomes
+ * its remote. If the screen isn't there any more, it plays here instead (`onFailed`).
+ */
+export function SendToScreen({ target, itemId, position, onFailed }: { target: CastTarget; itemId: string; position?: number; onFailed: () => void }) {
+  const navigate = useNavigate();
+  const toast = useToast();
+  const sent = useRef(false);
+  useEffect(() => {
+    if (sent.current) return;
+    sent.current = true;
+    api
+      .playOn(target.id, itemId, position)
+      .then((room) => {
+        rememberRemote({ roomId: room.id, screenName: target.name, title: room.title });
+        navigate(`/remote/${room.id}`, { replace: true });
+      })
+      .catch((err: Error) => {
+        setCastTarget(undefined);
+        toast('error', t("Couldn't play on {screen} ({reason}). Playing here instead.", { screen: target.name, reason: err.message }));
+        onFailed();
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="page container remote remote--ended">
+      <Cast size={36} />
+      <p>{t('Sending to {screen}…', { screen: target.name })}</p>
+      <Spinner size={24} />
+    </div>
+  );
+}
+
 /**
  * "Play on…": the other places Netfish is open (your devices, and the household's TVs).
  * Picking one plays the film there, and this device becomes its remote.
@@ -70,6 +179,8 @@ export function PlayOnButton({ itemId, title, position, onSent, className = 'btn
     mutationFn: (screen: Screen) => api.playOn(screen.id, itemId, position?.()),
     onSuccess: (room, screen) => {
       setOpen(false);
+      // Like casting: Play keeps going to that screen until you disconnect.
+      setCastTarget({ id: screen.id, name: screen.name });
       rememberRemote({ roomId: room.id, screenName: screen.name, title });
       onSent?.();
       navigate(`/remote/${room.id}`, { replace: Boolean(onSent) });

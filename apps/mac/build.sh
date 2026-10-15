@@ -1,18 +1,19 @@
 #!/bin/bash
-# Builds Netfish for Mac (apps/mac/build/Netfish.app), and with --dmg the disk image in release/.
+# Builds Netfish for Mac (in ~/Library/Caches/netfish-build/mac), and with --dmg the disk image in release/.
 # Needs Xcode's command-line tools, plus mpv and dylibbundler from Homebrew
 # (brew install mpv dylibbundler): the app carries its own copy of libmpv and everything it
 # needs, so it runs on any Mac with macOS 15 or later, without Homebrew.
 set -euo pipefail
 cd "$(dirname "$0")"
 VERSION=$(node -p "require('../../package.json').version")
-APP=build/Netfish.app
+# Built outside the project, in a folder Spotlight and iCloud leave alone: otherwise every
+# build shows up as another "Netfish" next to the installed one when you search for it.
+BUILD="${XDG_CACHE_HOME:-$HOME/Library/Caches}/netfish-build/mac"
+APP=$BUILD/Netfish.app
 BREW=$(brew --prefix)
 
-rm -rf build
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" build/iconset.iconset
-# Keep build output out of iCloud.
-xattr -w 'com.apple.fileprovider.ignore#P' 1 build 2>/dev/null || true
+rm -rf "$BUILD" build # (build: where earlier versions of this script put it)
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$BUILD/iconset.iconset"
 
 swiftc -O -swift-version 5 -target arm64-apple-macos15.0 \
   -import-objc-header Netfish/Netfish-Bridging-Header.h \
@@ -31,10 +32,10 @@ cp -R ../ios/Netfish/en.lproj ../ios/Netfish/it.lproj "$APP/Contents/Resources/"
 
 # App icon from the shared artwork.
 for size in 16 32 128 256 512; do
-  sips -z $size $size ../common/icon.png --out "build/iconset.iconset/icon_${size}x${size}.png" >/dev/null
-  sips -z $((size * 2)) $((size * 2)) ../common/icon.png --out "build/iconset.iconset/icon_${size}x${size}@2x.png" >/dev/null
+  sips -z $size $size ../common/icon.png --out "$BUILD/iconset.iconset/icon_${size}x${size}.png" >/dev/null
+  sips -z $((size * 2)) $((size * 2)) ../common/icon.png --out "$BUILD/iconset.iconset/icon_${size}x${size}@2x.png" >/dev/null
 done
-iconutil -c icns build/iconset.iconset -o "$APP/Contents/Resources/Netfish.icns"
+iconutil -c icns "$BUILD/iconset.iconset" -o "$APP/Contents/Resources/Netfish.icns"
 
 # libmpv and the libraries it uses (FFmpeg and friends) go inside the app, pointed at from there.
 mkdir -p "$APP/Contents/Frameworks"
@@ -72,7 +73,7 @@ echo "Built $APP"
 # --selftest: a copy with its own identity (app.netfish.mac.selftest), so automated tests never
 # touch the real app's sign-in, settings or downloads.
 if [ "${1:-}" = "--selftest" ]; then
-  TEST=build/NetfishSelfTest.app
+  TEST=$BUILD/NetfishSelfTest.app
   rm -rf "$TEST"
   cp -R "$APP" "$TEST"
   /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier app.netfish.mac.selftest" -c "Set :CFBundleName Netfish Self-Test" "$TEST/Contents/Info.plist"
@@ -81,11 +82,11 @@ if [ "${1:-}" = "--selftest" ]; then
 fi
 
 if [ "${1:-}" = "--dmg" ]; then
-  mkdir -p build/dmg ../../release
-  cp -R "$APP" build/dmg/
-  ln -s /Applications build/dmg/Applications
+  mkdir -p "$BUILD/dmg" ../../release
+  cp -R "$APP" "$BUILD/dmg/"
+  ln -s /Applications "$BUILD/dmg/Applications"
   rm -f "../../release/Netfish-$VERSION-mac.dmg"
-  hdiutil create -volname Netfish -srcfolder build/dmg -ov -format UDZO "../../release/Netfish-$VERSION-mac.dmg" >/dev/null
+  hdiutil create -volname Netfish -srcfolder "$BUILD/dmg" -ov -format UDZO "../../release/Netfish-$VERSION-mac.dmg" >/dev/null
   echo "Built release/Netfish-$VERSION-mac.dmg"
   # What the app downloads to update itself (Settings → Update): no disk image to mount.
   rm -f "../../release/Netfish-$VERSION-mac.zip"

@@ -9,12 +9,23 @@ import { t } from '../i18n';
 
 export function Img({ src, alt = '', className = '', fallback }: { src?: string; alt?: string; className?: string; fallback?: ReactNode }) {
   const [state, setState] = useState<'loading' | 'ok' | 'error'>(src ? 'loading' : 'error');
-  useEffect(() => {
+  // A new picture starts over, straight away (resetting in an effect could land after a cached
+  // picture had already loaded, leaving it invisible).
+  const [shown, setShown] = useState(src);
+  if (shown !== src) {
+    setShown(src);
     setState(src ? 'loading' : 'error');
+  }
+  // Loaded before React was listening (from the cache): show it.
+  const ref = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    const img = ref.current;
+    if (img?.complete && img.naturalWidth) setState('ok');
   }, [src]);
   if (!src || state === 'error') return <div className={`img-fallback ${className}`}>{fallback}</div>;
   return (
     <img
+      ref={ref}
       src={src}
       alt={alt}
       loading="lazy"

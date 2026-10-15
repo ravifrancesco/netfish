@@ -8,6 +8,7 @@ import { appKind, desktop } from '../lib/desktop';
 import { useConfig } from '../lib/hooks';
 import { Logo } from './Logo';
 import { TogetherPill } from './Together';
+import { CastButton } from './PlayOn';
 import { t } from '../i18n';
 
 function useActiveDownloads() {
@@ -165,6 +166,7 @@ export function Nav({ user }: { user: User }) {
         <div className="nav__right">
           <TogetherPill />
           <SearchBox />
+          <CastButton />
           <ProfileMenu user={user} />
         </div>
       </header>

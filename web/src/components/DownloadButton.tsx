@@ -6,7 +6,7 @@ import { Spinner, useToast } from './ui';
 import { t } from '../i18n';
 
 /** Save a movie or episode to this device for offline viewing (desktop and iPhone/iPad apps). */
-export function DownloadButton({ itemId, compact }: { itemId: string; compact?: boolean }) {
+export function DownloadButton({ itemId, compact, round }: { itemId: string; compact?: boolean; round?: boolean }) {
   const list = useOffline();
   const toast = useToast();
   const entry = list.find((i) => i.itemId === itemId);
@@ -42,6 +42,13 @@ export function DownloadButton({ itemId, compact }: { itemId: string; compact?: 
     label = t('Retry download');
   }
 
+  if (round) {
+    return (
+      <button className={`round-btn${entry?.state === 'done' ? ' is-on' : ''}`} data-tip={label} aria-label={label} onClick={onClick} disabled={start.isPending}>
+        {icon}
+      </button>
+    );
+  }
   if (compact) {
     return (
       <button className={`icon-btn icon-btn--sm${entry?.state === 'done' ? ' is-done' : ''}`} title={label} aria-label={label} onClick={onClick} disabled={start.isPending}>

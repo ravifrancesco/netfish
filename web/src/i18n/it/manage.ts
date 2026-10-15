@@ -67,6 +67,7 @@ export default {
   'PIN saved.': 'PIN salvato.',
   'PIN removed.': 'PIN rimosso.',
   you: 'tu',
+  'Watched · mark as unwatched': 'Visto · segna come non visto',
   'Locked with a PIN': 'Bloccato con un PIN',
   'Sign {name} out on this device?': 'Disconnettere {name} da questo dispositivo?',
   Remove: 'Rimuovi',
