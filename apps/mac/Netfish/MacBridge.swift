@@ -40,6 +40,7 @@ final class MacBridge: NSObject, WKScriptMessageHandlerWithReply {
         takePositions: () => call('takePositions'),
         saveSnapshot: (json) => { call('saveSnapshot', json); },
         snapshot: () => call('snapshot'),
+        serverReachable: () => call('serverReachable'),
         toggleFullscreen: () => { call('fullscreen'); },
         notify: (n) => { call('notify', n); },
         update: {
@@ -135,6 +136,9 @@ final class MacBridge: NSObject, WKScriptMessageHandlerWithReply {
             store.saveSnapshot(args as? String ?? "")
             return nil
         case "snapshot": return store.snapshot() ?? NSNull()
+        case "serverReachable":
+            guard let server = Server.url else { return false }
+            return await Server.reachable(server)
         case "openServer":
             window.showServer()
             return nil

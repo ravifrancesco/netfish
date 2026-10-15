@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Cast, MonitorSmartphone, Pause, Play, RotateCcw, RotateCw, Square } from 'lucide-react';
 import { api } from '../api';
-import { Img, Spinner } from '../components/ui';
+import { Img } from '../components/ui';
+import { SwimmingFish } from '../components/Logo';
 import { rememberRemote } from '../components/PlayOn';
 import { setCastTarget } from '../lib/screens';
 import { clock } from '../lib/format';
@@ -40,7 +41,7 @@ export default function Remote() {
   if (!room) {
     return (
       <div className="page container remote remote--ended">
-        <Spinner size={32} />
+        <SwimmingFish />
       </div>
     );
   }

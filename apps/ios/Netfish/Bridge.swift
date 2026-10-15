@@ -32,6 +32,7 @@ enum Bridge {
         takePositions: () => call('takePositions'),
         saveSnapshot: (json) => { call('saveSnapshot', json); },
         snapshot: () => call('snapshot'),
+        serverReachable: () => call('serverReachable'),
         changeServer: () => { call('changeServer'); },
         connect: (input) => call('connect', input),
         currentServer: () => call('currentServer'),
@@ -100,6 +101,9 @@ final class BridgeHandler: NSObject, WKScriptMessageHandlerWithReply {
             store.saveSnapshot(args as? String ?? "")
             return nil
         case "snapshot": return store.snapshot() ?? NSNull()
+        case "serverReachable":
+            guard let server = Server.url else { return false }
+            return await Server.reachable(server)
         case "openServer":
             controller?.showServer()
             return nil

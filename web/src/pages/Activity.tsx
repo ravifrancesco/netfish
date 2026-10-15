@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { CalendarClock, TriangleAlert } from 'lucide-react';
 import type { DownloadItem, RequestItem } from '@netfish/shared';
 import { api } from '../api';
-import { ErrorState, Img, Progress, Spinner, StatusChip } from '../components/ui';
+import { Empty, ErrorState, Img, PageLoader, Progress, StatusChip } from '../components/ui';
 import { AVAILABILITY_LABEL, DOWNLOAD_LABEL, ago, bytes, duration, percent } from '../lib/format';
 import { useConfig, useMe } from '../lib/hooks';
 import { t, tn } from '../i18n';
@@ -57,10 +57,10 @@ function Downloads() {
   const { data: me } = useMe();
   const canStop = (d: DownloadItem) => Boolean(me?.isAdmin || d.mine);
   if (q.isError) return <ErrorState error={q.error} retry={() => void q.refetch()} />;
-  if (!q.data) return <Spinner size={28} />;
+  if (!q.data) return <PageLoader />;
   const mine = q.data.items.filter((d) => d.mine);
   const others = q.data.items.filter((d) => !d.mine);
-  if (!q.data.items.length) return <div className="empty"><p>{t('Nothing is downloading right now.')}</p></div>;
+  if (!q.data.items.length) return <Empty>{t('Nothing is downloading right now.')}</Empty>;
   return (
     <>
       {mine.length > 0 && (
@@ -90,8 +90,8 @@ const REQUEST_LABEL: Record<RequestItem['requestStatus'], string> = {
 function Requests({ scope }: { scope: 'mine' | 'all' }) {
   const q = useQuery({ queryKey: ['requests', scope], queryFn: () => api.requests(scope), refetchInterval: 10_000 });
   if (q.isError) return <ErrorState error={q.error} retry={() => void q.refetch()} />;
-  if (!q.data) return <Spinner size={28} />;
-  if (!q.data.items.length) return <div className="empty"><p>{t('No requests yet. Find something and hit Request.')}</p></div>;
+  if (!q.data) return <PageLoader />;
+  if (!q.data.items.length) return <Empty>{t('No requests yet. Find something and hit Request.')}</Empty>;
   return (
     <ul className="items">
       {q.data.items.map((r) => (
@@ -169,7 +169,7 @@ export default function ActivityPage() {
           </label>
         )}
       </div>
-      {tab === 'downloads' ? <Downloads /> : tab === 'requests' ? <Requests scope={scope} /> : <div className="empty"><p>{t("Downloads and requests aren't set up on this server.")}</p></div>}
+      {tab === 'downloads' ? <Downloads /> : tab === 'requests' ? <Requests scope={scope} /> : <Empty>{t("Downloads and requests aren't set up on this server.")}</Empty>}
     </div>
   );
 }

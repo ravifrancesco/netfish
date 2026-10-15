@@ -5,7 +5,7 @@ import { Info, Play, Plug, Plus, Star, X } from 'lucide-react';
 import type { Card } from '@netfish/shared';
 import { api } from '../api';
 import { Row, RowSkeleton } from '../components/Cards';
-import { ErrorState, Img, StatusChip } from '../components/ui';
+import { Empty, ErrorState, Img, StatusChip } from '../components/ui';
 import { decimal, titleHref } from '../lib/format';
 import { t } from '../i18n';
 import { useConfig, useMe } from '../lib/hooks';
@@ -148,9 +148,7 @@ export default function Home() {
           <Row key={row.id} row={row} />
         ))}
         {rows.length === 0 && (
-          <div className="empty">
-            <p>{t('Your library is empty for now. Search for something and request it.')}</p>
-          </div>
+          <Empty>{t('Your library is empty for now. Search for something and request it.')}</Empty>
         )}
       </div>
     </div>

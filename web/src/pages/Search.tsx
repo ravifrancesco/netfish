@@ -5,7 +5,7 @@ import { Search as SearchIcon } from 'lucide-react';
 import { api } from '../api';
 import { Grid } from '../components/Cards';
 import { PeopleRow, personHref } from '../components/People';
-import { ErrorState, Spinner } from '../components/ui';
+import { Empty, ErrorState, PageLoader } from '../components/ui';
 import { t } from '../i18n';
 
 export default function Search() {
@@ -42,11 +42,9 @@ export default function Search() {
       ) : results.isError ? (
         <ErrorState error={results.error} retry={() => void results.refetch()} />
       ) : !results.data ? (
-        <Spinner size={28} />
+        <PageLoader />
       ) : !results.data.items.length && !results.data.people.length ? (
-        <div className="empty">
-          <p>{t('Nothing found for “{query}”.', { query: q })}</p>
-        </div>
+        <Empty>{t('Nothing found for “{query}”.', { query: q })}</Empty>
       ) : (
         <>
           <h1 className="page__title">{t('Results for “{query}”', { query: q })}</h1>

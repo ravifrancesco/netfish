@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { TriangleAlert, CircleCheck, Download, LoaderCircle, Plus, X } from 'lucide-react';
 import type { Availability } from '@netfish/shared';
 import { percent } from '../lib/format';
+import { FishGlyph, SwimmingFish } from './Logo';
 import { t } from '../i18n';
 
 // ---------- Image with fade-in and a graceful fallback ----------
@@ -185,10 +186,29 @@ export function StorageWarning({ problem }: { problem?: string }) {
   );
 }
 
+/** A page (or part of one) still loading: the fish, centred. Buttons keep the small spinner. */
+export function PageLoader({ label }: { label?: string }) {
+  return (
+    <div className="page-loader">
+      <SwimmingFish label={label} />
+    </div>
+  );
+}
+
+/** Nothing to show: a quiet fish and a line of text (or more). */
+export function Empty({ children }: { children: ReactNode }) {
+  return (
+    <div className="empty">
+      <FishGlyph className="empty__fish" />
+      {typeof children === 'string' ? <p>{children}</p> : children}
+    </div>
+  );
+}
+
 export function ErrorState({ error, retry }: { error: unknown; retry?: () => void }) {
   return (
     <div className="empty">
-      <TriangleAlert size={28} />
+      <FishGlyph stranded className="empty__fish" />
       <p>{error instanceof Error ? error.message : t('Something went wrong')}</p>
       {retry && (
         <button className="btn btn--ghost" onClick={retry}>

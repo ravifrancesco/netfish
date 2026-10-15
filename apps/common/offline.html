@@ -98,7 +98,22 @@
       /* Offline mode: the server can't be reached; downloads first, the last Home below, greyed out. */
       .offline { display: flex; align-items: center; gap: 16px; padding: 14px 16px; margin: 0 0 24px; border-radius: 10px; background: rgba(255, 181, 71, 0.1); border: 1px solid rgba(255, 181, 71, 0.35); }
       .offline[hidden] { display: none; }
-      .offline svg { width: 26px; height: 26px; flex: none; fill: none; stroke: var(--warn); stroke-width: 2; stroke-linecap: round; }
+      .offline__fish { width: 30px; height: 30px; flex: none; overflow: visible; fill: var(--warn); stroke: var(--warn); stroke-linejoin: round; }
+      .offline__fish .eye { fill: #1c1408; stroke: none; }
+      .offline__fish .swim { animation: bob 3.2s ease-in-out infinite; }
+      .offline__fish .tail { transform-box: fill-box; transform-origin: 100% 50%; }
+      .offline__fish .bubble { fill: none; stroke: var(--accent); stroke-width: 1.6; opacity: 0; }
+      /* The server answered again: the banner turns the accent colour and the fish swims. */
+      .offline.is-back { background: rgba(54, 226, 198, 0.1); border-color: rgba(54, 226, 198, 0.4); }
+      .offline.is-back .offline__fish { fill: var(--accent); stroke: var(--accent); }
+      .offline.is-back .offline__fish .eye { fill: #03140f; }
+      .offline.is-back .offline__fish .tail { animation: wag 0.7s ease-in-out infinite alternate; }
+      .offline.is-back .offline__fish .bubble { animation: rise 2.4s ease-out infinite; }
+      .offline.is-back .offline__fish .bubble + .bubble { animation-delay: 1.2s; }
+      @keyframes bob { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(1px, -2px); } }
+      @keyframes wag { from { transform: rotate(-9deg); } to { transform: rotate(9deg); } }
+      @keyframes rise { 0% { opacity: 0; transform: translate(0, 0) scale(0.6); } 20% { opacity: 0.9; } 100% { opacity: 0; transform: translate(5px, -18px) scale(1.1); } }
+      @media (prefers-reduced-motion: reduce) { .offline__fish * { animation: none !important; } }
       .offline__text { flex: 1; display: grid; gap: 2px; }
       .offline__text span { color: var(--text-2); font-size: 14px; }
       .snap-head { margin-top: 40px; }
@@ -133,10 +148,13 @@
     </header>
     <main>
       <div class="offline" id="offline" hidden>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 2l20 20M8.5 16.5a5 5 0 0 1 7 0M2 8.8a15 15 0 0 1 4.2-2.7M10.7 5.1A15 15 0 0 1 22 8.8M5 12.9a10 10 0 0 1 5.2-2.8M17.4 13.3a10 10 0 0 0-2.3-1.6M12 20h.01" /></svg>
-        <div class="offline__text">
-          <strong data-t>You're offline</strong>
-          <span data-t>Netfish can't reach your server. What's downloaded on this device still plays.</span>
+        <svg class="offline__fish" viewBox="0 0 64 64" aria-hidden="true">
+          <g class="swim"><path class="tail" d="M15 32 L6 23 L6 41 Z" stroke-width="4" /><path d="M23 15 L52 32 L23 49 Z" stroke-width="6" /><circle class="eye" cx="38" cy="27.5" r="2.5" /></g>
+          <circle class="bubble" cx="57" cy="25" r="2.2" /><circle class="bubble" cx="59" cy="22" r="1.5" />
+        </svg>
+        <div class="offline__text" aria-live="polite">
+          <strong id="offline-title" data-t>You're offline</strong>
+          <span id="offline-text" data-t>Netfish can't reach your server. What's downloaded on this device still plays.</span>
         </div>
         <button class="btn btn--accent" id="retry" data-t>Try again</button>
       </div>
@@ -215,6 +233,11 @@
         'Try again': 'Riprova',
         'Your Home': 'La tua Home',
         'needs your server': 'serve il tuo server',
+        'Checking…': 'Controllo…',
+        "Still can't reach your server. Netfish keeps trying and will tell you when it's back.": 'Il server non risponde ancora. Netfish continua a provare e ti avvisa quando torna.',
+        'Your server is back': 'Il tuo server è tornato',
+        'Reconnect to get all of Netfish back.': 'Riconnettiti per riavere tutto Netfish.',
+        'Reconnect': 'Riconnetti',
       };
       /** t('Play {title}', { title }) → the Italian (or the English) with {placeholders} filled in. */
       const t = (text, values) =>
@@ -252,7 +275,52 @@
         document.getElementById('offline').hidden = false;
         document.getElementById('note').hidden = true;
         document.getElementById('home').hidden = true;
-        document.getElementById('retry').onclick = () => desktop.openServer();
+        watchForServer();
+      }
+
+      /**
+       * Offline mode keeps asking the server (every 15 seconds, while the page is in view);
+       * when it answers, the banner says so, and Reconnect goes back. Never on its own:
+       * you might be in the middle of a film.
+       */
+      function watchForServer() {
+        const banner = document.getElementById('offline');
+        const title = document.getElementById('offline-title');
+        const text = document.getElementById('offline-text');
+        const retry = document.getElementById('retry');
+        if (!desktop.serverReachable) {
+          retry.onclick = () => desktop.openServer();
+          return;
+        }
+        let back = false;
+        let checking;
+        const check = () =>
+          (checking ??= desktop
+            .serverReachable()
+            .catch(() => false)
+            .then((up) => {
+              checking = undefined;
+              if (up && !back) {
+                back = true;
+                banner.classList.add('is-back');
+                title.textContent = t('Your server is back');
+                text.textContent = t('Reconnect to get all of Netfish back.');
+                retry.textContent = t('Reconnect');
+              }
+              return up;
+            }));
+        retry.onclick = async () => {
+          if (back) return desktop.openServer();
+          retry.disabled = true;
+          retry.textContent = t('Checking…');
+          const up = await check();
+          retry.disabled = false;
+          if (up) return desktop.openServer();
+          retry.textContent = t('Try again');
+          text.textContent = t("Still can't reach your server. Netfish keeps trying and will tell you when it's back.");
+        };
+        setInterval(() => !document.hidden && !back && check(), 15_000);
+        document.addEventListener('visibilitychange', () => !document.hidden && !back && check());
       }
       // What Home looked like last time, shown greyed out (what's downloaded stays playable).
       let snapshot;

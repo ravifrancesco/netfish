@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ApiError, setUnauthorizedHandler } from './api';
 import { Nav } from './components/Nav';
 import { Splash, shouldShowSplash } from './components/Splash';
-import { Spinner, ToastProvider } from './components/ui';
+import { PageLoader, ToastProvider } from './components/ui';
 import { useConfig, useMe } from './lib/hooks';
 import { isTV, manageFocus } from './lib/tv';
 import ActivityPage from './pages/Activity';
@@ -71,7 +71,7 @@ function Shell({ user }: { user: NonNullable<ReturnType<typeof useMe>['data']> }
       <TvFocus />
       {!watching && <Nav user={user} />}
       <main className={watching ? 'main main--player' : 'main'}>
-        <Suspense fallback={<div className="page container"><Spinner size={32} /></div>}>
+        <Suspense fallback={<div className="page container"><PageLoader /></div>}>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/movies" element={<Browse key="movie" mediaType="movie" />} />

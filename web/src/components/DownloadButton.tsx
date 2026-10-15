@@ -35,6 +35,18 @@ function RoundDownload({ itemId, entry, start, starting }: { itemId: string; ent
 
   const state = starting ? 'starting' : (entry?.state ?? 'none');
   const loading = state === 'downloading' || state === 'paused' || state === 'starting';
+  // Finished while you watched it: a few bubbles, once (not when the page opens already done).
+  const [splash, setSplash] = useState(false);
+  const wasLoading = useRef(loading);
+  useEffect(() => {
+    if (wasLoading.current && state === 'done') setSplash(true);
+    wasLoading.current = loading;
+  }, [state, loading]);
+  useEffect(() => {
+    if (!splash) return;
+    const timer = setTimeout(() => setSplash(false), 1600);
+    return () => clearTimeout(timer);
+  }, [splash]);
   const fraction = entry?.size ? Math.min(1, entry.received / entry.size) : undefined;
   const pct = fraction !== undefined ? Math.min(99, Math.floor(fraction * 100)) : undefined;
   const label =
@@ -66,6 +78,13 @@ function RoundDownload({ itemId, entry, start, starting }: { itemId: string; ent
         disabled={starting}
       >
         {state === 'failed' || state === 'interrupted' ? <RotateCcw size={20} /> : <ArrowDownToLine size={20} />}
+        {splash && (
+          <span className="round-btn__splash" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+        )}
         {loading && (
           <svg className={`round-btn__ring${fraction === undefined ? ' is-spinning' : ''}${state === 'paused' ? ' is-paused' : ''}`} viewBox="0 0 48 48" aria-hidden="true">
             <circle className="round-btn__track" cx="24" cy="24" r="23" />

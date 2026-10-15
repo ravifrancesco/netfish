@@ -59,6 +59,7 @@ import java.net.URL;
 @OptIn(markerClass = UnstableApi.class)
 public class MainActivity extends Activity {
     private static final String SETUP = "file:///android_asset/setup.html";
+    private static final String LOADING = "file:///android_asset/loading.html";
 
     private WebView web;
     private VideoEngine video;
@@ -151,25 +152,46 @@ public class MainActivity extends Activity {
                 String url = request.getUrl().toString();
                 if (!request.isForMainFrame() || url.startsWith("file:") || url.startsWith(OfflineStore.ORIGIN)) return;
                 // Away from home with films downloaded: straight to them.
-                if (offline != null && offline.hasDownloads()) {
-                    JSONObject target = new JSONObject();
-                    try {
-                        target.put("offline", true);
-                    } catch (JSONException ignored) {
-                        // can't happen
-                    }
-                    showOffline(target);
-                }
+                if (offline != null && offline.hasDownloads()) showOffline(offlineMode());
                 else showSetup(getString(R.string.error_server_unreachable, server(), error.getDescription()));
             }
         });
 
         String server = server();
+        if (server == null) showSetup(null);
+        else start(server);
+        web.requestFocus();
+    }
+
+    /**
+     * The fish while a quick check finds the server (a few seconds at most), then Netfish,
+     * or, away from home, the downloads, rather than a blank screen while the web view gives up.
+     */
+    private void start(String server) {
         // Opened from a notification: straight to that page.
         String path = getIntent() != null ? getIntent().getStringExtra("path") : null;
-        if (server == null) showSetup(null);
-        else web.loadUrl(path != null && path.startsWith("/") ? server.replaceAll("/+$", "") + path : server);
-        web.requestFocus();
+        String page = path != null && path.startsWith("/") ? server.replaceAll("/+$", "") + path : server;
+        web.loadUrl(LOADING);
+        new Thread(() -> {
+            boolean up = reachable(server);
+            runOnUiThread(() -> {
+                if (isDestroyed()) return;
+                forgetHistory = true; // back never lands on the fish
+                if (up) web.loadUrl(page);
+                else if (offline != null && offline.hasDownloads()) showOffline(offlineMode());
+                else showSetup(getString(R.string.error_server_unreachable, server, getString(R.string.nothing_answered)));
+            });
+        }, "netfish-start").start();
+    }
+
+    private static JSONObject offlineMode() {
+        JSONObject target = new JSONObject();
+        try {
+            target.put("offline", true);
+        } catch (JSONException ignored) {
+            // can't happen
+        }
+        return target;
     }
 
     @Override
@@ -282,7 +304,9 @@ public class MainActivity extends Activity {
             if ("true".equals(handled)) return;
             String url = web.getUrl() == null ? "" : web.getUrl();
             String server = server();
-            if (url.startsWith(SETUP)) {
+            if (url.startsWith(LOADING)) {
+                moveTaskToBack(true);
+            } else if (url.startsWith(SETUP)) {
                 if (server != null && !url.contains("error=")) web.loadUrl(server);
                 else moveTaskToBack(true);
             } else if (url.startsWith(OfflineStore.ORIGIN)) {
@@ -346,6 +370,22 @@ public class MainActivity extends Activity {
         int port = uri.getPort();
         if (port == -1 && scheme.equals("http") && local) port = 7777;
         return scheme + "://" + host + (port == -1 ? "" : ":" + port);
+    }
+
+    /** Whether anything answers at the server, quickly: it's on and this device can reach it. */
+    static boolean reachable(String origin) {
+        HttpURLConnection conn = null;
+        try {
+            conn = (HttpURLConnection) new URL(origin + "/api/health").openConnection();
+            conn.setConnectTimeout(4000);
+            conn.setReadTimeout(4000);
+            conn.setUseCaches(false);
+            return conn.getResponseCode() > 0;
+        } catch (java.io.IOException e) {
+            return false;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
     }
 
     /** Make sure the address really is a Netfish server before saving it. */
@@ -540,6 +580,17 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public String snapshot() {
             return offline == null || !fromApp() ? null : offline.snapshot();
+        }
+
+        /** The downloads page, away from home: is the server back? Answers window.__netfishReach(true|false). */
+        @JavascriptInterface
+        public void checkServer() {
+            String server = server();
+            if (!fromApp() || server == null) return;
+            new Thread(() -> {
+                boolean up = reachable(server);
+                runOnUiThread(() -> web.evaluateJavascript("window.__netfishReach&&window.__netfishReach(" + up + ")", null));
+            }, "netfish-check").start();
         }
 
         @JavascriptInterface

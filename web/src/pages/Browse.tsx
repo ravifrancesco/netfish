@@ -5,7 +5,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import type { MediaType } from '@netfish/shared';
 import { api } from '../api';
 import { Grid } from '../components/Cards';
-import { ErrorState, Spinner } from '../components/ui';
+import { Empty, ErrorState, PageLoader, Spinner } from '../components/ui';
 import { appKind, canDownloadHere, desktop, useOffline, type OfflineItem } from '../lib/desktop';
 import { bytes } from '../lib/format';
 import { useConfig } from '../lib/hooks';
@@ -46,9 +46,9 @@ function Library({ mediaType, sort }: { mediaType: MediaType; sort: string }) {
   });
   const sentinel = useAutoLoad(() => void q.fetchNextPage(), Boolean(q.hasNextPage && !q.isFetchingNextPage));
   if (q.isError) return <ErrorState error={q.error} retry={() => void q.refetch()} />;
-  if (!q.data) return <Spinner size={28} />;
+  if (!q.data) return <PageLoader />;
   const cards = q.data.pages.flatMap((p) => p.items);
-  if (!cards.length) return <div className="empty"><p>{t('Nothing here yet.')}</p></div>;
+  if (!cards.length) return <Empty>{t('Nothing here yet.')}</Empty>;
   return (
     <>
       <p className="muted small">{tn(q.data.pages[0].total, '{n} title', '{n} titles')}</p>
@@ -62,8 +62,8 @@ function Library({ mediaType, sort }: { mediaType: MediaType; sort: string }) {
 function NotOnDisk({ mediaType }: { mediaType: MediaType }) {
   const q = useQuery({ queryKey: ['removed', mediaType], queryFn: () => api.removed(mediaType) });
   if (q.isError) return <ErrorState error={q.error} retry={() => void q.refetch()} />;
-  if (!q.data) return <Spinner size={28} />;
-  if (!q.data.items.length) return <div className="empty"><p>{t('Everything in your library is on disk.')}</p></div>;
+  if (!q.data) return <PageLoader />;
+  if (!q.data.items.length) return <Empty>{t('Everything in your library is on disk.')}</Empty>;
   return (
     <>
       <p className="muted small">{t('Deleted from disk to save space. Open one to download it again.')}</p>
@@ -81,7 +81,7 @@ function Discover({ kind, mediaType }: { kind: string; mediaType: MediaType }) {
   });
   const sentinel = useAutoLoad(() => void q.fetchNextPage(), Boolean(q.hasNextPage && !q.isFetchingNextPage));
   if (q.isError) return <ErrorState error={q.error} retry={() => void q.refetch()} />;
-  if (!q.data) return <Spinner size={28} />;
+  if (!q.data) return <PageLoader />;
   const seen = new Set<string>();
   const cards = q.data.pages
     .flatMap((p) => p.items)
@@ -165,7 +165,7 @@ function Offline({ mediaType }: { mediaType: MediaType }) {
 
   if (mediaType === 'movie') {
     const movies = list.filter((i) => i.kind === 'Movie');
-    if (!movies.length) return <div className="empty"><p>{t('No movies on {device} yet. Press Download on any movie to watch it offline.', { device: appKind().device })}</p></div>;
+    if (!movies.length) return <Empty>{t('No movies on {device} yet. Press Download on any movie to watch it offline.', { device: appKind().device })}</Empty>;
     return (
       <div className="grid">
         {movies.map((m) => (
@@ -200,7 +200,7 @@ function Offline({ mediaType }: { mediaType: MediaType }) {
 
   const shows = new Map<string, OfflineItem[]>();
   for (const ep of list.filter((i) => i.kind === 'Episode')) shows.set(showKey(ep), [...(shows.get(showKey(ep)) ?? []), ep]);
-  if (!shows.size) return <div className="empty"><p>{t('No episodes on {device} yet. Use the download icon next to any episode.', { device: appKind().device })}</p></div>;
+  if (!shows.size) return <Empty>{t('No episodes on {device} yet. Use the download icon next to any episode.', { device: appKind().device })}</Empty>;
   return (
     <div className="grid">
       {[...shows.entries()].map(([key, eps]) => {

@@ -53,7 +53,20 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     override func viewDidLoad() {
         super.viewDidLoad()
         store.onChange = { [weak self] list in self?.push(list) }
-        if let server = Server.url { open(server) } else { showSetup(error: nil) }
+        if let server = Server.url { start(server) } else { showSetup(error: nil) }
+    }
+
+    /// Opening: the fish swims while the server is checked (a few seconds at most), then
+    /// Netfish, or offline mode (the downloads) when it doesn't answer.
+    private func start(_ server: URL) {
+        web.load(URLRequest(url: LocalScheme.url("loading.html", query: [:])))
+        Task { @MainActor in
+            if await Server.reachable(server) { return open(server) }
+            if store.hasDownloads { return showOffline(["offline": true]) }
+            showSetup(error: L("Couldn't reach {server} ({error}). Is it on, and are you on your home network?", [
+                "server": server.absoluteString, "error": L("nothing answered"),
+            ]))
+        }
     }
 
     override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }

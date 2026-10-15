@@ -62,6 +62,7 @@ enum Strings {
         "Can't reach {address} ({error})": "Impossibile raggiungere {address} ({error})",
         "{address} doesn't look like a Netfish server": "{address} non sembra un server Netfish",
         "the server": "il server",
+        "nothing answered": "nessuna risposta",
         "Couldn't reach {server} ({error}). Is it on?": "Impossibile raggiungere {server} ({error}). È acceso?",
         "Couldn't reach {server} ({error}). Is it on, and are you on your home network?":
             "Impossibile raggiungere {server} ({error}). È acceso e sei sulla rete di casa?",

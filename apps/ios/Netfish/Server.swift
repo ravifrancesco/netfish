@@ -35,6 +35,21 @@ enum Server {
         return url
     }
 
+    /// Is the server there? Any answer counts. Asked before loading Netfish, so away from home
+    /// the app shows offline mode within seconds instead of waiting for the page to time out.
+    static func reachable(_ origin: URL, timeout: TimeInterval = 4) async -> Bool {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = timeout
+        config.timeoutIntervalForResource = timeout
+        config.waitsForConnectivity = false
+        let session = URLSession(configuration: config)
+        defer { session.finishTasksAndInvalidate() }
+        var request = URLRequest(url: origin.appendingPathComponent("api/health"), cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: timeout)
+        request.httpMethod = "GET"
+        guard let (_, response) = try? await session.data(for: request) else { return false }
+        return response is HTTPURLResponse
+    }
+
     /// Make sure the address really is a Netfish server before saving it.
     static func probe(_ origin: URL) async throws {
         var request = URLRequest(url: origin.appendingPathComponent("api/health"))

@@ -146,8 +146,20 @@ sealed class MainWindow : Form
         };
         controller.MoveFocus(CoreWebView2MoveFocusReason.Programmatic);
 
-        if (Server.Url is { } server) Navigate(server);
+        if (Server.Url is { } server) _ = Start(server);
         else ShowSetup(null);
+    }
+
+    /// <summary>
+    /// Opening: the fish swims while the server is checked (a few seconds at most), then
+    /// Netfish, or offline mode (the downloads) when it doesn't answer.
+    /// </summary>
+    async Task Start(Uri server)
+    {
+        Navigate(LocalPages.Page("loading.html"));
+        if (await Server.Reachable(server)) Navigate(server);
+        else if (store.HasDownloads) ShowOffline(new JsonObject { ["offline"] = true });
+        else ShowSetup(L("Couldn't reach {server} ({why}). Is it on?", ("server", server.GetLeftPart(UriPartial.Authority)), ("why", L("nothing answered"))));
     }
 
     /// <summary>Edge's engine went away (crashed or updated): start it again where the page was.</summary>

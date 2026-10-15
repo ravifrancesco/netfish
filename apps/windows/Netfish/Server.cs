@@ -42,6 +42,25 @@ static class Server
         set => AppData.SaveConfig(c => c["serverUrl"] = value?.GetLeftPart(UriPartial.Authority));
     }
 
+    static readonly HttpClient quick = new() { Timeout = TimeSpan.FromSeconds(4) };
+
+    /// <summary>
+    /// Is the server there? Any answer counts. Asked before loading Netfish, so away from home
+    /// the app shows offline mode within seconds instead of waiting for the page to time out.
+    /// </summary>
+    public static async Task<bool> Reachable(Uri server)
+    {
+        try
+        {
+            using var response = await quick.GetAsync(new Uri(server, "/api/health"), HttpCompletionOption.ResponseHeadersRead);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     /// <summary>True when the address is on the saved server (same scheme, host and port).</summary>
     public static bool Owns(Uri? url)
     {

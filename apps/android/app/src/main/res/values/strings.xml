@@ -3,6 +3,7 @@
 <resources>
     <!-- Server address (setup page) -->
     <string name="error_server_unreachable">Couldn\'t reach %1$s (%2$s). Is the server on?</string>
+    <string name="nothing_answered">nothing answered</string>
     <string name="error_enter_address">Enter the address of your Netfish server</string>
     <string name="error_not_an_address">That doesn\'t look like an address</string>
     <string name="error_not_netfish">%1$s doesn\'t look like a Netfish server</string>

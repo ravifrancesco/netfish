@@ -8,7 +8,8 @@ import { clock } from '../lib/format';
 import { useMe } from '../lib/hooks';
 import { othersRooms, roomHref, roomPosition, useRooms, useTick, type Together } from '../lib/together';
 import { Initial } from './ProfilePicker';
-import { Img, Progress, Spinner, useToast } from './ui';
+import { Img, PageLoader, Progress, Spinner, useToast } from './ui';
+import { FishPair } from './Logo';
 import { t, tn } from '../i18n';
 
 const inviteLink = (id: string) => `${location.origin}/together/${id}`;
@@ -96,7 +97,7 @@ export function TogetherRow() {
     <section className="row row--wide row--together">
       <div className="row__head">
         <h2 className="row__title">
-          <span className="live-dot" aria-hidden="true" /> {t('Watch together')}
+          <FishPair /> {t('Watch together')}
         </h2>
       </div>
       <div className="row__viewport">
@@ -210,8 +211,8 @@ export function JoinRoom() {
     );
   }
   return (
-    <div className="page container empty">
-      <Spinner size={32} />
+    <div className="page container">
+      <PageLoader />
     </div>
   );
 }

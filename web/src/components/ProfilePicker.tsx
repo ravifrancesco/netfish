@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Delete, Lock, Plus } from 'lucide-react';
 import type { DeviceProfile } from '@netfish/shared';
 import { api } from '../api';
-import { Mark } from './Logo';
+import { Mark, SwimmingFish } from './Logo';
 import { Img, Spinner } from './ui';
 import { t } from '../i18n';
 
@@ -120,7 +120,7 @@ export function ProfilePicker({ onAdd, onPicked }: { onAdd: () => void; onPicked
     onPicked();
   };
 
-  if (!q.data) return <div className="profiles"><Spinner size={28} /></div>;
+  if (!q.data) return <div className="profiles"><SwimmingFish /></div>;
   if (locked) return <div className="profiles"><PinPad profile={locked} onBack={() => setLocked(undefined)} onDone={done} /></div>;
 
   return (

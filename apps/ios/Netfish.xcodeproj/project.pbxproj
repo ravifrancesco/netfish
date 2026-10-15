@@ -12,6 +12,7 @@
 		3761190D56E6AC778F639FB4 /* WebViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E04F74E7FC7DCAEACB46D55 /* WebViewController.swift */; };
 		3C3276CA51807F52629939F0 /* LocalScheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33803339248507EFC6EA654E /* LocalScheme.swift */; };
 		51C5217266CF8867FEF0A9CA /* offline.html in Resources */ = {isa = PBXBuildFile; fileRef = 196F85C51A8848D87B64E383 /* offline.html */; };
+		3A1D6C2E8F4B5A7C9E0D1F2A /* loading.html in Resources */ = {isa = PBXBuildFile; fileRef = 4B2E7D3F9A5C6B8D0F1E2A3B /* loading.html */; };
 		605EC8A07E3A654DA7893A25 /* OfflineStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73B6329DEE5665832C9AEFC1 /* OfflineStore.swift */; };
 		60AF367DA0E64DB98DC26691 /* NetfishApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC44BF1A2D0B4F664CB97B4 /* NetfishApp.swift */; };
 		834E49893E24B876B2E4A272 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A917EC4ED88393BDD8002BC3 /* Assets.xcassets */; };
@@ -23,6 +24,7 @@
 
 /* Begin PBXFileReference section */
 		196F85C51A8848D87B64E383 /* offline.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = offline.html; sourceTree = "<group>"; };
+		4B2E7D3F9A5C6B8D0F1E2A3B /* loading.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = loading.html; sourceTree = "<group>"; };
 		33803339248507EFC6EA654E /* LocalScheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalScheme.swift; sourceTree = "<group>"; };
 		4EEAA0F8785190938922BFDD /* Strings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Strings.swift; sourceTree = "<group>"; };
 		5DC44BF1A2D0B4F664CB97B4 /* NetfishApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetfishApp.swift; sourceTree = "<group>"; };
@@ -43,6 +45,7 @@
 		09418D812A57DC481DE51401 /* common */ = {
 			isa = PBXGroup;
 			children = (
+				4B2E7D3F9A5C6B8D0F1E2A3B /* loading.html */,
 				196F85C51A8848D87B64E383 /* offline.html */,
 				5E09BADF6CD90E32844B34CA /* setup.html */,
 			);
@@ -156,6 +159,7 @@
 			files = (
 				834E49893E24B876B2E4A272 /* Assets.xcassets in Resources */,
 				1347E968C10D6C51B05E4C35 /* InfoPlist.strings in Resources */,
+				3A1D6C2E8F4B5A7C9E0D1F2A /* loading.html in Resources */,
 				51C5217266CF8867FEF0A9CA /* offline.html in Resources */,
 				A7DB3C8022A72EA3297AD9A1 /* setup.html in Resources */,
 			);
@@ -247,7 +251,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				MARKETING_VERSION = 0.6.1;
+				MARKETING_VERSION = 0.6.2;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -306,7 +310,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				MARKETING_VERSION = 0.6.1;
+				MARKETING_VERSION = 0.6.2;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

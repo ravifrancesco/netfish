@@ -3,7 +3,7 @@ import { useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api';
 import { Grid } from '../components/Cards';
-import { ErrorState, Img, Spinner } from '../components/ui';
+import { Empty, ErrorState, Img, PageLoader } from '../components/ui';
 import { locale, t } from '../i18n';
 
 const longDate = (iso: string) => {
@@ -27,7 +27,7 @@ export default function PersonPage() {
   if (!q.data) {
     return (
       <div className="page container">
-        <Spinner size={28} />
+        <PageLoader />
       </div>
     );
   }
@@ -66,9 +66,7 @@ export default function PersonPage() {
         </section>
       ))}
       {p.sections.length === 0 && (
-        <div className="empty">
-          <p>{t('Nothing by {name} to show yet.', { name: p.name })}</p>
-        </div>
+        <Empty>{t('Nothing by {name} to show yet.', { name: p.name })}</Empty>
       )}
     </div>
   );

@@ -528,12 +528,14 @@ final class OfflineStore {
             + "const n = window.NetfishAndroid; if (!n || window.netfishDesktop) return;"
             + "const parse = (s) => { const r = JSON.parse(s); if (r && !Array.isArray(r) && r.error) throw new Error(r.error); return r; };"
             + "const offline = new Set(); window.__netfishOfflineChanged = (l) => offline.forEach((cb) => cb(l));"
+            + "const reach = []; window.__netfishReach = (up) => reach.splice(0).forEach((cb) => cb(Boolean(up)));"
             + "window.netfishDesktop = { platform: n.platform(), version: n.version(),"
             + " offlineList: async () => parse(n.offlineList()), onOfflineChange: (cb) => { offline.add(cb); return () => offline.delete(cb); },"
             + " removeOffline: async (id) => parse(n.removeOffline(id)), removeOfflineSeries: async (k) => parse(n.removeOfflineSeries(k)),"
             + " retryOffline: async (id) => parse(n.retryOffline(id)), offlineUsage: async () => Number(n.offlineUsage()),"
             + " clearOffline: async () => parse(n.clearOffline()), openServer: () => n.openServer(), openOffline: (t) => n.openOffline(JSON.stringify(t || {})),"
             + " savePosition: (id, s, f) => n.savePosition(String(id), Number(s) || 0, Boolean(f)), snapshot: async () => n.snapshot() || null,"
-            + " filmShowing: (on) => n.filmShowing(Boolean(on)) };"
+            + " filmShowing: (on) => n.filmShowing(Boolean(on)),"
+            + " serverReachable: () => new Promise((done) => { reach.push(done); if (reach.length === 1) n.checkServer(); }) };"
             + "})();";
 }

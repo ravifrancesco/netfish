@@ -76,6 +76,7 @@ sealed class Bridge(MainWindow window, OfflineStore store)
             takePositions: () => call('takePositions'),
             saveSnapshot: (json) => send('saveSnapshot', json),
             snapshot: () => call('snapshot'),
+            serverReachable: () => call('serverReachable'),
             toggleFullscreen: () => send('fullscreen'),
             keepAwake: (on) => send('keepAwake', Boolean(on)),
             notify: (n) => send('notify', n),
@@ -195,6 +196,7 @@ sealed class Bridge(MainWindow window, OfflineStore store)
                 store.SaveSnapshot(Str(args) ?? "");
                 return null;
             case "snapshot": return store.Snapshot() is { } snap ? JsonValue.Create(snap) : null;
+            case "serverReachable": return JsonValue.Create(Server.Url is { } server && await Server.Reachable(server));
 
             // Notifications
             case "notify":

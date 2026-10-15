@@ -19,7 +19,8 @@ import {
 } from 'lucide-react';
 import type { PlaybackSession, ProgressReport, StreamTrack, TogetherCommand } from '@netfish/shared';
 import { api } from '../api';
-import { Spinner, useToast } from '../components/ui';
+import { useToast } from '../components/ui';
+import { SwimmingFish } from '../components/Logo';
 import { clock } from '../lib/format';
 import { getPrefs, setPrefs, usePrefs } from '../lib/prefs';
 import { desktop } from '../lib/desktop';
@@ -142,7 +143,7 @@ function PlayDownload({ itemId }: { itemId: string }) {
   return (
     <div className="player">
       <div className="player__center">
-        <Spinner size={48} />
+        <SwimmingFish size={56} className="swimming-fish--player" />
       </div>
     </div>
   );
@@ -895,7 +896,7 @@ function Player() {
 
       {(waiting || info.isLoading) && !error && !needsTap && (
         <div className="player__center">
-          <Spinner size={48} />
+          <SwimmingFish size={56} className="swimming-fish--player" />
         </div>
       )}
       {(error || info.isError) && (

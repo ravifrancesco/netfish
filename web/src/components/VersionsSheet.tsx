@@ -6,7 +6,8 @@ import { api } from '../api';
 import { bytes } from '../lib/format';
 import { useLanguages, useMe, useRefreshTitle } from '../lib/hooks';
 import { LanguageSelect } from './LanguageSelect';
-import { ErrorState, Modal, Spinner, useToast } from './ui';
+import { Empty, ErrorState, Modal, Spinner, useToast } from './ui';
+import { SwimmingFish } from './Logo';
 import { t, tn } from '../i18n';
 
 /**
@@ -306,7 +307,7 @@ export function VersionsSheet({
 
         {search.isLoading || search.isFetching ? (
           <div className="versions__loading">
-            <Spinner size={26} />
+            <SwimmingFish size={40} />
             <p>{t('Asking your indexers… this can take up to a minute.')}</p>
           </div>
         ) : search.isError ? (
@@ -320,9 +321,7 @@ export function VersionsSheet({
               </button>
             </div>
             {shown === 0 ? (
-              <div className="empty">
-                <p>{t('Nothing matches these filters.')}</p>
-              </div>
+              <Empty>{t('Nothing matches these filters.')}</Empty>
             ) : (
               <ul className="releases">
                 {strong.map(renderRelease)}

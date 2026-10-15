@@ -76,7 +76,7 @@ final class MainWindow: NSWindowController, NSWindowDelegate, WKNavigationDelega
             self?.push("__netfishVideo", state)
         }
 
-        if let server = Server.url { open(server) } else { showSetup(error: nil) }
+        if let server = Server.url { start(server) } else { showSetup(error: nil) }
     }
 
     override func showWindow(_ sender: Any?) {
@@ -107,6 +107,17 @@ final class MainWindow: NSWindowController, NSWindowDelegate, WKNavigationDelega
         let target = !fresh && Server.owns(returnURL) ? returnURL! : server
         returnURL = nil
         open(target)
+    }
+
+    /// Opening: the fish swims while the server is checked (a few seconds at most), then
+    /// Netfish, or offline mode (the downloads) when it doesn't answer.
+    private func start(_ server: URL) {
+        web.load(URLRequest(url: LocalScheme.url("loading.html", query: [:])))
+        Task { @MainActor in
+            if await Server.reachable(server) { return open(server) }
+            if store.hasDownloads { return showOffline(["offline": true]) }
+            showSetup(error: L("Couldn't reach {server} ({error}). Is it on?", ["server": server.absoluteString, "error": L("nothing answered")]))
+        }
     }
 
     func goHome() {

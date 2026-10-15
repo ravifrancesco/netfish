@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+    <title>Netfish</title>
+    <!--
+      What the apps show while they look for the server (a few seconds at most): the fish,
+      swimming. Bundled in every app, so it shows at once, with or without a network.
+    -->
+    <style>
+      :root { color-scheme: dark; }
+      html, body { margin: 0; height: 100%; background: #06080b; color: #eef3f6; font: 15px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; -webkit-user-select: none; user-select: none; }
+      body { display: grid; place-items: center; -webkit-app-region: drag; }
+      .stage { display: grid; justify-items: center; gap: 18px; animation: in 0.5s ease-out both; }
+      svg { width: 96px; height: 96px; overflow: visible; }
+      .swim { animation: bob 2.4s ease-in-out infinite; }
+      .tail { transform-box: fill-box; transform-origin: 100% 50%; animation: wag 0.7s ease-in-out infinite alternate; }
+      .bubble { fill: none; stroke: #36e2c6; stroke-width: 1.4; opacity: 0; animation: rise 2.4s ease-out infinite; }
+      .bubble:nth-of-type(2) { animation-delay: 0.8s; }
+      .bubble:nth-of-type(3) { animation-delay: 1.6s; }
+      .word { font-size: 26px; letter-spacing: -0.035em; }
+      .word .net { font-weight: 300; color: #b5c0ca; }
+      .word .fish { font-weight: 800; margin-left: 0.04em; }
+      .status { min-height: 1.5em; color: #7c8996; font-size: 14px; opacity: 0; animation: in 0.6s ease-out 1.4s forwards; }
+      @keyframes in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+      @keyframes bob { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(2px, -3px); } }
+      @keyframes wag { from { transform: rotate(-9deg); } to { transform: rotate(9deg); } }
+      @keyframes rise { 0% { opacity: 0; transform: translate(0, 0) scale(0.6); } 20% { opacity: 0.9; } 100% { opacity: 0; transform: translate(6px, -22px) scale(1.1); } }
+      @media (prefers-reduced-motion: reduce) {
+        .swim, .tail, .bubble, .stage, .status { animation: none; }
+        .status { opacity: 1; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <defs>
+          <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8cf8e6" /><stop offset="1" stop-color="#13b89c" /></linearGradient>
+        </defs>
+        <g class="swim">
+          <path class="tail" d="M15 32 L6 23 L6 41 Z" fill="url(#g)" stroke="url(#g)" stroke-width="4" stroke-linejoin="round" />
+          <path d="M23 15 L52 32 L23 49 Z" fill="url(#g)" stroke="url(#g)" stroke-width="6" stroke-linejoin="round" />
+          <circle cx="38" cy="27.5" r="2.5" fill="#03140f" />
+        </g>
+        <circle class="bubble" cx="56" cy="26" r="2" />
+        <circle class="bubble" cx="58" cy="24" r="1.4" />
+        <circle class="bubble" cx="55" cy="27" r="1.7" />
+      </svg>
+      <span class="word" aria-label="Netfish"><span class="net">net</span><span class="fish">fish</span></span>
+      <span class="status" id="status">Looking for your server…</span>
+    </div>
+    <script>
+      const lang = (navigator.languages && navigator.languages[0]) || navigator.language || 'en';
+      if (/^it\b/i.test(lang)) {
+        document.documentElement.lang = 'it';
+        document.getElementById('status').textContent = 'Cerco il tuo server…';
+      }
+    </script>
+  </body>
+</html>
