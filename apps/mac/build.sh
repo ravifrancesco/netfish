@@ -40,7 +40,8 @@ iconutil -c icns build/iconset.iconset -o "$APP/Contents/Resources/Netfish.icns"
 mkdir -p "$APP/Contents/Frameworks"
 xattr -cr "$APP"
 dylibbundler -ns -cd -of -b -x "$APP/Contents/MacOS/Netfish" -d "$APP/Contents/Frameworks" -p @executable_path/../Frameworks/ >/dev/null
-if otool -L "$APP/Contents/MacOS/Netfish" "$APP"/Contents/Frameworks/*.dylib | grep -q /opt/homebrew; then
+# (grep without -q: with pipefail, -q stopping early can make the whole check fail at random.)
+if otool -L "$APP/Contents/MacOS/Netfish" "$APP"/Contents/Frameworks/*.dylib | grep /opt/homebrew >/dev/null; then
   echo "Some libraries still point at Homebrew" >&2
   exit 1
 fi
@@ -51,10 +52,10 @@ rpaths() { otool -l "$1" | awk '/cmd LC_RPATH/ { getline; getline; print $2 }'; 
 for bin in "$APP/Contents/MacOS/Netfish" "$APP"/Contents/Frameworks/*.dylib; do
   for path in $(rpaths "$bin" | sort | uniq -d); do
     for _ in 1 2 3 4; do
-      rpaths "$bin" | grep -qxF "$path" || break
+      rpaths "$bin" | grep -xF "$path" >/dev/null || break
       install_name_tool -delete_rpath "$path" "$bin" 2>/dev/null || true
     done
-    install_name_tool -add_rpath "$path" "$bin" 2>/dev/null
+    install_name_tool -add_rpath "$path" "$bin"
   done
   if [ -n "$(rpaths "$bin" | sort | uniq -d)" ]; then
     echo "$(basename "$bin") still lists a search path twice (macOS 15 won't load it)" >&2
