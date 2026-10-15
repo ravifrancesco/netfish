@@ -169,6 +169,9 @@ export const radarr = {
   setMonitored: (movieIds: number[], monitored: boolean) =>
     arrRequest<unknown>('radarr', '/movie/editor', { method: 'PUT', body: { movieIds, monitored } }),
   deleteFile: (movieFileId: number) => arrRequest<void>('radarr', `/moviefile/${movieFileId}`, { method: 'DELETE' }),
+  /** Forget a movie (files kept: only used when it has none). */
+  deleteMovie: (movieId: number) =>
+    arrRequest<void>('radarr', `/movie/${movieId}`, { method: 'DELETE', query: { deleteFiles: false, addImportExclusion: false } }),
   search: (movieIds: number[]) => arrRequest<unknown>('radarr', '/command', { body: { name: 'MoviesSearch', movieIds } }),
   rootFolders: () => arrRequest<ArrRootFolder[]>('radarr', '/rootfolder'),
   diskSpace: () => arrRequest<ArrDisk[]>('radarr', '/diskspace'),
@@ -197,6 +200,9 @@ export const sonarr = {
     arrRequest<unknown>('sonarr', '/episode/monitor', { method: 'PUT', body: { episodeIds, monitored } }),
   setSeriesMonitored: (seriesIds: number[], monitored: boolean) =>
     arrRequest<unknown>('sonarr', '/series/editor', { method: 'PUT', body: { seriesIds, monitored } }),
+  /** Forget a show (files kept: only used when it has none). */
+  deleteSeries: (seriesId: number) =>
+    arrRequest<void>('sonarr', `/series/${seriesId}`, { method: 'DELETE', query: { deleteFiles: false, addImportListExclusion: false } }),
   deleteFiles: (episodeFileIds: number[]) =>
     arrRequest<void>('sonarr', '/episodefile/bulk', { method: 'DELETE', body: { episodeFileIds } }),
   searchSeason: (seriesId: number, seasonNumber: number) =>

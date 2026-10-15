@@ -69,6 +69,14 @@ export default {
   you: 'tu',
   'Watched · mark as unwatched': 'Visto · segna come non visto',
 
+  // Taking a request back
+  'Cancel request': 'Annulla richiesta',
+  'Cancel the request for {title}?': 'Annullare la richiesta di {title}?',
+  'Keep it': 'Mantienila',
+  'Request cancelled.': 'Richiesta annullata.',
+  "Radarr and Sonarr stop looking for it, and it's no longer requested. You can request it again any time.":
+    'Radarr e Sonarr smettono di cercarlo e non risulta più richiesto. Puoi richiederlo di nuovo quando vuoi.',
+
   // The round download button on a title's page
   'Downloaded to {device}': 'Scaricato su {device}',
   'Download deleted from {device}.': 'Download eliminato da {device}.',

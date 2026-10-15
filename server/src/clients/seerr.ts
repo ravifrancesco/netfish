@@ -225,6 +225,8 @@ export const seerr = {
   /** "unknown" makes a title requestable again (after its files were deleted, or a download stopped). */
   setMediaStatus: (mediaId: number, status: 'unknown' | 'available' | 'partial' | 'processing' | 'pending') =>
     seerrRequest<unknown>(`/media/${mediaId}/${status}`, { method: 'POST' }),
+  /** Forget a title and every request for it: it reads "not requested" again. */
+  deleteMedia: (mediaId: number) => seerrRequest<unknown>(`/media/${mediaId}`, { method: 'DELETE' }),
   userByJellyfinId: (jellyfinUserId: string) => seerrRequest<SeerrUser>(`/user/jellyfin/${jellyfinUserId}`),
   users: () => seerrRequest<{ results: SeerrUser[] }>('/user', { query: { take: 1000, skip: 0 } }),
   importJellyfinUsers: (jellyfinUserIds: string[]) =>

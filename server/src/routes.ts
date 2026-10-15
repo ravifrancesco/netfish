@@ -51,7 +51,7 @@ import { readyToWatch } from './services/ready';
 import { command, control, createRoom, endRoom, getRoom, leave, listRooms, openStream, setTracks, setWaiting } from './services/together';
 import { listScreens, openLive, playOn } from './services/screens';
 import { cleanupSuggestions, keepForGood } from './services/cleanup';
-import { deleteFromDisk, downloadAgain, removedTitles, stopDownload, storage } from './services/manage';
+import { cancelRequest, deleteFromDisk, downloadAgain, removedTitles, stopDownload, storage } from './services/manage';
 import { createRequest, listRequests, myRequestKeys } from './services/requests';
 import { scrobble, setScrobble, startImport, startLink, traktStatus, unlink } from './services/trakt';
 import { jellyfinDetail, jellyfinSeason, movieDetail, seasonDetail, tvDetail } from './services/titles';
@@ -297,6 +297,11 @@ export async function apiRoutes(app: FastifyInstance) {
     api.post<{ Params: TitleParams; Body: { seasons?: number[] } }>('/title/:type/:id/delete', { preHandler: requireAdmin }, async (req) => {
       const { mediaType, tmdbId } = mediaTitle(req);
       return deleteFromDisk(userOf(req), mediaType, tmdbId, seasonsOf(req.body));
+    });
+    // Cancel a request before anything is on disk: whoever asked for it, or an admin.
+    api.delete<{ Params: TitleParams }>('/title/:type/:id/request', async (req) => {
+      const { mediaType, tmdbId } = mediaTitle(req);
+      return cancelRequest(userOf(req), mediaType, tmdbId);
     });
     api.post<{ Params: TitleParams; Body: { seasons?: number[] } }>('/title/:type/:id/redownload', { preHandler: requireAdmin }, async (req) => {
       const { mediaType, tmdbId } = mediaTitle(req);

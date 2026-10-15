@@ -695,6 +695,13 @@ void app.register(
     });
     s.get('/user', async () => ({ results: USERS.map((u) => ({ id: u.seerrId, displayName: u.name, jellyfinUserId: u.id })) }));
     s.post('/user/import-from-jellyfin', async (_req, reply) => reply.code(201).send([]));
+    s.delete<{ Params: { id: string } }>('/media/:id', async (req, reply) => {
+      const t = TITLES.find((x) => x.tmdbId === Number(req.params.id));
+      if (!t) return reply.code(404).send({ message: 'Media not found' });
+      for (let i = requests.length - 1; i >= 0; i--) if (requests[i].type === t.type && requests[i].tmdbId === t.tmdbId) requests.splice(i, 1);
+      statusOverride.delete(`${t.type}-${t.tmdbId}`);
+      return reply.code(204).send();
+    });
     s.post<{ Params: { id: string; status: string } }>('/media/:id/:status', async (req, reply) => {
       const t = TITLES.find((x) => x.tmdbId === Number(req.params.id));
       const code = { unknown: 1, pending: 2, processing: 3, partial: 4, available: 5 }[req.params.status];
@@ -846,6 +853,13 @@ void app.register(
       }
       return [];
     });
+    r.delete<{ Params: { id: string } }>('/movie/:id', async (req, reply) => {
+      const t = TITLES.find((x) => x.type === 'movie' && x.n === Number(req.params.id));
+      if (!t) return reply.code(404).send();
+      arrKnown.delete(`movie-${t.tmdbId}`);
+      unmonitored.delete(`movie-${t.tmdbId}`);
+      return reply.code(200).send({});
+    });
     r.delete<{ Params: { id: string } }>('/moviefile/:id', async (req, reply) => {
       const t = TITLES.find((x) => x.type === 'movie' && x.n === Math.floor(Number(req.params.id) / 100));
       if (!t || !library.delete(`movie-${t.tmdbId}`)) return reply.code(404).send({ message: 'Movie file not found' });
@@ -931,6 +945,13 @@ void app.register(
         else unmonitored.add(`tv-${t.tmdbId}`);
       }
       return [];
+    });
+    r.delete<{ Params: { id: string } }>('/series/:id', async (req, reply) => {
+      const t = TITLES.find((x) => x.type === 'tv' && x.n === Number(req.params.id));
+      if (!t) return reply.code(404).send();
+      arrKnown.delete(`tv-${t.tmdbId}`);
+      for (const key of [...unmonitored]) if (key === `tv-${t.tmdbId}` || key.startsWith(`tv-${t.tmdbId}-`)) unmonitored.delete(key);
+      return reply.code(200).send({});
     });
     r.delete<{ Body: { episodeFileIds: number[] } }>('/episodefile/bulk', async (req) => {
       for (const id of req.body.episodeFileIds) {

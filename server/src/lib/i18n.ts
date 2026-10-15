@@ -211,6 +211,8 @@ const IT: Record<string, string> = {
   'This room is full': 'Questa stanza è piena',
   'Only {name} can end this room': 'Solo {name} può chiudere questa stanza',
   "That device isn't open any more": 'Quel dispositivo non è più aperto',
+  'Only an admin, or whoever asked for it, can cancel this request': 'Solo un amministratore, o chi l’ha chiesto, può annullare questa richiesta',
+  "It's already on disk: delete it from disk instead": 'È già sul disco: eliminalo dal disco invece',
   'Sign in to {name} again': 'Accedi di nuovo come {name}',
   'A PIN is four digits': 'Il PIN è di quattro cifre',
   'Only that person can remove a profile with a PIN': 'Solo quella persona può rimuovere un profilo con il PIN',

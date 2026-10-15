@@ -157,6 +157,48 @@ export function DeleteFromDisk({ d, menu }: { d: TitleDetail; menu?: boolean }) 
 }
 
 /** Admins: monitor it again in Radarr/Sonarr and search, so it comes back. */
+/** Take a request back before anything is on disk: nobody looks for it any more, and it can be asked for again. */
+export function CancelRequest({ d }: { d: TitleDetail }) {
+  const [open, setOpen] = useState(false);
+  const toast = useToast();
+  const refresh = useRefreshAll();
+  const cancel = useMutation({
+    mutationFn: () => api.cancelRequest(d.mediaType, d.tmdbId!),
+    onSuccess: () => {
+      setOpen(false);
+      refresh(d.mediaType, d.tmdbId);
+      toast('ok', t('Request cancelled.'));
+    },
+    onError: (err) => toast('error', (err as Error).message),
+  });
+  if (!d.tmdbId) return null;
+  return (
+    <>
+      <button type="button" className="link-btn small" onClick={() => setOpen(true)}>
+        {t('Cancel request')}
+      </button>
+      {open && (
+        <Modal
+          title={t('Cancel the request for {title}?', { title: d.title })}
+          onClose={() => setOpen(false)}
+          footer={
+            <>
+              <button className="btn btn--ghost" onClick={() => setOpen(false)}>
+                {t('Keep it')}
+              </button>
+              <button className="btn btn--danger" disabled={cancel.isPending} onClick={() => cancel.mutate()}>
+                {cancel.isPending ? <Spinner size={16} /> : <CircleStop size={16} />} {t('Cancel request')}
+              </button>
+            </>
+          }
+        >
+          <p className="muted">{t("Radarr and Sonarr stop looking for it, and it's no longer requested. You can request it again any time.")}</p>
+        </Modal>
+      )}
+    </>
+  );
+}
+
 export function DownloadAgain({ d, seasons, className = 'btn btn--accent btn--sm' }: { d: TitleDetail; seasons?: number[]; className?: string }) {
   const toast = useToast();
   const refresh = useRefreshAll();

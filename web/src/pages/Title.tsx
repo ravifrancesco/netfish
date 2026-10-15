@@ -10,7 +10,7 @@ import { DownloadButton } from '../components/DownloadButton';
 import { TogetherOnTitle, WatchTogetherButton } from '../components/Together';
 import { NameLinks, PeopleRow } from '../components/People';
 import { isNotAvailable, notOutText } from '../components/NotOut';
-import { DeleteFromDisk, DownloadAgain, RemovedNote, StopDownload } from '../components/Manage';
+import { CancelRequest, DeleteFromDisk, DownloadAgain, RemovedNote, StopDownload } from '../components/Manage';
 import { RatingsStrip, TrailerPlayer } from '../components/Extras';
 import { RequestButton } from '../components/RequestButton';
 import { SubtitlesSheet } from '../components/SubtitlesSheet';
@@ -165,6 +165,13 @@ function StatusPanel({ d }: { d: TitleDetail }) {
             ? t('Requested by you {when}', { when: ago(latest.createdAt) })
             : t('Requested by {name} {when}', { name: latest.requestedBy, when: ago(latest.createdAt) })}
           {latest.status === 'declined' && ` · ${t('declined')}`}
+          {/* Still only asked for (nothing downloading, nothing on disk): it can be taken back. */}
+          {(latest.mine || me?.isAdmin) && !d.downloads.length && !d.removed && (d.status === 'processing' || d.status === 'pending') && (
+            <>
+              {' · '}
+              <CancelRequest d={d} />
+            </>
+          )}
         </p>
       )}
     </div>

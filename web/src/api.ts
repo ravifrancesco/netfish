@@ -143,6 +143,8 @@ export const api = {
 
   setWatched: (itemId: string, watched: boolean) => call<{ ok: true }>(`/items/${enc(itemId)}/watched`, { body: { watched } }),
   hideFromContinue: (itemId: string) => call<{ ok: true }>(`/items/${enc(itemId)}/hide`, { method: 'POST' }),
+  /** Take a request back before anything is on disk. */
+  cancelRequest: (mediaType: MediaType, tmdbId: number) => call<{ ok: true }>(`/title/${mediaType}/${tmdbId}/request`, { method: 'DELETE' }),
   /** Where someone got to in a download watched on this device. */
   setPosition: (itemId: string, seconds: number, finished: boolean, at: string) =>
     call<{ ok: true }>(`/items/${enc(itemId)}/position`, { body: { seconds, finished, at } }),

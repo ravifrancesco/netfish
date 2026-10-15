@@ -53,6 +53,18 @@ async function resetSeerr(mediaType: MediaType, tmdbId: number | undefined, stat
   catalog.invalidate(mediaType, tmdbId);
 }
 
+/**
+ * A request taken back: Seerr forgets the title and its requests. (Only setting it to
+ * "unknown" isn't enough: Seerr checks Radarr/Sonarr every few minutes and sets anything
+ * they still know without files back to "processing".)
+ */
+async function forgetRequest(mediaType: MediaType, tmdbId: number | undefined) {
+  if (!tmdbId || !has.seerr()) return;
+  const media = mediaType === 'movie' ? (await catalog.movie(tmdbId)).mediaInfo : (await catalog.tv(tmdbId)).mediaInfo;
+  if (media?.id) await seerr.deleteMedia(media.id);
+  catalog.invalidate(mediaType, tmdbId);
+}
+
 function forget(mediaType: MediaType, tmdbId: number, tvdbId?: number) {
   if (mediaType === 'movie') forgetRadarrMovie(tmdbId);
   else forgetSonarrSeries(tvdbId);
@@ -85,8 +97,16 @@ export async function stopDownload(user: SessionUser, id: string, mode: StopMode
     if (!record) throw new HttpError(404, t('That download has already finished or been stopped'));
     await radarr.removeFromQueue([queueId], removal);
     if (mode === 'stop' && record.movieId) {
-      await radarr.setMonitored([record.movieId], false);
-      await settle(resetSeerr('movie', item.tmdbId), undefined);
+      if (item.tmdbId) forgetRadarrMovie(item.tmdbId);
+      const movie = item.tmdbId ? await settle(radarrMovie(item.tmdbId), undefined) : undefined;
+      if (movie?.hasFile) {
+        // Was replacing a copy that's already there: keep that one, stop looking for better.
+        await radarr.setMonitored([record.movieId], false);
+      } else {
+        // Nothing on disk: take the request back, so it can be asked for again.
+        await radarr.deleteMovie(record.movieId);
+        await settle(forgetRequest('movie', item.tmdbId), undefined);
+      }
     }
   } else {
     const records = (await sonarr.queue()).records.filter((r) => `sonarr-${r.downloadId ?? r.id}` === id);
@@ -97,9 +117,53 @@ export async function stopDownload(user: SessionUser, id: string, mode: StopMode
     );
     const episodes = records.map((r) => r.episodeId).filter((n): n is number => n !== undefined);
     if (mode === 'stop' && episodes.length) await sonarr.setEpisodesMonitored(episodes, false);
+    // The show's only download, and nothing of it on disk: take the request back.
+    const seriesId = records[0]?.seriesId;
+    if (mode === 'stop' && seriesId) {
+      const left = (await sonarr.queue()).records.some((r) => r.seriesId === seriesId);
+      // (Unsure what's on disk? Then nothing is forgotten.)
+      const files = await sonarr.episodeFiles(seriesId).catch(() => undefined);
+      if (!left && files && !files.length) {
+        await sonarr.deleteSeries(seriesId);
+        await settle(forgetRequest('tv', item.tmdbId), undefined);
+      }
+    }
   }
   if (item.tmdbId) forget(item.mediaType, item.tmdbId, item.tvdbId);
   forgetDownloads();
+  return { ok: true };
+}
+
+/**
+ * Cancel request: before anything is on disk, Radarr/Sonarr stop looking and forget the
+ * title, and Seerr forgets the request, so it reads "not requested" and can be asked for
+ * again. Whoever asked for it, or an admin.
+ */
+export async function cancelRequest(user: SessionUser, mediaType: MediaType, tmdbId: number) {
+  if (!user.isAdmin && !(await isMine(user, mediaType, tmdbId))) {
+    throw new HttpError(403, t('Only an admin, or whoever asked for it, can cancel this request'));
+  }
+  const stopped = { blocklist: false, skipRedownload: true };
+  if (mediaType === 'movie') {
+    forgetRadarrMovie(tmdbId);
+    const movie = has.radarr() ? await settle(radarrMovie(tmdbId), undefined) : undefined;
+    if (movie?.hasFile) throw new HttpError(409, t("It's already on disk: delete it from disk instead"));
+    if (movie) {
+      const queued = (await radarr.queue()).records.filter((r) => r.movieId === movie.id).map((r) => r.id);
+      if (queued.length) await radarr.removeFromQueue(queued, stopped);
+      await radarr.deleteMovie(movie.id);
+    }
+  } else {
+    const series = has.sonarr() ? await settle(seriesFor(user, tmdbId), undefined) : undefined;
+    if (series) {
+      if (series.statistics?.episodeFileCount) throw new HttpError(409, t("It's already on disk: delete it from disk instead"));
+      const queued = (await sonarr.queue()).records.filter((r) => r.seriesId === series.id).map((r) => r.id);
+      if (queued.length) await sonarr.removeFromQueue(queued, stopped);
+      await sonarr.deleteSeries(series.id);
+    }
+  }
+  await forgetRequest(mediaType, tmdbId);
+  forget(mediaType, tmdbId);
   return { ok: true };
 }
 
