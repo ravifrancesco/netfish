@@ -7,7 +7,7 @@ import type { DownloadItem, MediaType, SeasonSummary, TitleDetail } from '@netfi
 import { api, type TitleRef } from '../api';
 import { Row } from '../components/Cards';
 import { DownloadButton } from '../components/DownloadButton';
-import { WatchTogetherButton } from '../components/Together';
+import { TogetherOnTitle, WatchTogetherButton } from '../components/Together';
 import { NameLinks, PeopleRow } from '../components/People';
 import { isNotAvailable, notOutText } from '../components/NotOut';
 import { DeleteFromDisk, DownloadAgain, RemovedNote, StopDownload } from '../components/Manage';
@@ -398,6 +398,7 @@ export default function Title() {
             <DeleteFromDisk d={d} />
           </div>
           {d.play?.progress !== undefined && <Progress value={d.play.progress} tone="watch" className="tp__progress" />}
+          <TogetherOnTitle titleId={d.jellyfinId} />
 
           <StatusPanel d={d} />
           <Languages d={d} onSheet={setSheet} />

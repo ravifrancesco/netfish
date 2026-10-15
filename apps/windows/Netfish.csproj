@@ -19,7 +19,7 @@
     <RootNamespace>Netfish</RootNamespace>
     <Product>Netfish</Product>
     <Company>Netfish</Company>
-    <Version>0.4.0</Version>
+    <Version>0.4.1</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>

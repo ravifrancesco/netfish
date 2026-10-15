@@ -1,9 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { api } from '../api';
 import { titleHref } from './format';
 import { desktop } from './desktop';
 import { getPrefs } from './prefs';
+import { useRooms } from './together';
 import { t } from '../i18n';
 
 declare global {
@@ -74,28 +75,17 @@ export function useReadyNotifications(userId: string) {
 /** Notifies when someone else opens a Watch together room (rooms already open when the app starts don't count). */
 export function useTogetherNotifications(userId: string) {
   const navigate = useNavigate();
+  const rooms = useRooms().data?.rooms;
+  const seen = useRef<Set<string> | undefined>(undefined);
   useEffect(() => {
-    if (!getPrefs().notifyTogether || !notifySupport()) return;
-    let seen: Set<string> | undefined;
-    let stopped = false;
-    const check = async () => {
-      const { rooms } = await api.rooms().catch(() => ({ rooms: [] }));
-      if (stopped) return;
-      const open = rooms.filter((r) => r.hostId !== userId && !r.members.some((m) => m.userId === userId));
-      if (seen) {
-        for (const room of open) {
-          if (seen.has(room.id)) continue;
-          const body = room.subtitle ? `${room.title} · ${room.subtitle}` : room.title;
-          show(t('{name} wants to watch together', { name: room.hostName }), body, `/together/${room.id}`, navigate);
-        }
+    if (!rooms) return;
+    if (seen.current && getPrefs().notifyTogether && notifySupport()) {
+      for (const room of rooms) {
+        if (seen.current.has(room.id) || room.hostId === userId || room.members.some((m) => m.userId === userId)) continue;
+        const body = room.subtitle ? `${room.title} · ${room.subtitle}` : room.title;
+        show(t('{name} wants to watch together', { name: room.hostName }), body, `/together/${room.id}`, navigate);
       }
-      seen = new Set([...(seen ?? []), ...rooms.map((r) => r.id)]);
-    };
-    void check();
-    const every = setInterval(() => void check(), 30_000);
-    return () => {
-      stopped = true;
-      clearInterval(every);
-    };
-  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
+    }
+    seen.current = new Set([...(seen.current ?? []), ...rooms.map((r) => r.id)]);
+  }, [rooms, userId]); // eslint-disable-line react-hooks/exhaustive-deps
 }

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { Download, ExternalLink, RefreshCw, X } from 'lucide-react';
+import { CloudDownload, Download, ExternalLink, RefreshCw, X } from 'lucide-react';
 import { desktop, type UpdateStatus } from '../lib/desktop';
 import { percent } from '../lib/format';
-import { Progress, Spinner } from './ui';
+import { Progress, Spinner, Switch } from './ui';
 import { t } from '../i18n';
 
 const newer = (a: string, b: string) => {
@@ -118,15 +118,14 @@ export function AppUpdate() {
       {progress !== undefined && <Progress value={progress} />}
       {error && <p className="conn__result is-bad">{error}</p>}
       {update.setAuto && status && (
-        <label className="check">
-          <input type="checkbox" checked={Boolean(status.auto)} onChange={(e) => void setAuto(e.target.checked)} />
-          <span>
-            {t('Update Netfish by itself')}
-            <span className="muted small"> · {t('New versions download in the background and install when you quit Netfish.')}</span>
-          </span>
-        </label>
+        <div className="account" title={t('New versions download in the background and install when you quit Netfish.')}>
+          <CloudDownload size={20} />
+          <div className="muted small">{t('Auto-update')}</div>
+          <span className="spacer" />
+          <Switch on={Boolean(status.auto)} onChange={(on) => void setAuto(on)} label={t('Auto-update')} />
+        </div>
       )}
-      {status?.auto && status.autoProblem && <p className="muted small">{t("Couldn't update by itself: {problem}", { problem: status.autoProblem })}</p>}
+      {status?.auto && status.autoProblem && <p className="muted small">{t('Auto-update failed: {problem}', { problem: status.autoProblem })}</p>}
     </div>
   );
 }

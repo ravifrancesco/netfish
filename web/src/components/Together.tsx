@@ -2,16 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Check, Copy, LogOut, Play, Users, X } from 'lucide-react';
-import type { TogetherRoom } from '@netfish/shared';
+import type { TogetherMember, TogetherRoom } from '@netfish/shared';
 import { api } from '../api';
 import { clock } from '../lib/format';
 import { useMe } from '../lib/hooks';
-import type { Together } from '../lib/together';
+import { othersRooms, roomHref, roomPosition, useRooms, useTick, type Together } from '../lib/together';
 import { Initial } from './ProfilePicker';
-import { Img, Spinner, useToast } from './ui';
+import { Img, Progress, Spinner, useToast } from './ui';
 import { t, tn } from '../i18n';
 
-const roomHref = (room: TogetherRoom) => `/watch/${room.playback.itemId}?room=${room.id}`;
 const inviteLink = (id: string) => `${location.origin}/together/${id}`;
 
 /** Title page: start a room for what Play would play, and go straight into it. */
@@ -30,38 +29,153 @@ export function WatchTogetherButton({ itemId, className = 'btn btn--ghost btn--l
   );
 }
 
-/** Home: rooms other people have open, to join with one click. */
-export function TogetherBanner() {
+/** The people in a room right now, once each (the same person can be on two devices). */
+const peopleIn = (room: TogetherRoom, exceptId?: string) => {
+  const seen = new Map<string, TogetherMember>();
+  for (const m of room.members) if (m.here && m.userId !== exceptId && !seen.has(m.userId)) seen.set(m.userId, m);
+  return [...seen.values()];
+};
+
+/** "ravi", "ravi and sam", "ravi and 2 others". */
+function whoText(people: TogetherMember[]) {
+  const names = people.map((m) => m.name);
+  if (names.length > 2) return tn(names.length - 1, '{name} and {n} other', '{name} and {n} others', { name: names[0] });
+  if (names.length === 2) return t('{a} and {b}', { a: names[0], b: names[1] });
+  return names[0] ?? '';
+}
+
+function Faces({ people, max = 3, className = 'room-faces' }: { people: TogetherMember[]; max?: number; className?: string }) {
+  return (
+    <span className={className} aria-hidden="true">
+      {people.slice(0, max).map((m) => (
+        <Img key={m.userId} src={m.avatar} className="room-face" fallback={<Initial name={m.name} />} />
+      ))}
+      {people.length > max && <span className="room-face room-face--more">+{people.length - max}</span>}
+    </span>
+  );
+}
+
+function RoomCard({ room }: { room: TogetherRoom }) {
+  const people = peopleIn(room);
+  const position = roomPosition(room);
+  const who = whoText(people);
+  return (
+    <div className="wide room-card">
+      <Link to={roomHref(room)} className="wide__frame" aria-label={t('Join {who} watching {title}', { who, title: room.title })}>
+        <Img src={room.image} className="wide__img" fallback={<span className="card__fallback">{room.title}</span>} />
+        <span className={`room-live${room.playback.playing ? '' : ' is-paused'}`}>{room.playback.playing ? t('Live') : t('Paused')}</span>
+        <Faces people={people} />
+        <span className="wide__play" aria-hidden="true">
+          <Play size={22} fill="currentColor" />
+        </span>
+        {room.durationSeconds ? <Progress value={Math.min(1, position / room.durationSeconds)} className="wide__bar" /> : null}
+      </Link>
+      <div className="wide__meta">
+        <div className="wide__text">
+          <span className="wide__title">{room.title}</span>
+          <span className="wide__subtitle">{[room.subtitle, who].filter(Boolean).join(' · ')}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Home: the rooms others are watching in, as a row like the others. Appears and goes as rooms do. */
+export function TogetherRow() {
   const me = useMe().data;
-  const q = useQuery({ queryKey: ['rooms'], queryFn: api.rooms, refetchInterval: 30_000, staleTime: 15_000 });
-  const rooms = (q.data?.rooms ?? []).filter((r) => r.members.some((m) => m.here && m.userId !== me?.id));
+  const rooms = othersRooms(useRooms().data?.rooms, me?.id);
+  useTick(15_000); // the progress bars move
   if (!rooms.length) return null;
   return (
-    <div className="together-rooms">
+    <section className="row row--wide row--together">
+      <div className="row__head">
+        <h2 className="row__title">
+          <span className="live-dot" aria-hidden="true" /> {t('Watch together')}
+        </h2>
+      </div>
+      <div className="row__viewport">
+        <div className="row__track">
+          {rooms.map((room) => (
+            <RoomCard key={room.id} room={room} />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** The top bar, on every page: someone is watching together; the menu lists the rooms. */
+export function TogetherPill() {
+  const me = useMe().data;
+  const rooms = othersRooms(useRooms().data?.rooms, me?.id);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', close);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  useEffect(() => {
+    if (!rooms.length) setOpen(false);
+  }, [rooms.length]);
+  if (!rooms.length) return null;
+
+  const everyone = [...new Map(rooms.flatMap((r) => peopleIn(r, me?.id)).map((m) => [m.userId, m])).values()];
+  return (
+    <div className="together-pill-wrap" ref={ref}>
+      <button
+        className="together-pill"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-label={tn(rooms.length, 'Watch together: {n} room open', 'Watch together: {n} rooms open')}
+        title={t('Watch together')}
+      >
+        <span className="live-dot" aria-hidden="true" />
+        <Faces people={everyone} max={2} />
+        <span className="together-pill__label">{t('Watch together')}</span>
+      </button>
+      {open && (
+        <div className="menu together-menu" role="menu">
+          {rooms.map((room) => (
+            <Link key={room.id} to={roomHref(room)} className="together-menu__item" role="menuitem" onClick={() => setOpen(false)}>
+              <Img src={room.image} className="together-menu__art" fallback={<Users size={18} />} />
+              <span className="together-menu__text">
+                <strong>{room.title}</strong>
+                <span className="muted small">{[room.subtitle, whoText(peopleIn(room, me?.id))].filter(Boolean).join(' · ')}</span>
+              </span>
+              <span className="btn btn--accent btn--sm">{t('Join')}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A title's page: someone is watching it together right now. */
+export function TogetherOnTitle({ titleId }: { titleId?: string }) {
+  const me = useMe().data;
+  const rooms = othersRooms(useRooms().data?.rooms, me?.id).filter((r) => titleId && r.titleId === titleId);
+  if (!rooms.length) return null;
+  return (
+    <div className="together-lines">
       {rooms.map((room) => {
-        const here = room.members.filter((m) => m.here);
-        const names = [...new Set(here.map((m) => m.name))];
-        const who =
-          names.length > 2
-            ? tn(names.length - 1, '{name} and {n} other', '{name} and {n} others', { name: names[0] })
-            : names.length === 2
-              ? t('{a} and {b}', { a: names[0], b: names[1] })
-              : names[0];
+        const people = peopleIn(room, me?.id);
         return (
-          <div key={room.id} className="together-room">
-            <Img src={room.image} className="together-room__art" fallback={<Users size={22} />} />
-            <div className="together-room__text">
-              <span className="muted small">
-                <Users size={14} /> {t('Watch together')}
-              </span>
-              <strong>{room.title}</strong>
-              <span className="muted small">
-                {room.subtitle ? `${room.subtitle} · ` : ''}
-                {who}
-              </span>
-            </div>
+          <div key={room.id} className="together-line">
+            <span className="live-dot" aria-hidden="true" />
+            <span>
+              {tn(people.length, '{who} is watching this together', '{who} are watching this together', { who: whoText(people) })}
+              {room.subtitle && <span className="muted"> · {room.subtitle}</span>}
+            </span>
             <Link to={roomHref(room)} className="btn btn--accent btn--sm">
-              <Play size={16} fill="currentColor" /> {t('Join')}
+              <Play size={15} fill="currentColor" /> {t('Join')}
             </Link>
           </div>
         );

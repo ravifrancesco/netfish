@@ -1,6 +1,62 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { TogetherAction, TogetherEvent, TogetherRoom } from '@netfish/shared';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { TogetherAction, TogetherEvent, TogetherRoom, TogetherRoomsEvent } from '@netfish/shared';
 import { api, ApiError } from '../api';
+
+// ---------- The rooms on this server (Home, the top bar, title pages) ----------
+
+/** The server's clock minus this device's, from the live list (0 until it's heard from). */
+let roomsClock = 0;
+
+/** Rooms with someone in them. Kept current by useLiveRooms; a slow check in case that can't connect. */
+export const useRooms = () => useQuery({ queryKey: ['rooms'], queryFn: api.rooms, refetchInterval: 60_000, staleTime: 30_000 });
+
+/** Rooms someone other than you is watching in right now. */
+export const othersRooms = (rooms: TogetherRoom[] | undefined, meId: string | undefined) =>
+  (rooms ?? []).filter((r) => r.members.some((m) => m.here && m.userId !== meId));
+
+/** Where a room's film is now (seconds). */
+export const roomPosition = (room: TogetherRoom) =>
+  room.playback.position + (room.playback.playing ? Math.max(0, Date.now() + roomsClock - room.playback.at) / 1000 : 0);
+
+export const roomHref = (room: TogetherRoom) => `/watch/${room.playback.itemId}?room=${room.id}`;
+
+/**
+ * Follows the server's live list of rooms, so a room someone opens shows up for everyone
+ * at once, without reloading. Off while watching (the player has its own line, and
+ * browsers allow only a few open connections to one server).
+ */
+export function useLiveRooms(enabled: boolean) {
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (!enabled || typeof EventSource === 'undefined') return;
+    const source = new EventSource('/api/together/live');
+    source.onmessage = (e) => {
+      try {
+        const event = JSON.parse(e.data) as TogetherRoomsEvent;
+        if (!event.rooms) return;
+        roomsClock = event.now - Date.now();
+        qc.setQueryData(['rooms'], { rooms: event.rooms });
+      } catch {
+        /* not for us */
+      }
+    };
+    // Back from a dropped line: catch up on what was missed.
+    source.onopen = () => void qc.invalidateQueries({ queryKey: ['rooms'] });
+    return () => source.close();
+  }, [enabled, qc]);
+}
+
+/** Re-renders every so often (for things that move with time, like a room's progress). */
+export function useTick(ms: number) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick((n) => n + 1), ms);
+    return () => clearInterval(timer);
+  }, [ms]);
+}
+
+// ---------- One room, from its player ----------
 
 /** An id for this open player (crypto.randomUUID needs https, which a home server often isn't). */
 const newClientId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;

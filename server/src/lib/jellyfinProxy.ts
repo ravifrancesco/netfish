@@ -51,7 +51,11 @@ export function registerJellyfinProxy(app: FastifyInstance) {
       if (token) headers.authorization = authHeader(token);
 
       return new Promise<void>((resolve) => {
+        // Answered once Jellyfin's reply is on its way: a later error belongs to that stream (Fastify
+        // ends it), and a second answer would crash the server.
+        let answered = false;
         const upstream = (target.protocol === 'https:' ? https : http).request(target, { method: req.method, headers }, (res) => {
+          answered = true;
           reply.code(res.statusCode ?? 502);
           for (const [name, value] of Object.entries(res.headers)) {
             if (value !== undefined && !HOP_BY_HOP.has(name)) reply.header(name, value);
@@ -61,7 +65,11 @@ export function registerJellyfinProxy(app: FastifyInstance) {
         });
         upstream.setTimeout(30_000, () => upstream.destroy(new Error('timed out')));
         upstream.on('error', (err) => {
-          if (!reply.sent) reply.code(502).send({ error: t('Jellyfin is unreachable ({reason})', { reason: err.message }) });
+          // Nobody to tell when the viewer has already gone (seeked, closed the player).
+          if (!answered && !reply.sent && !reply.raw.destroyed) {
+            answered = true;
+            reply.code(502).send({ error: t('Jellyfin is unreachable ({reason})', { reason: err.message }) });
+          }
           resolve();
         });
         // Viewer seeked or closed the player: stop pulling the old byte range from the Pi.

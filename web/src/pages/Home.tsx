@@ -10,7 +10,7 @@ import { decimal, titleHref } from '../lib/format';
 import { t } from '../i18n';
 import { useConfig, useMe } from '../lib/hooks';
 import { UpdateNudge } from '../components/AppUpdate';
-import { TogetherBanner } from '../components/Together';
+import { TogetherRow } from '../components/Together';
 
 /** Admins: a nudge to finish connecting services until they're all there. */
 function SetupNudge() {
@@ -65,7 +65,7 @@ function Hero({ card }: { card: Card }) {
       <div className="hero__shade" />
       <div className="hero__content">
         <span className="hero__kicker">{card.mediaType === 'tv' ? t('Series') : t('Film')}</span>
-        <h1 className="hero__title">{card.title}</h1>
+        <h1 className={`hero__title${card.title.length > 22 ? ' hero__title--long' : ''}`}>{card.title}</h1>
         <div className="hero__meta">
           {card.year && <span>{card.year}</span>}
           {card.rating && (
@@ -119,7 +119,7 @@ export default function Home() {
       <div className="rows">
         <SetupNudge />
         <UpdateNudge />
-        <TogetherBanner />
+        <TogetherRow />
         {rows.map((row) => (
           <Row key={row.id} row={row} />
         ))}

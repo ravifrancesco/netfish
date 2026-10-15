@@ -446,6 +446,9 @@ export interface TogetherRoom {
   /** For an episode: "S1:E3 · Its name". */
   subtitle?: string;
   image?: string;
+  /** Jellyfin's id for the film, or for the show an episode belongs to. */
+  titleId?: string;
+  durationSeconds?: number;
   playback: TogetherPlayback;
   members: TogetherMember[];
   createdAt: string;
@@ -456,6 +459,12 @@ export interface TogetherEvent {
   room?: TogetherRoom;
   ended?: boolean;
   /** The server's clock (ms), so players agree on where the film is. */
+  now: number;
+}
+
+/** The live list of rooms (Home, the top bar and title pages follow it). */
+export interface TogetherRoomsEvent {
+  rooms: TogetherRoom[];
   now: number;
 }
 

@@ -7,6 +7,7 @@ import { api } from '../api';
 import { appKind, desktop } from '../lib/desktop';
 import { useConfig } from '../lib/hooks';
 import { Logo } from './Logo';
+import { TogetherPill } from './Together';
 import { t } from '../i18n';
 
 function useActiveDownloads() {
@@ -162,6 +163,7 @@ export function Nav({ user }: { user: User }) {
           ))}
         </nav>
         <div className="nav__right">
+          <TogetherPill />
           <SearchBox />
           <ProfileMenu user={user} />
         </div>

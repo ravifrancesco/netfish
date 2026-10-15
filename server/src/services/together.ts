@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import type { ServerResponse } from 'node:http';
 import type { FastifyReply } from 'fastify';
-import type { TogetherAction, TogetherControl, TogetherEvent, TogetherPlayback, TogetherRoom } from '@netfish/shared';
+import type { TogetherAction, TogetherControl, TogetherEvent, TogetherPlayback, TogetherRoom, TogetherRoomsEvent } from '@netfish/shared';
 import type { SessionUser } from '../auth';
 import { jellyfin, ticksToSeconds } from '../clients/jellyfin';
 import { jfImage } from '../lib/images';
@@ -43,6 +43,8 @@ interface Room {
   title: string;
   subtitle?: string;
   image?: string;
+  titleId?: string;
+  durationSeconds?: number;
   playback: TogetherPlayback;
   players: Map<string, Player>;
   createdAt: number;
@@ -63,6 +65,8 @@ function view(room: Room): TogetherRoom {
     title: room.title,
     subtitle: room.subtitle,
     image: room.image,
+    titleId: room.titleId,
+    durationSeconds: room.durationSeconds,
     playback: room.playback,
     members: [...room.players.values()].map((p) => ({
       clientId: p.clientId,
@@ -76,7 +80,20 @@ function view(room: Room): TogetherRoom {
   };
 }
 
-function send(stream: ServerResponse, event: TogetherEvent) {
+// Everyone's Home, top bar and title pages: told when rooms open, change and close.
+const watchers = new Set<ServerResponse>();
+let announcing: ReturnType<typeof setTimeout> | undefined;
+
+function announce() {
+  if (announcing) return; // a burst of changes goes out as one
+  announcing = setTimeout(() => {
+    announcing = undefined;
+    const event: TogetherRoomsEvent = { rooms: listRooms(), now: Date.now() };
+    for (const s of watchers) send(s, event);
+  }, 300);
+}
+
+function send(stream: ServerResponse, event: TogetherEvent | TogetherRoomsEvent) {
   try {
     stream.write(`data: ${JSON.stringify(event)}\n\n`);
   } catch {
@@ -87,10 +104,12 @@ function send(stream: ServerResponse, event: TogetherEvent) {
 function broadcast(room: Room) {
   const event: TogetherEvent = { room: view(room), now: Date.now() };
   for (const p of room.players.values()) for (const s of p.streams) send(s, event);
+  announce();
 }
 
 function end(room: Room) {
   rooms.delete(room.id);
+  announce();
   const event: TogetherEvent = { ended: true, now: Date.now() };
   for (const p of room.players.values())
     for (const s of p.streams) {
@@ -107,6 +126,8 @@ async function describe(user: SessionUser, itemId: string) {
   const resume = ticksToSeconds(item.UserData?.PlaybackPositionTicks);
   const length = ticksToSeconds(item.RunTimeTicks);
   return {
+    titleId: (episode ? item.SeriesId : item.Id) ?? undefined,
+    durationSeconds: length || undefined,
     /** Where this person left off, unless that's the end credits. */
     resume: resume && (!length || resume < length - 60) ? resume : 0,
     title: (episode ? item.SeriesName : item.Name) ?? item.Name,
@@ -173,6 +194,29 @@ export function listRooms(): TogetherRoom[] {
 
 export const getRoom = (id: string) => view(roomOf(id));
 
+/** Opens a server-sent events line: no buffering on the way, reconnect quickly if it drops. */
+function openLine(reply: FastifyReply): ServerResponse {
+  reply.hijack();
+  const stream = reply.raw;
+  stream.writeHead(200, {
+    'content-type': 'text/event-stream; charset=utf-8',
+    'cache-control': 'no-cache, no-transform',
+    connection: 'keep-alive',
+    // nginx and friends: pass every message on at once.
+    'x-accel-buffering': 'no',
+  });
+  stream.write('retry: 2000\n\n');
+  return stream;
+}
+
+/** The live list of rooms: all of them now, then again whenever one opens, changes or closes. */
+export function watchRooms(reply: FastifyReply) {
+  const stream = openLine(reply);
+  watchers.add(stream);
+  send(stream, { rooms: listRooms(), now: Date.now() });
+  stream.on('close', () => watchers.delete(stream));
+}
+
 /**
  * A player's live line to the room (server-sent events): the room now, then every change.
  * Being connected is what "here" means; the line drops when the player closes.
@@ -189,16 +233,7 @@ export function openStream(user: SessionUser, id: string, clientId: unknown, rep
     room.players.set(client, player);
   }
 
-  reply.hijack();
-  const stream = reply.raw;
-  stream.writeHead(200, {
-    'content-type': 'text/event-stream; charset=utf-8',
-    'cache-control': 'no-cache, no-transform',
-    connection: 'keep-alive',
-    // nginx and friends: pass every message on at once.
-    'x-accel-buffering': 'no',
-  });
-  stream.write('retry: 2000\n\n');
+  const stream = openLine(reply);
   player.streams.add(stream);
   room.emptySince = undefined;
   broadcast(room);
@@ -288,5 +323,12 @@ setInterval(() => {
     }
     if ((room.emptySince && now - room.emptySince > EMPTY_FOR) || now - room.createdAt > MAX_AGE) end(room);
     else if (changed) broadcast(room);
+  }
+  for (const s of watchers) {
+    try {
+      s.write(': still here\n\n');
+    } catch {
+      /* gone */
+    }
   }
 }, 15_000).unref();

@@ -106,8 +106,8 @@ export default {
   'Netfish {version} is available for this computer.': 'È disponibile Netfish {version} per questo computer.',
   'Netfish {version} is ready and installs when you quit Netfish.': 'Netfish {version} è pronto e si installa quando chiudi Netfish.',
   'Restart now': 'Riavvia ora',
-  'Update Netfish by itself': 'Aggiorna Netfish da solo',
+  'Auto-update': 'Aggiornamento automatico',
   'New versions download in the background and install when you quit Netfish.':
     'Le nuove versioni si scaricano in background e si installano quando chiudi Netfish.',
-  "Couldn't update by itself: {problem}": 'Aggiornamento automatico non riuscito: {problem}',
+  'Auto-update failed: {problem}': 'Aggiornamento automatico non riuscito: {problem}',
 } as Record<string, string>;

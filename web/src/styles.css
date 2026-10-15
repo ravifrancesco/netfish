@@ -733,8 +733,14 @@ p {
 
 .hero {
   position: relative;
-  height: min(86vh, 820px);
-  min-height: 480px;
+  /* The content flows from the bottom up: a long title in a short window makes the hero
+     taller instead of running up under the top bar. */
+  min-height: max(480px, min(86vh, 820px));
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  /* At the bottom: room for the rows, which slide up over the hero (.rows' margin), plus a gap. */
+  padding: calc(var(--nav-h) + 24px) var(--gutter) calc(clamp(60px, 12vw, 150px) + clamp(36px, 8vh, 70px));
   overflow: hidden;
 }
 .hero--skeleton {
@@ -743,6 +749,7 @@ p {
 .hero--empty {
   height: calc(var(--nav-h) + 40px);
   min-height: 0;
+  padding: 0;
 }
 .hero__media,
 .hero__img {
@@ -768,10 +775,8 @@ p {
     linear-gradient(0deg, var(--bg) 0%, var(--bg) 3%, rgba(6, 8, 11, 0) 40%);
 }
 .hero__content {
-  position: absolute;
-  left: var(--gutter);
-  bottom: clamp(140px, 22vh, 220px);
-  width: min(560px, calc(100% - 2 * var(--gutter)));
+  position: relative;
+  width: min(560px, 100%);
   display: grid;
   gap: 14px;
   animation: rise-in 0.8s var(--ease) 0.1s both;
@@ -789,6 +794,9 @@ p {
   letter-spacing: -0.04em;
   line-height: 0.98;
   text-shadow: 0 2px 30px rgba(0, 0, 0, 0.4);
+}
+.hero__title--long {
+  font-size: clamp(2rem, 4vw, 3.3rem);
 }
 .hero__meta,
 .tp__meta {
@@ -1288,7 +1296,8 @@ p {
 .img-fallback.profile-tile__avatar,
 .img-fallback.pinpad__avatar,
 .img-fallback.device-profiles__avatar,
-.img-fallback.together-panel__avatar {
+.img-fallback.together-panel__avatar,
+.img-fallback.room-face {
   padding: 0;
   overflow: hidden;
 }
@@ -2294,6 +2303,49 @@ a.item__link:hover {
   gap: 14px;
   flex-wrap: wrap;
 }
+.switch {
+  position: relative;
+  flex: none;
+  width: 46px;
+  height: 26px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--surface-3);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+.switch__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--text-2);
+  transition:
+    transform 0.15s var(--ease),
+    background 0.15s ease;
+}
+.switch.is-on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.switch.is-on .switch__knob {
+  transform: translateX(20px);
+  background: var(--accent-ink);
+}
+.switch:focus-visible,
+html.is-tv .switch:focus {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+.switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 .services {
   list-style: none;
   margin: 0;
@@ -3198,11 +3250,8 @@ html.is-tv ::-webkit-scrollbar {
     display: flex;
   }
   .hero {
-    height: 72vh;
-    min-height: 420px;
-  }
-  .hero__content {
-    bottom: 110px;
+    min-height: max(420px, 72vh);
+    padding-bottom: 110px;
   }
   .hero__overview {
     -webkit-line-clamp: 2;
@@ -3314,44 +3363,6 @@ html.is-tv ::-webkit-scrollbar {
 }
 
 /* ---------- Watch together ---------- */
-.together-rooms {
-  display: grid;
-  gap: 10px;
-  margin: 0 var(--gutter);
-}
-.together-room {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 10px 14px 10px 10px;
-  border-radius: var(--radius);
-  background: rgba(18, 23, 30, 0.92);
-  border: 1px solid var(--accent-soft);
-  backdrop-filter: blur(10px);
-}
-.together-room__art {
-  width: 112px;
-  aspect-ratio: 16 / 9;
-  border-radius: var(--radius-sm);
-  object-fit: cover;
-  flex: none;
-}
-.together-room__text {
-  flex: 1;
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-.together-room__text strong {
-  font-size: 1.05rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.together-room__text svg {
-  vertical-align: -2px;
-  color: var(--accent);
-}
 .together-wrap {
   position: relative;
 }
@@ -3482,11 +3493,169 @@ html.is-tv .together-chip:focus {
   text-align: center;
   max-width: calc(100% - 32px);
 }
-@media (max-width: 600px) {
-  .together-room__art {
-    width: 72px;
+
+/* A pulsing dot: something is happening right now. */
+.live-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 rgba(54, 226, 198, 0.6);
+  animation: live-pulse 1.8s ease-out infinite;
+  flex: none;
+}
+@keyframes live-pulse {
+  70% {
+    box-shadow: 0 0 0 8px rgba(54, 226, 198, 0);
   }
-  .together-chip {
-    padding: 6px 10px;
+  100% {
+    box-shadow: 0 0 0 0 rgba(54, 226, 198, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-dot {
+    animation: none;
+  }
+}
+.row--together .row__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.room-live {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.room-live.is-paused {
+  background: rgba(14, 18, 24, 0.85);
+  color: var(--text-2);
+}
+.room-faces {
+  display: inline-flex;
+  align-items: center;
+}
+.room-card .room-faces {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+}
+.room-face {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--bg);
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-left: -8px;
+  flex: none;
+}
+.room-face:first-child {
+  margin-left: 0;
+}
+.room-face--more {
+  display: grid;
+  place-items: center;
+  background: var(--surface-3);
+  color: var(--text-2);
+}
+
+/* The top bar's "someone is watching together" */
+.together-pill-wrap {
+  position: relative;
+}
+.together-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-soft);
+  background: rgba(14, 18, 24, 0.6);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 650;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.together-pill .room-face {
+  width: 22px;
+  height: 22px;
+  font-size: 0.68rem;
+}
+.together-pill:hover,
+.together-pill[aria-expanded='true'],
+html.is-tv .together-pill:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+.together-menu {
+  width: min(380px, calc(100vw - 32px));
+  display: grid;
+  gap: 2px;
+}
+.together-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+}
+.together-menu__item:hover,
+.together-menu__item:focus-visible {
+  background: var(--surface-2);
+  outline: none;
+}
+.together-menu__art {
+  width: 72px;
+  aspect-ratio: 16 / 9;
+  border-radius: 4px;
+  object-fit: cover;
+  flex: none;
+}
+.together-menu__text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+.together-menu__text strong,
+.together-menu__text span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A title's page: someone's watching it together */
+.together-lines {
+  display: grid;
+  gap: 8px;
+}
+.together-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 14px;
+  border-radius: var(--radius);
+  background: rgba(18, 23, 30, 0.85);
+  border: 1px solid var(--accent-soft);
+  font-size: 0.92rem;
+  width: fit-content;
+  max-width: 100%;
+}
+@media (max-width: 1100px) {
+  .together-pill__label {
+    display: none;
   }
 }

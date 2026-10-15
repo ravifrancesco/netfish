@@ -19,6 +19,7 @@ import Title from './pages/Title';
 import { t } from './i18n';
 import { useReadyNotifications, useTogetherNotifications } from './lib/notify';
 import { JoinRoom } from './components/Together';
+import { useLiveRooms } from './lib/together';
 import { ProfilePicker, useProfiles, wasPicked } from './components/ProfilePicker';
 
 // The player pulls in hls.js; only load it when someone presses play.
@@ -57,6 +58,7 @@ function Shell({ user }: { user: NonNullable<ReturnType<typeof useMe>['data']> }
   useTogetherNotifications(user.id);
   // The player and the profile picker fill the screen without the menu bar.
   const watching = pathname.startsWith('/watch/') || pathname.startsWith('/profiles');
+  useLiveRooms(!pathname.startsWith('/watch/'));
   return (
     <>
       <ScrollToTop />

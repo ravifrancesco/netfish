@@ -10,7 +10,7 @@ A Netflix-style front door for a home media server. One app to browse, discover,
 - **Everything in one search:** your library and everything TMDB knows, with clear badges (in library, requested, downloading 45%, partly available).
 - **Suggestions that learn, for free:** *Top picks* blends TMDB's "people who liked this also liked" with the genres, directors and actors each person watches most, and with what's popular on your server. Home also gets *Popular on this server*, *More from* a favourite director and *Because you like* a favourite actor. No account or subscription needed; it all runs on the Pi.
 - **Directors and actors:** search a name to see their films and shows, what's in your library first. Every name on a title page opens that person's page too.
-- **Watch together:** start a room from any film or episode. Others on your server join from Home, a notification or a link, and play, pause, skipping and the next episode stay in step on every device: TVs, phones, computers, browsers. Everyone's progress and *watched* stay their own.
+- **Watch together:** start a room from any film or episode. It shows up at once for everyone on your server (a *Watch together* row on Home, the top bar, the title's page, a notification), and play, pause, skipping and the next episode stay in step on every device: TVs, phones, computers, browsers. Everyone's progress and *watched* stay their own.
 - **Who's watching?:** several people can stay signed in on one device (the living-room TV) and switch with a click; anyone can lock their profile with a 4-digit PIN.
 - **Ready to watch:** what you asked for gets its own row on Home as soon as it arrives, and the Mac, Windows and Android apps (or your browser) can tell you with a notification.
 - **Mark as watched:** a film, an episode or a whole season, and take anything off *Continue Watching* with one click.
@@ -23,7 +23,7 @@ A Netflix-style front door for a home media server. One app to browse, discover,
 - **Scores and trailers:** TMDB, IMDb, Rotten Tomatoes (critics and audience), Metacritic and Letterboxd, plus in-app trailers for any title.
 - **A real player:** direct play when the browser can handle the file. Otherwise Jellyfin repackages it (cheap on a Pi), and only transcodes as a last resort. It supports audio and subtitle switching, resume, skip intro, next-episode autoplay and keyboard shortcuts.
 - **Apps:** the web app at `http://<pi>:7777` (works on phones too), plus apps for Mac, Windows, iPhone/iPad, Android (phones, tablets, Fire TV and Android TV) and Samsung TVs. The Mac, Windows, iPhone/iPad and Android phone apps can also **download movies and episodes for offline viewing**.
-- **Updates itself:** the Mac and Windows apps tell you when a new version is out and install it with one click, or, with **Update Netfish by itself** on, download it in the background and install it when you quit.
+- **Updates itself:** the Mac and Windows apps tell you when a new version is out and install it with one click, or, with **Auto-update** on, download it in the background and install it when you quit.
 - **In English and Italian:** every app, the server's messages and the install guides; Netfish follows your device's language, or pick one in Settings. Titles and plots from TMDB come in your language too.
 - **Trakt, optional:** link one Trakt account for the whole server. What anyone watches is added to it, past history can be imported once, and its recommendations become rows on everyone's Home. Needs Trakt VIP (see *Good to know*).
 - **Set up from the app:** a first-run screen, then **Settings → Connections** for every service's address and API key, with a test button.
@@ -110,7 +110,7 @@ The apps show the interface from your server, so most new features arrive by upd
 
 **1. Portainer → Stacks → Add stack**, name it `netfish`, paste [`docker-compose.yml`](docker-compose.yml), and **Deploy**. No variables are needed: Portainer pulls the ready-made image `ghcr.io/ravifrancesco/netfish:latest` (built by GitHub for Raspberry Pi and PCs).
 
-**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.4.0`.
+**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.4.1`.
 
 <details>
 <summary>Or build the image on the Pi yourself</summary>

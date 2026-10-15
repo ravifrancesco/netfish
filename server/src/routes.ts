@@ -47,7 +47,7 @@ import { offlineInfo, playInfo, reportProgress, startPlayback } from './services
 import { personDetail } from './services/people';
 import { hideFromContinue, setWatched } from './services/watched';
 import { readyToWatch } from './services/ready';
-import { control, createRoom, endRoom, getRoom, leave, listRooms, openStream, setWaiting } from './services/together';
+import { control, createRoom, endRoom, getRoom, leave, listRooms, openStream, setWaiting, watchRooms } from './services/together';
 import { cleanupSuggestions, keepForGood } from './services/cleanup';
 import { deleteFromDisk, downloadAgain, removedTitles, stopDownload, storage } from './services/manage';
 import { createRequest, listRequests, myRequestKeys } from './services/requests';
@@ -320,6 +320,10 @@ export async function apiRoutes(app: FastifyInstance) {
     // Watch together: rooms where play, pause and seeking stay in step for everyone.
     type Room = { Params: { id: string } };
     api.get('/together', async () => ({ rooms: listRooms() }));
+    api.get('/together/live', async (_req, reply) => {
+      watchRooms(reply);
+      return reply;
+    });
     api.post<{ Body: { itemId?: string; position?: number } }>('/together', async (req) =>
       createRoom(userOf(req), clean(req.body?.itemId, 64), Number.isFinite(req.body?.position) ? Number(req.body?.position) : undefined),
     );
