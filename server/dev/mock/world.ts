@@ -179,6 +179,13 @@ export interface MockDownload {
 }
 export const downloads: MockDownload[] = [];
 
+/** Titles Radarr/Sonarr still keep after their files were deleted (`movie-<tmdb>`, `tv-<tmdb>`). */
+export const arrKnown = new Set<string>();
+/** Not monitored in Radarr/Sonarr: `movie-<tmdb>`, `tv-<tmdb>` (the series) or `tv-<tmdb>-<season>`. */
+export const unmonitored = new Set<string>();
+/** Seerr statuses set by hand (POST /media/:id/:status), until something downloads. */
+export const statusOverride = new Map<string, number>();
+
 let nextId = 1;
 export const newId = () => nextId++;
 
@@ -188,6 +195,7 @@ const ISO3: Record<string, string> = {
 };
 
 export function startDownload(title: Title, opts: { season?: number; ageMs?: number; durationMs?: number; release?: string; quality?: string; languages?: string[]; stalledAt?: number } = {}) {
+  statusOverride.delete(`${title.type}-${title.tmdbId}`);
   const base = title.title.replace(/[^A-Za-z0-9]+/g, '.');
   downloads.push({
     id: newId(),
@@ -238,6 +246,7 @@ export const librarySeasons = (t: Title) => Array.from({ length: t.seasons }, (_
 export function seasonStatus(t: Title, s: number): number {
   if (library.has(`tv-${t.tmdbId}-${s}`)) return 5;
   if (downloads.some((d) => d.title === t && d.season === s)) return 3;
+  if (statusOverride.has(`tv-${t.tmdbId}`)) return statusOverride.get(`tv-${t.tmdbId}`)!;
   const req = requests.find((r) => r.type === 'tv' && r.tmdbId === t.tmdbId && r.seasons.includes(s) && r.status !== 3);
   if (req) return req.status === 1 ? 2 : 3;
   return 1;
@@ -248,6 +257,7 @@ export function mediaStatus(t: Title): number {
   if (t.type === 'movie') {
     if (library.has(`movie-${t.tmdbId}`)) return 5;
     if (downloads.some((d) => d.title === t)) return 3;
+    if (statusOverride.has(`movie-${t.tmdbId}`)) return statusOverride.get(`movie-${t.tmdbId}`)!;
     const req = requests.find((r) => r.type === 'movie' && r.tmdbId === t.tmdbId && r.status !== 3);
     return req ? (req.status === 1 ? 2 : 3) : 1;
   }

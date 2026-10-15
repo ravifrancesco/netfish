@@ -9,6 +9,7 @@ import { ErrorState, Img, StatusChip } from '../components/ui';
 import { decimal, titleHref } from '../lib/format';
 import { t } from '../i18n';
 import { useConfig, useMe } from '../lib/hooks';
+import { UpdateNudge } from '../components/AppUpdate';
 
 /** Admins: a nudge to finish connecting services until they're all there. */
 function SetupNudge() {
@@ -116,6 +117,7 @@ export default function Home() {
       {hero ? <Hero card={hero} /> : <div className="hero hero--empty" />}
       <div className="rows">
         <SetupNudge />
+        <UpdateNudge />
         {rows.map((row) => (
           <Row key={row.id} row={row} />
         ))}

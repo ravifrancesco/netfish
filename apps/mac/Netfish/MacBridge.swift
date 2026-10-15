@@ -16,6 +16,8 @@ final class MacBridge: NSObject, WKScriptMessageHandlerWithReply {
       window.__netfishOfflineChanged = (list) => offline.forEach((cb) => { try { cb(list); } catch (e) {} });
       const video = new Set();
       window.__netfishVideo = (state) => video.forEach((cb) => { try { cb(state); } catch (e) {} });
+      const updates = new Set();
+      window.__netfishUpdate = (p) => updates.forEach((cb) => { try { cb(p); } catch (e) {} });
       window.netfishDesktop = {
         platform: 'darwin',
         version: '\(version)',
@@ -35,6 +37,11 @@ final class MacBridge: NSObject, WKScriptMessageHandlerWithReply {
         openOffline: (target) => { call('openOffline', target || {}); },
         openServer: () => { call('openServer'); },
         toggleFullscreen: () => { call('fullscreen'); },
+        update: {
+          check: () => call('updateCheck'),
+          install: () => call('updateInstall'),
+          onProgress: (cb) => { updates.add(cb); return () => updates.delete(cb); },
+        },
         videoOverlay: {
           name: 'mpv',
           profile: () => call('videoProfile'),
@@ -61,6 +68,8 @@ final class MacBridge: NSObject, WKScriptMessageHandlerWithReply {
 
     private weak var window: MainWindow?
     private let store = OfflineStore.shared
+    /// The newer release the last check found.
+    private var release: Updater.Release?
 
     init(window: MainWindow) {
         self.window = window
@@ -113,6 +122,24 @@ final class MacBridge: NSObject, WKScriptMessageHandlerWithReply {
             return nil
         case "openServer":
             window.showServer()
+            return nil
+
+        // Updates from GitHub Releases
+        case "updateCheck":
+            release = try await Updater.check()
+            return [
+                "current": MacBridge.version,
+                "latest": release?.version ?? NSNull(),
+                "available": release != nil,
+                "canInstall": release?.download != nil,
+                "page": release?.page?.absoluteString ?? NSNull(),
+            ] as [String: Any]
+        case "updateInstall":
+            if release == nil { release = try await Updater.check() }
+            guard let found = release else { throw Problem(L("Netfish is up to date")) }
+            try await Updater.install(found) { [weak window] received, total in
+                Task { @MainActor in window?.push("__netfishUpdate", ["received": received, "total": total]) }
+            }
             return nil
 
         // Window

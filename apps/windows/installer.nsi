@@ -7,6 +7,7 @@ Unicode true
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 !include "x64.nsh"
+!include "FileFunc.nsh"
 
 Name "Netfish"
 OutFile "${OUTFILE}"
@@ -86,6 +87,14 @@ Section "Netfish"
   WriteRegStr HKCU "${UNINSTALL_KEY}" "UninstallString" '"$INSTDIR\Uninstall.exe"'
   WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoRepair" 1
+
+  ; Updating from inside Netfish ("Netfish-windows.exe /S /UPDATE"): open it again when done.
+  ${GetParameters} $R0
+  ClearErrors
+  ${GetOptions} $R0 "/UPDATE" $R1
+  ${IfNot} ${Errors}
+    Exec '"$INSTDIR\Netfish.exe"'
+  ${EndIf}
 SectionEnd
 
 Section "Uninstall"

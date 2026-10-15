@@ -88,6 +88,7 @@ export function jfToCard(item: JfItem, index: LibraryIndex): Card {
       jfImage(item.Id, 'Thumb', item.ImageTags?.Thumb, { maxWidth: 640 }) ??
       jfImage(item.Id, 'Backdrop', item.BackdropImageTags?.[0], { maxWidth: 640 }),
     rating: item.CommunityRating,
+    runtimeMinutes: item.RunTimeTicks ? Math.round(item.RunTimeTicks / 600_000_000) || undefined : undefined,
     status: 'available',
   };
 }

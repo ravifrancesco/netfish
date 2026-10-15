@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { RotateCcw, Trash2, X } from 'lucide-react';
 import { useSearchParams } from 'react-router';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import type { MediaType } from '@netfish/shared';
 import { api } from '../api';
 import { Grid } from '../components/Cards';
@@ -30,6 +30,8 @@ const SORTS = [
   { value: 'name', label: t('A–Z') },
   { value: 'year', label: t('Release year') },
   { value: 'rating', label: t('Rating') },
+  { value: 'shortest', label: t('Shortest first') },
+  { value: 'longest', label: t('Longest first') },
 ];
 
 function Library({ mediaType, sort }: { mediaType: MediaType; sort: string }) {
@@ -50,8 +52,22 @@ function Library({ mediaType, sort }: { mediaType: MediaType; sort: string }) {
   return (
     <>
       <p className="muted small">{tn(q.data.pages[0].total, '{n} title', '{n} titles')}</p>
-      <Grid cards={cards} />
+      <Grid cards={cards} showLength={sort === 'shortest' || sort === 'longest'} />
       <div ref={sentinel} className="sentinel">{q.isFetchingNextPage && <Spinner />}</div>
+    </>
+  );
+}
+
+/** Deleted from disk to save space, still part of the library. */
+function NotOnDisk({ mediaType }: { mediaType: MediaType }) {
+  const q = useQuery({ queryKey: ['removed', mediaType], queryFn: () => api.removed(mediaType) });
+  if (q.isError) return <ErrorState error={q.error} retry={() => void q.refetch()} />;
+  if (!q.data) return <Spinner size={28} />;
+  if (!q.data.items.length) return <div className="empty"><p>{t('Everything in your library is on disk.')}</p></div>;
+  return (
+    <>
+      <p className="muted small">{t('Deleted from disk to save space. Open one to download it again.')}</p>
+      <Grid cards={q.data.items} />
     </>
   );
 }
@@ -226,6 +242,9 @@ export default function Browse({ mediaType }: { mediaType: MediaType }) {
   const tab = params.get('tab') ?? 'library';
   const sort = params.get('sort') ?? 'added';
   const set = (patch: Record<string, string>) => setParams({ tab, sort, ...patch }, { replace: true });
+  // Only shown once something was deleted from disk.
+  const removed = useQuery({ queryKey: ['removed', mediaType], queryFn: () => api.removed(mediaType), enabled: Boolean(config?.features.downloads) });
+  const removedCount = removed.data?.items.length ?? 0;
   const discoverTabs =
     mediaType === 'movie'
       ? [
@@ -247,6 +266,11 @@ export default function Browse({ mediaType }: { mediaType: MediaType }) {
           <button role="tab" aria-selected={tab === 'library'} className={`tab${tab === 'library' ? ' is-active' : ''}`} onClick={() => set({ tab: 'library' })}>
             {t('Your library')}
           </button>
+          {(removedCount > 0 || tab === 'removed') && (
+            <button role="tab" aria-selected={tab === 'removed'} className={`tab${tab === 'removed' ? ' is-active' : ''}`} onClick={() => set({ tab: 'removed' })}>
+              {t('Not on disk')} <span className="tab__count">{removedCount}</span>
+            </button>
+          )}
           {canDownloadHere() && (
             <button role="tab" aria-selected={tab === 'offline'} className={`tab${tab === 'offline' ? ' is-active' : ''}`} onClick={() => set({ tab: 'offline' })}>
               {t('Offline')}
@@ -271,6 +295,8 @@ export default function Browse({ mediaType }: { mediaType: MediaType }) {
       </div>
       {tab === 'library' ? (
         <Library mediaType={mediaType} sort={sort} />
+      ) : tab === 'removed' ? (
+        <NotOnDisk mediaType={mediaType} />
       ) : tab === 'offline' ? (
         <Offline mediaType={mediaType} />
       ) : (

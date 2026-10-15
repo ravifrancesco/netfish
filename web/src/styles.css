@@ -1236,6 +1236,154 @@ p {
 .statusbox__note svg {
   flex: none;
 }
+.app-update {
+  display: grid;
+  gap: 10px;
+}
+.card__length {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(6, 8, 11, 0.82);
+  color: var(--text);
+  font-size: 0.75rem;
+  font-weight: 650;
+  backdrop-filter: blur(6px);
+}
+.item {
+  position: relative;
+}
+.item--actions .item__link {
+  padding-right: 56px;
+}
+.item__actions {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+}
+.dlline__top .icon-btn {
+  margin-left: auto;
+}
+.btn--danger {
+  background: var(--danger);
+  color: #1a0505;
+}
+.btn--danger:hover {
+  filter: brightness(1.08);
+}
+.choices {
+  display: grid;
+  gap: 10px;
+}
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+  padding: 14px;
+  text-align: left;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.choice:hover,
+.choice:focus-visible {
+  border-color: var(--accent);
+}
+.choice > span {
+  display: grid;
+  gap: 4px;
+}
+.choice svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent);
+}
+.choice--danger svg {
+  color: var(--danger);
+}
+.choice--danger:hover,
+.choice--danger:focus-visible {
+  border-color: var(--danger);
+}
+.seasons-pick {
+  display: grid;
+  gap: 8px;
+}
+.statusbox__note--removed {
+  flex-wrap: wrap;
+}
+.statusbox__note--removed > span {
+  flex: 1;
+  min-width: 200px;
+}
+.tab__count {
+  margin-left: 4px;
+  font-size: 0.8em;
+  opacity: 0.7;
+}
+.storage {
+  display: grid;
+  gap: 14px;
+}
+.disk {
+  display: grid;
+  gap: 8px;
+}
+.disk__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.disk__free {
+  font-size: 0.9rem;
+  color: var(--text-2);
+}
+.disk__free.is-low {
+  color: var(--warn, #f5b14c);
+}
+.storage__totals {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.bigs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.big {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.big__poster {
+  width: 30px;
+  height: 45px;
+  flex: none;
+  object-fit: cover;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+.big__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: inherit;
+  text-decoration: none;
+}
+a.big__title:hover {
+  text-decoration: underline;
+}
 .item__notout {
   display: flex;
   align-items: center;

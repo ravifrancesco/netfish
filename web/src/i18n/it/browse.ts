@@ -163,6 +163,8 @@ export default {
   'Search your library and everything you could add to it, or a director or actor to see their work.':
     'Cerca nella tua libreria e in tutto ciò che puoi aggiungere, oppure un regista o un attore per vedere i suoi lavori.',
   People: 'Persone',
+  'Shortest first': 'Prima i più brevi',
+  'Longest first': 'Prima i più lunghi',
   'Movies & shows': 'Film e serie TV',
 
   // Not out yet (Radarr waits for a digital release, Sonarr for episodes to air)

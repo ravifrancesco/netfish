@@ -21,6 +21,10 @@ import {
   USERS,
   addedAt,
   advance,
+  arrKnown,
+  library,
+  statusOverride,
+  unmonitored,
   audio,
   downloads,
   episodeName,
@@ -151,6 +155,9 @@ function userDataDto(userId: string | undefined, item: Item) {
   };
 }
 
+/** Lengths as they'd be in a real library (the sample video every title plays is 3 minutes). */
+const nominalMinutes = (t: Title) => (t.type === 'movie' ? 84 + ((t.n * 37) % 70) : 24 + ((t.n * 11) % 36));
+
 function dto(item: Item, userId?: string, full = false): Record<string, unknown> {
   const t = item.title;
   const seriesId = ids.series(t);
@@ -158,7 +165,7 @@ function dto(item: Item, userId?: string, full = false): Record<string, unknown>
     case 'movie':
       return {
         Id: item.id, Name: t.title, Type: 'Movie', ProductionYear: t.year, PremiereDate: `${t.year}-06-01T00:00:00.0000000Z`,
-        Overview: t.overview, Genres: t.genres, CommunityRating: t.rating, OfficialRating: 'PG-13', RunTimeTicks: RUNTIME_TICKS,
+        Overview: t.overview, Genres: t.genres, CommunityRating: t.rating, OfficialRating: 'PG-13', RunTimeTicks: full ? RUNTIME_TICKS : nominalMinutes(t) * 600_000_000,
         ProviderIds: { Tmdb: String(t.tmdbId) }, ImageTags: { Primary: 'p1', Thumb: 't1' }, BackdropImageTags: ['b1'],
         DateCreated: date(titleAdded(t)), UserData: userDataDto(userId, item), Taglines: [],
         People: jfPeople(t),
@@ -167,7 +174,7 @@ function dto(item: Item, userId?: string, full = false): Record<string, unknown>
     case 'series':
       return {
         Id: item.id, Name: t.title, Type: 'Series', ProductionYear: t.year, PremiereDate: `${t.year}-01-15T00:00:00.0000000Z`,
-        Overview: t.overview, Genres: t.genres, CommunityRating: t.rating, OfficialRating: 'TV-14',
+        Overview: t.overview, Genres: t.genres, CommunityRating: t.rating, OfficialRating: 'TV-14', RunTimeTicks: nominalMinutes(t) * 600_000_000,
         ProviderIds: { Tmdb: String(t.tmdbId), Tvdb: String(t.tvdbId) }, ImageTags: { Primary: 'p1' }, BackdropImageTags: ['b1'],
         DateCreated: date(titleAdded(t)), UserData: userDataDto(userId, item), People: jfPeople(t),
       };
@@ -240,6 +247,7 @@ void app.register(
     jf.get('/Users', async (req, reply) =>
       jfUser(req)?.admin ? USERS.map((u) => ({ Id: u.id, Name: u.name, Policy: { IsAdministrator: u.admin } })) : reply.code(403).send(),
     );
+    jf.post('/Library/Refresh', async (req, reply) => (jfUser(req)?.admin ? reply.code(204).send() : reply.code(403).send()));
     jf.post('/Sessions/Logout', async (req, reply) => {
       sessions.delete(jfToken(req) ?? '');
       return reply.code(204).send();
@@ -277,6 +285,8 @@ void app.register(
             return i.title.year;
           case 'CommunityRating':
             return i.title.rating;
+          case 'Runtime':
+            return nominalMinutes(i.title);
           case 'Random':
             return Math.random();
           default:
@@ -664,6 +674,13 @@ void app.register(
     });
     s.get('/user', async () => ({ results: USERS.map((u) => ({ id: u.seerrId, displayName: u.name, jellyfinUserId: u.id })) }));
     s.post('/user/import-from-jellyfin', async (_req, reply) => reply.code(201).send([]));
+    s.post<{ Params: { id: string; status: string } }>('/media/:id/:status', async (req, reply) => {
+      const t = TITLES.find((x) => x.tmdbId === Number(req.params.id));
+      const code = { unknown: 1, pending: 2, processing: 3, partial: 4, available: 5 }[req.params.status];
+      if (!t || !code) return reply.code(404).send({ message: 'Media not found' });
+      statusOverride.set(`${t.type}-${t.tmdbId}`, code);
+      return mediaInfo(t) ?? { id: t.tmdbId, tmdbId: t.tmdbId, status: code };
+    });
   },
   { prefix: '/seerr/api/v1' },
 );
@@ -695,7 +712,7 @@ function queueRecords(type: 'movie' | 'tv') {
       const t = d.title;
       if (type === 'movie') return [{ ...base, id: d.id, movieId: t.n, movie: { id: t.n, title: t.title, tmdbId: t.tmdbId, year: t.year, images: [{ coverType: 'poster', remoteUrl: posterUrl(t) }] } }];
       return Array.from({ length: EPISODES_PER_SEASON }, (_, i) => ({
-        ...base, id: d.id * 100 + i, seriesId: t.n, episodeId: t.n * 1000 + i, seasonNumber: d.season,
+        ...base, id: d.id * 100 + i, seriesId: t.n, episodeId: t.n * 10000 + d.season! * 100 + i + 1, seasonNumber: d.season,
         series: { id: t.n, title: t.title, tvdbId: t.tvdbId, tmdbId: t.tmdbId, images: [{ coverType: 'poster', remoteUrl: posterUrl(t) }] },
         episode: { seasonNumber: d.season, episodeNumber: i + 1, title: episodeName(t, d.season!, i + 1) },
       }));
@@ -749,9 +766,23 @@ const isOut = (t: Title) => (t.type === 'movie' ? releaseOf(t).isAvailable !== f
 const arrAuth = async (req: FastifyRequest, reply: import('fastify').FastifyReply) => {
   if (req.headers['x-api-key'] !== API_KEY) return reply.code(401).send({ message: 'Unauthorized' });
 };
-const managed = (t: Title) => inLibrary(t) || requests.some((r) => r.type === t.type && r.tmdbId === t.tmdbId) || downloads.some((d) => d.title === t);
+const managed = (t: Title) =>
+  inLibrary(t) || arrKnown.has(`${t.type}-${t.tmdbId}`) || requests.some((r) => r.type === t.type && r.tmdbId === t.tmdbId) || downloads.some((d) => d.title === t);
+const GB = 1024 ** 3;
+const fileSize = (t: Title, season?: number) => (season ? Math.round((5 + (t.n % 4)) * 1.1 * GB) : Math.round((4 + (t.n % 9) * 1.3) * GB));
+const DISK = 4 * 1024 * GB;
+const onDisk = (t: Title) => (t.type === 'movie' ? (inLibrary(t) ? fileSize(t) : 0) : librarySeasons(t).reduce((n, s) => n + fileSize(t, s), 0));
+const freeSpace = () => Math.round(DISK - 1.3 * 1024 * GB - TITLES.reduce((n, t) => n + onDisk(t), 0));
+const seasonsDto = (t: Title) =>
+  Array.from({ length: t.seasons }, (_, i) => i + 1).map((s) => {
+    const has = library.has(`tv-${t.tmdbId}-${s}`);
+    return {
+      seasonNumber: s, monitored: !unmonitored.has(`tv-${t.tmdbId}-${s}`),
+      statistics: { episodeFileCount: has ? EPISODES_PER_SEASON : 0, episodeCount: EPISODES_PER_SEASON, totalEpisodeCount: EPISODES_PER_SEASON, sizeOnDisk: has ? fileSize(t, s) : 0 },
+    };
+  });
 const fileDto = (t: Title, season?: number) => ({
-  id: t.n * 100 + (season ?? 0), seasonNumber: season, quality: { quality: { name: 'Bluray-1080p', resolution: 1080 } },
+  id: t.n * 100 + (season ?? 0), seasonNumber: season, size: fileSize(t, season), quality: { quality: { name: 'Bluray-1080p', resolution: 1080 } },
   languages: langList(audioOf(t).map((l) => ISO3_NAME[l] ?? 'English')), customFormatScore: 0,
 });
 
@@ -763,7 +794,8 @@ void app.register(
     r.get<{ Querystring: Q }>('/movie', async (req) =>
       TITLES.filter((t) => t.type === 'movie' && managed(t) && (!req.query.tmdbId || t.tmdbId === Number(req.query.tmdbId))).map((t) => ({
         id: t.n, title: t.title, tmdbId: t.tmdbId, hasFile: inLibrary(t), images: [{ coverType: 'poster', remoteUrl: posterUrl(t) }],
-        movieFile: inLibrary(t) ? fileDto(t) : undefined, ...releaseOf(t),
+        movieFile: inLibrary(t) ? fileDto(t) : undefined, ...releaseOf(t), year: t.year,
+        monitored: !unmonitored.has(`movie-${t.tmdbId}`), sizeOnDisk: inLibrary(t) ? fileSize(t) : 0,
       })),
     );
     r.get<{ Querystring: Q }>('/release', async (req) => {
@@ -773,6 +805,44 @@ void app.register(
       // Like Radarr: before a movie is available, every release is turned down for it.
       return isOut(t) ? fakeReleases(t) : fakeReleases(t).map((r) => ({ ...r, rejected: true, rejections: [...(r.rejections ?? []), `Movie ${t.title} is not available`] }));
     });
+    // Managing files: the queue, monitoring, deleting, searching again, and the disks.
+    r.delete<{ Body: { ids: number[] }; Querystring: Q }>('/queue/bulk', async (req) => {
+      for (const id of req.body.ids) {
+        const d = downloads.find((x) => x.id === id && x.title.type === 'movie');
+        if (!d) continue;
+        downloads.splice(downloads.indexOf(d), 1);
+        if (req.query.blocklist === 'true' && req.query.skipRedownload === 'false') startDownload(d.title, { durationMs: 70_000, release: `${d.release}.REPACK` });
+      }
+      return {};
+    });
+    r.put<{ Body: { movieIds: number[]; monitored: boolean } }>('/movie/editor', async (req) => {
+      for (const n of req.body.movieIds) {
+        const t = TITLES.find((x) => x.type === 'movie' && x.n === n);
+        if (!t) continue;
+        arrKnown.add(`movie-${t.tmdbId}`);
+        if (req.body.monitored) unmonitored.delete(`movie-${t.tmdbId}`);
+        else unmonitored.add(`movie-${t.tmdbId}`);
+      }
+      return [];
+    });
+    r.delete<{ Params: { id: string } }>('/moviefile/:id', async (req, reply) => {
+      const t = TITLES.find((x) => x.type === 'movie' && x.n === Math.floor(Number(req.params.id) / 100));
+      if (!t || !library.delete(`movie-${t.tmdbId}`)) return reply.code(404).send({ message: 'Movie file not found' });
+      arrKnown.add(`movie-${t.tmdbId}`);
+      return {};
+    });
+    r.post<{ Body: { name: string; movieIds?: number[] } }>('/command', async (req, reply) => {
+      for (const n of req.body.movieIds ?? []) {
+        const t = TITLES.find((x) => x.type === 'movie' && x.n === n);
+        if (t && isOut(t) && !inLibrary(t) && !downloads.some((d) => d.title === t)) startDownload(t, { durationMs: 60_000 });
+      }
+      return reply.code(201).send({ id: newId(), name: req.body.name, status: 'queued' });
+    });
+    r.get('/rootfolder', async () => [{ id: 1, path: '/data/movies', accessible: true, freeSpace: freeSpace() }]);
+    r.get('/diskspace', async () => [
+      { path: '/', label: 'overlay', freeSpace: 21 * GB, totalSpace: 58 * GB },
+      { path: '/data', label: 'media', freeSpace: freeSpace(), totalSpace: DISK },
+    ]);
     r.post<{ Body: { guid: string } }>('/release', async (req, reply) => {
       const hit = releaseCache.get(req.body.guid);
       if (!hit) return reply.code(404).send({ message: "Couldn't find requested release in cache, cache timeout probably expired." });
@@ -791,6 +861,8 @@ void app.register(
     r.get<{ Querystring: Q }>('/series', async (req) =>
       TITLES.filter((t) => t.type === 'tv' && managed(t) && (!req.query.tvdbId || t.tvdbId === Number(req.query.tvdbId))).map((t) => ({
         id: t.n, title: t.title, tvdbId: t.tvdbId, tmdbId: t.tmdbId, images: [{ coverType: 'poster', remoteUrl: posterUrl(t) }], ...releaseOf(t),
+        year: t.year, monitored: !unmonitored.has(`tv-${t.tmdbId}`), seasons: seasonsDto(t),
+        statistics: { sizeOnDisk: librarySeasons(t).reduce((n, s) => n + fileSize(t, s), 0), episodeFileCount: librarySeasons(t).length * EPISODES_PER_SEASON },
       })),
     );
     r.get<{ Querystring: Q }>('/episodefile', async (req) => {
@@ -799,9 +871,66 @@ void app.register(
     });
     r.get<{ Querystring: Q }>('/episode', async (req) => {
       const n = Number(req.query.seriesId);
-      const season = Number(req.query.seasonNumber ?? 1);
-      return Array.from({ length: EPISODES_PER_SEASON }, (_, i) => ({ id: n * 10000 + season * 100 + i + 1, seasonNumber: season, episodeNumber: i + 1 }));
+      const t = TITLES.find((x) => x.type === 'tv' && x.n === n);
+      const seasons = req.query.seasonNumber ? [Number(req.query.seasonNumber)] : Array.from({ length: t?.seasons ?? 1 }, (_, i) => i + 1);
+      return seasons.flatMap((season) =>
+        Array.from({ length: EPISODES_PER_SEASON }, (_, i) => ({
+          id: n * 10000 + season * 100 + i + 1, seasonNumber: season, episodeNumber: i + 1,
+          episodeFileId: t && library.has(`tv-${t.tmdbId}-${season}`) ? n * 100 + season : 0, monitored: !(t && unmonitored.has(`tv-${t.tmdbId}-${season}`)),
+        })),
+      );
     });
+    r.delete<{ Body: { ids: number[] }; Querystring: Q }>('/queue/bulk', async (req) => {
+      const ids = new Set(req.body.ids.map((id) => Math.floor(id / 100)));
+      for (const d of downloads.filter((x) => ids.has(x.id) && x.title.type === 'tv')) {
+        downloads.splice(downloads.indexOf(d), 1);
+        if (req.query.blocklist === 'true' && req.query.skipRedownload === 'false') startDownload(d.title, { season: d.season, durationMs: 80_000, release: `${d.release}.REPACK` });
+      }
+      return {};
+    });
+    const seasonOfEpisode = (id: number) => {
+      const t = TITLES.find((x) => x.type === 'tv' && x.n === Math.floor(id / 10000));
+      return t && { t, season: Math.floor((id % 10000) / 100) };
+    };
+    r.put<{ Body: { episodeIds: number[]; monitored: boolean } }>('/episode/monitor', async (req) => {
+      for (const id of req.body.episodeIds) {
+        const hit = seasonOfEpisode(id);
+        if (!hit) continue;
+        arrKnown.add(`tv-${hit.t.tmdbId}`);
+        if (req.body.monitored) unmonitored.delete(`tv-${hit.t.tmdbId}-${hit.season}`);
+        else unmonitored.add(`tv-${hit.t.tmdbId}-${hit.season}`);
+      }
+      return [];
+    });
+    r.put<{ Body: { seriesIds: number[]; monitored: boolean } }>('/series/editor', async (req) => {
+      for (const n of req.body.seriesIds) {
+        const t = TITLES.find((x) => x.type === 'tv' && x.n === n);
+        if (!t) continue;
+        if (req.body.monitored) unmonitored.delete(`tv-${t.tmdbId}`);
+        else unmonitored.add(`tv-${t.tmdbId}`);
+      }
+      return [];
+    });
+    r.delete<{ Body: { episodeFileIds: number[] } }>('/episodefile/bulk', async (req) => {
+      for (const id of req.body.episodeFileIds) {
+        const t = TITLES.find((x) => x.type === 'tv' && x.n === Math.floor(id / 100));
+        if (!t) continue;
+        library.delete(`tv-${t.tmdbId}-${id % 100}`);
+        arrKnown.add(`tv-${t.tmdbId}`);
+      }
+      return {};
+    });
+    r.post<{ Body: { name: string; seriesId?: number; seasonNumber?: number } }>('/command', async (req, reply) => {
+      const t = TITLES.find((x) => x.type === 'tv' && x.n === req.body.seriesId);
+      const season = req.body.seasonNumber;
+      if (t && season && !library.has(`tv-${t.tmdbId}-${season}`) && !downloads.some((d) => d.title === t && d.season === season)) startDownload(t, { season, durationMs: 70_000 });
+      return reply.code(201).send({ id: newId(), name: req.body.name, status: 'queued' });
+    });
+    r.get('/rootfolder', async () => [{ id: 1, path: '/data/tv', accessible: true, freeSpace: freeSpace() }]);
+    r.get('/diskspace', async () => [
+      { path: '/', label: 'overlay', freeSpace: 21 * GB, totalSpace: 58 * GB },
+      { path: '/data', label: 'media', freeSpace: freeSpace(), totalSpace: DISK },
+    ]);
     r.get<{ Querystring: Q }>('/release', async (req) => {
       await sleep(1500);
       if (req.query.episodeId) {

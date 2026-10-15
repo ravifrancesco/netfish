@@ -222,6 +222,9 @@ export const seerr = {
   requests: (query: Record<string, string | number | undefined>, asUser?: number) =>
     seerrRequest<{ pageInfo: { results: number }; results: SeerrRequest[] }>('/request', { query, asUser }),
 
+  /** "unknown" makes a title requestable again (after its files were deleted, or a download stopped). */
+  setMediaStatus: (mediaId: number, status: 'unknown' | 'available' | 'partial' | 'processing' | 'pending') =>
+    seerrRequest<unknown>(`/media/${mediaId}/${status}`, { method: 'POST' }),
   userByJellyfinId: (jellyfinUserId: string) => seerrRequest<SeerrUser>(`/user/jellyfin/${jellyfinUserId}`),
   users: () => seerrRequest<{ results: SeerrUser[] }>('/user', { query: { take: 1000, skip: 0 } }),
   importJellyfinUsers: (jellyfinUserIds: string[]) =>

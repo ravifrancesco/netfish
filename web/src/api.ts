@@ -23,6 +23,8 @@ import type {
   SearchResponse,
   SeasonDetail,
   ServerSettings,
+  StopMode,
+  StorageInfo,
   ServiceConnection,
   ServiceConnectionUpdate,
   ServiceStatus,
@@ -119,4 +121,12 @@ export const api = {
   offline: (itemId: string, target: 'desktop' | 'apple' | 'mp4' | 'original' = 'desktop') => call<OfflineDescriptor>(`/play/${enc(itemId)}/offline?target=${target}`),
   playSession: (itemId: string, body: PlaybackRequest) => call<PlaybackSession>(`/play/${enc(itemId)}/session`, { body }),
   progress: (report: ProgressReport, keepalive = false) => call<void>('/play/progress', { body: report, keepalive }),
+
+  stopDownload: (id: string, mode: StopMode) => call<{ ok: true }>(`/downloads/${enc(id)}/stop`, { body: { mode } }),
+  deleteFromDisk: (type: MediaType, tmdbId: number, seasons?: number[]) =>
+    call<{ freed: number }>(`/title/${type}/${tmdbId}/delete`, { body: { seasons } }),
+  downloadAgain: (type: MediaType, tmdbId: number, seasons?: number[]) =>
+    call<{ ok: true }>(`/title/${type}/${tmdbId}/redownload`, { body: { seasons } }),
+  removed: (type: MediaType) => call<{ items: Card[] }>(`/library/removed?type=${type}`),
+  storage: () => call<StorageInfo>('/admin/storage'),
 };

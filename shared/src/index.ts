@@ -115,6 +115,8 @@ export interface Card {
   subtitle?: string;
   /** Landscape image for wide cards. */
   thumb?: string;
+  /** Length in minutes: the movie's, or a typical episode's for a show. */
+  runtimeMinutes?: number;
   /** Present while Radarr/Sonarr are downloading it. 0..1 */
   downloadProgress?: number;
 }
@@ -248,6 +250,12 @@ export interface TitleDetail {
   /** Radarr/Sonarr manage this title. */
   managed: boolean;
   notOut?: NotOut;
+  /** Admins: what's on disk, so it can be deleted. */
+  disk?: DiskInfo;
+  /** Deleted from disk to save space: still listed, and can be downloaded again. */
+  removed?: RemovedInfo;
+  /** The current user may delete it from disk and download it again (admins, Radarr/Sonarr manage it). */
+  canManage: boolean;
   /** This user may pick a specific release for it (managed + allowed by the server). */
   canChooseVersion: boolean;
   canRequest: boolean;
@@ -327,6 +335,36 @@ export interface DownloadItem {
   releaseTitle?: string;
   /** Requested by the current user through Seerr. */
   mine: boolean;
+}
+
+/** stop: cancel it for good (Radarr/Sonarr stop looking) · replace: block this release and find another. */
+export type StopMode = 'stop' | 'replace';
+
+/** What's on disk for a title, from Radarr/Sonarr. */
+export interface DiskInfo {
+  size: number;
+  /** TV: per season, only seasons with files. */
+  seasons?: Array<{ seasonNumber: number; size: number; files: number }>;
+}
+
+export interface RemovedInfo {
+  at: string;
+  /** Space it freed, in bytes. */
+  size?: number;
+  /** TV: the seasons that were deleted (all of them when absent). */
+  seasons?: number[];
+  by?: string;
+}
+
+/** Settings → Storage. Sizes in bytes. */
+export interface StorageInfo {
+  /** `path`: the library folder(s) on that disk, e.g. "/data/movies · /data/tv". */
+  disks: Array<{ path: string; free: number; total: number; holds: MediaType[] }>;
+  movies?: { count: number; size: number };
+  shows?: { count: number; size: number };
+  biggest: Array<{ key: string; mediaType: MediaType; tmdbId?: number; title: string; year?: number; poster?: string; size: number }>;
+  /** Titles deleted from disk and kept in the library. */
+  removed: number;
 }
 
 export interface DownloadsResponse {

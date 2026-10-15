@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { ChevronLeft, ChevronRight, Info, Play } from 'lucide-react';
 import type { Card, Row as RowData } from '@netfish/shared';
-import { titleHref } from '../lib/format';
+import { duration, titleHref } from '../lib/format';
 import { Img, Progress, StatusChip } from './ui';
 import { t } from '../i18n';
 
-export function PosterCard({ card }: { card: Card }) {
+export function PosterCard({ card, showLength }: { card: Card; showLength?: boolean }) {
   const downloading = card.downloadProgress !== undefined && card.status !== 'available';
   return (
     <Link to={titleHref(card)} className="card" aria-label={`${card.title}${card.year ? ` (${card.year})` : ''}`}>
@@ -16,6 +16,7 @@ export function PosterCard({ card }: { card: Card }) {
           <StatusChip status={card.status} progress={card.downloadProgress} compact />
         </div>
         {downloading && <Progress value={card.downloadProgress!} className="card__bar" />}
+        {showLength && card.runtimeMinutes && <span className="card__length">{duration(card.runtimeMinutes * 60)}</span>}
         <div className="card__hover">
           <span className="card__hover-title">{card.title}</span>
           {card.year && <span className="card__hover-year">{card.year}</span>}
@@ -97,11 +98,12 @@ export function Row({ row }: { row: RowData }) {
   );
 }
 
-export function Grid({ cards }: { cards: Card[] }) {
+/** `showLength`: each poster shows its length (when the list is sorted by it). */
+export function Grid({ cards, showLength }: { cards: Card[]; showLength?: boolean }) {
   return (
     <div className="grid">
       {cards.map((card) => (
-        <PosterCard key={card.key} card={card} />
+        <PosterCard key={card.key} card={card} showLength={showLength} />
       ))}
     </div>
   );

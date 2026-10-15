@@ -196,6 +196,12 @@ const IT: Record<string, string> = {
   'not out yet': 'non ancora uscito',
   "{service} won't download it yet: it isn't out. It downloads by itself once it is.":
     '{service} non lo scarica ancora perché non è ancora uscito. Si scaricherà da solo quando uscirà.',
+  // Managing what's on disk
+  'That download has already finished or been stopped': 'Quel download è già finito o è stato fermato',
+  'Only an admin, or whoever asked for it, can stop this download': 'Solo un amministratore, o chi l’ha richiesto, può fermare questo download',
+  "There's no file to delete": 'Non c’è nessun file da eliminare',
+  "Radarr doesn't manage this movie": 'Radarr non gestisce questo film',
+
   'Movie size limit': 'Il limite per i film',
   'Episode size limit': 'Il limite per gli episodi',
 };

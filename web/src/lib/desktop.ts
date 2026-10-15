@@ -40,6 +40,17 @@ export interface VideoOverlay {
   onState: (callback: (state: Record<string, unknown>) => void) => () => void;
 }
 
+/** The Mac and Windows apps can update themselves from GitHub Releases. */
+export interface UpdateStatus {
+  current: string;
+  latest?: string;
+  available: boolean;
+  /** The release has this app's file: it can be installed from inside the app. */
+  canInstall: boolean;
+  /** The release's page (what's new, manual download). */
+  page?: string;
+}
+
 export interface DesktopBridge {
   /** darwin / win32 / linux (desktop), ios, or firetv. */
   platform: string;
@@ -67,6 +78,12 @@ export interface DesktopBridge {
   clearOffline?: () => Promise<OfflineItem[]>;
   /** Open the downloads page, optionally straight into one movie (play) or one show. */
   openOffline?: (target?: { play?: string; show?: string }) => void;
+  update?: {
+    check: () => Promise<UpdateStatus>;
+    /** Downloads and installs the new version; the app restarts when it's done. */
+    install: () => Promise<void>;
+    onProgress: (callback: (p: { received: number; total: number }) => void) => () => void;
+  };
 }
 
 /** The Android app's Java bridge (TVs, phones, tablets): methods only, strings in and out. */

@@ -183,6 +183,8 @@ export const jellyfin = {
     const path = { start: '/Sessions/Playing', progress: '/Sessions/Playing/Progress', stop: '/Sessions/Playing/Stopped' }[event];
     return jfRequest<void>(token, path, { method: 'POST', body });
   },
+  /** Scan the libraries for changes (e.g. files deleted through Radarr/Sonarr). Needs admin rights. */
+  refreshLibrary: (token: string) => jfRequest<void>(token, '/Library/Refresh', { method: 'POST' }),
   /** Re-scan one item so newly downloaded subtitle files show up. Needs admin rights. */
   refreshItem: (token: string, itemId: string) =>
     jfRequest<void>(token, `/Items/${itemId}/Refresh`, {

@@ -46,6 +46,13 @@ static class Strings
 
     static readonly Dictionary<string, string> Italian = new()
     {
+        // Updating
+        ["Couldn't check for updates"] = "Non riesco a controllare gli aggiornamenti",
+        ["This version can only be downloaded from its page."] = "Questa versione si può scaricare solo dalla sua pagina.",
+        ["Couldn't download the update"] = "Non riesco a scaricare l'aggiornamento",
+        ["The download doesn't look like Netfish {version}."] = "Il file scaricato non sembra Netfish {version}.",
+        ["Netfish is up to date"] = "Netfish è aggiornato",
+
         // Starting up
         ["Netfish needs Microsoft Edge WebView2, which isn't on this PC yet. Open the download page?"] =
             "Netfish ha bisogno di Microsoft Edge WebView2, che non è ancora installato su questo PC. Vuoi aprire la pagina per scaricarlo?",

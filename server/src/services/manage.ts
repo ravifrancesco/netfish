@@ -1,0 +1,337 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import type { Card, DiskInfo, MediaType, RemovedInfo, StopMode, StorageInfo } from '@netfish/shared';
+import type { SessionUser } from '../auth';
+import { config, has } from '../config';
+import { posterOf, radarr, sonarr, type ArrDisk, type ArrRootFolder, type RadarrMovie, type SonarrSeries } from '../clients/arr';
+import { jellyfin } from '../clients/jellyfin';
+import { seerr } from '../clients/seerr';
+import { settle } from '../lib/async';
+import { MINUTE, TTLCache } from '../lib/cache';
+import { t } from '../lib/i18n';
+import { writeJson } from '../lib/storage';
+import { HttpError } from '../lib/upstream';
+import { forgetRadarrMovie, forgetSonarrSeries, radarrMovie } from './arrLookup';
+import { catalog } from './catalog';
+import { allDownloads, forgetDownloads } from './downloads';
+import { invalidateLibrary } from './library';
+import { grabbedKeys, seriesFor } from './releases';
+import { myRequestKeys } from './requests';
+
+/**
+ * Managing what's on disk, through Radarr and Sonarr: stopping a download, deleting a
+ * title's files to free space while keeping it listed ("Not on disk"), and getting it
+ * back. Netfish remembers what it deleted, and when, in its data folder.
+ */
+
+interface Removed extends RemovedInfo {
+  mediaType: MediaType;
+  tmdbId: number;
+  title: string;
+  year?: number;
+}
+
+const FILE = path.join(config.dataDir, 'removed.json');
+let removed: Record<string, Removed> = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(FILE, 'utf8'));
+  } catch {
+    return {};
+  }
+})();
+const save = () => writeJson(FILE, removed);
+const storageCache = new TTLCache<StorageInfo>(2);
+const keyOf = (mediaType: MediaType, tmdbId: number) => `${mediaType}-${tmdbId}`;
+const sum = (ns: Array<number | undefined>) => ns.reduce<number>((total, n) => total + (n ?? 0), 0);
+
+/** Seerr still thinks a title it never hears about is downloaded or on its way; "unknown" makes it requestable again. */
+async function resetSeerr(mediaType: MediaType, tmdbId: number | undefined, status: 'unknown' | 'processing' = 'unknown') {
+  if (!tmdbId || !has.seerr()) return;
+  const media = mediaType === 'movie' ? (await catalog.movie(tmdbId)).mediaInfo : (await catalog.tv(tmdbId)).mediaInfo;
+  if (media?.id) await seerr.setMediaStatus(media.id, status);
+  catalog.invalidate(mediaType, tmdbId);
+}
+
+function forget(mediaType: MediaType, tmdbId: number, tvdbId?: number) {
+  if (mediaType === 'movie') forgetRadarrMovie(tmdbId);
+  else forgetSonarrSeries(tvdbId);
+  catalog.invalidate(mediaType, tmdbId);
+  invalidateLibrary();
+  forgetDownloads();
+  storageCache.clear();
+}
+
+// ---------- Stopping a download ----------
+
+async function isMine(user: SessionUser, mediaType: MediaType, tmdbId?: number, tvdbId?: number) {
+  const mine = new Set([...(await settle(myRequestKeys(user), new Set<string>())), ...grabbedKeys(user)]);
+  return (tmdbId !== undefined && mine.has(keyOf(mediaType, tmdbId))) || (tvdbId !== undefined && mine.has(`tvdb-${tvdbId}`));
+}
+
+export async function stopDownload(user: SessionUser, id: string, mode: StopMode) {
+  const item = (await allDownloads()).find((d) => d.id === id);
+  if (!item) throw new HttpError(404, t('That download has already finished or been stopped'));
+  if (!user.isAdmin && !(await isMine(user, item.mediaType, item.tmdbId, item.tvdbId))) {
+    throw new HttpError(403, t('Only an admin, or whoever asked for it, can stop this download'));
+  }
+  // "stop": gone for good. "replace": this release is blocklisted and Radarr/Sonarr look for another one.
+  const removal = mode === 'replace' ? { blocklist: true, skipRedownload: false } : { blocklist: false, skipRedownload: true };
+
+  if (item.source === 'radarr') {
+    const queueId = Number(id.slice('radarr-'.length));
+    const record = (await radarr.queue()).records.find((r) => r.id === queueId);
+    if (!record) throw new HttpError(404, t('That download has already finished or been stopped'));
+    await radarr.removeFromQueue([queueId], removal);
+    if (mode === 'stop' && record.movieId) {
+      await radarr.setMonitored([record.movieId], false);
+      await settle(resetSeerr('movie', item.tmdbId), undefined);
+    }
+  } else {
+    const records = (await sonarr.queue()).records.filter((r) => `sonarr-${r.downloadId ?? r.id}` === id);
+    if (!records.length) throw new HttpError(404, t('That download has already finished or been stopped'));
+    await sonarr.removeFromQueue(
+      records.map((r) => r.id),
+      removal,
+    );
+    const episodes = records.map((r) => r.episodeId).filter((n): n is number => n !== undefined);
+    if (mode === 'stop' && episodes.length) await sonarr.setEpisodesMonitored(episodes, false);
+  }
+  if (item.tmdbId) forget(item.mediaType, item.tmdbId, item.tvdbId);
+  forgetDownloads();
+  return { ok: true };
+}
+
+// ---------- Deleting from disk, and getting it back ----------
+
+async function freshMovie(tmdbId: number) {
+  forgetRadarrMovie(tmdbId);
+  const movie = await radarrMovie(tmdbId);
+  if (!movie) throw new HttpError(404, t("Radarr doesn't manage this movie"));
+  return movie;
+}
+
+async function freshSeries(user: SessionUser, tmdbId: number) {
+  const series = await seriesFor(user, tmdbId);
+  forgetSonarrSeries(series.tvdbId);
+  return seriesFor(user, tmdbId);
+}
+
+/** Jellyfin notices deleted files on its next scan; ask for it now so the title leaves the library right away. */
+async function rescan(user: SessionUser) {
+  await settle(jellyfin.refreshLibrary(config.jellyfin.apiKey ?? user.token), undefined);
+}
+
+export async function deleteFromDisk(user: SessionUser, mediaType: MediaType, tmdbId: number, seasons?: number[]) {
+  const key = keyOf(mediaType, tmdbId);
+  let freed = 0;
+  let tvdbId: number | undefined;
+  if (mediaType === 'movie') {
+    const movie = await freshMovie(tmdbId);
+    if (!movie.movieFile) throw new HttpError(404, t("There's no file to delete"));
+    freed = movie.movieFile.size ?? movie.sizeOnDisk ?? 0;
+    await radarr.deleteFile(movie.movieFile.id);
+    // Unmonitored, so Radarr doesn't simply download it again.
+    await radarr.setMonitored([movie.id], false);
+    removed[key] = { mediaType, tmdbId, title: movie.title, year: movie.year, size: freed, at: new Date().toISOString(), by: user.name };
+    await settle(resetSeerr('movie', tmdbId), undefined);
+  } else {
+    const series = await freshSeries(user, tmdbId);
+    tvdbId = series.tvdbId;
+    const files = await sonarr.episodeFiles(series.id);
+    const chosen = seasons?.length ? files.filter((f) => seasons.includes(f.seasonNumber ?? -1)) : files;
+    if (!chosen.length) throw new HttpError(404, t("There's no file to delete"));
+    freed = sum(chosen.map((f) => f.size));
+    await sonarr.deleteFiles(chosen.map((f) => f.id));
+    const gone = [...new Set(chosen.map((f) => f.seasonNumber ?? -1))];
+    const episodes = await sonarr.episodes(series.id);
+    await sonarr.setEpisodesMonitored(
+      episodes.filter((e) => gone.includes(e.seasonNumber)).map((e) => e.id),
+      false,
+    );
+    const whole = chosen.length === files.length;
+    if (whole) {
+      await sonarr.setSeriesMonitored([series.id], false);
+      await settle(resetSeerr('tv', tmdbId), undefined);
+    }
+    const before = removed[key];
+    removed[key] = {
+      mediaType,
+      tmdbId,
+      title: series.title,
+      year: series.year,
+      size: (before?.size ?? 0) + freed,
+      seasons: whole ? undefined : [...new Set([...(before?.seasons ?? []), ...gone])].sort((a, b) => a - b),
+      at: new Date().toISOString(),
+      by: user.name,
+    };
+  }
+  save();
+  await rescan(user);
+  forget(mediaType, tmdbId, tvdbId);
+  return { freed };
+}
+
+export async function downloadAgain(user: SessionUser, mediaType: MediaType, tmdbId: number, seasons?: number[]) {
+  const key = keyOf(mediaType, tmdbId);
+  let tvdbId: number | undefined;
+  if (mediaType === 'movie') {
+    const movie = await freshMovie(tmdbId);
+    await radarr.setMonitored([movie.id], true);
+    await radarr.search([movie.id]);
+    delete removed[key];
+  } else {
+    const series = await freshSeries(user, tmdbId);
+    tvdbId = series.tvdbId;
+    const entry = removed[key];
+    const all = (series.seasons ?? []).map((s) => s.seasonNumber).filter((n) => n > 0);
+    const wanted = seasons?.length ? seasons : (entry?.seasons ?? all);
+    const episodes = await sonarr.episodes(series.id);
+    await sonarr.setEpisodesMonitored(
+      episodes.filter((e) => wanted.includes(e.seasonNumber)).map((e) => e.id),
+      true,
+    );
+    await sonarr.setSeriesMonitored([series.id], true);
+    for (const season of wanted) await sonarr.searchSeason(series.id, season);
+    const left = (entry?.seasons ?? []).filter((s) => !wanted.includes(s));
+    if (entry && left.length) removed[key] = { ...entry, seasons: left };
+    else delete removed[key];
+  }
+  save();
+  // Seerr shows it as on its way again (it was "unknown" while off the disk).
+  await settle(resetSeerr(mediaType, tmdbId, 'processing'), undefined);
+  forget(mediaType, tmdbId, tvdbId);
+  return { ok: true };
+}
+
+export function removedInfo(mediaType: MediaType, tmdbId?: number): RemovedInfo | undefined {
+  const entry = tmdbId ? removed[keyOf(mediaType, tmdbId)] : undefined;
+  return entry && { at: entry.at, size: entry.size, seasons: entry.seasons, by: entry.by };
+}
+
+/** "Not on disk": titles deleted to save space, newest first. Ones that came back by other means drop off. */
+export async function removedTitles(mediaType: MediaType): Promise<Card[]> {
+  let changed = false;
+  const entries = Object.entries(removed).filter(([, e]) => e.mediaType === mediaType);
+  const kept = await Promise.all(
+    entries.map(async ([key, e]) => {
+      if (e.mediaType === 'movie') {
+        const movie = await settle(radarrMovie(e.tmdbId), undefined);
+        if (movie?.hasFile || movie === null) {
+          delete removed[key];
+          changed = true;
+          return undefined;
+        }
+      }
+      return e;
+    }),
+  );
+  if (changed) save();
+  const list = kept.filter((e): e is Removed => Boolean(e)).sort((a, b) => b.at.localeCompare(a.at));
+  return Promise.all(
+    list.map(async (e): Promise<Card> => {
+      const basics = has.seerr() ? await settle(catalog.basics(e.mediaType, e.tmdbId), undefined) : undefined;
+      return {
+        key: keyOf(e.mediaType, e.tmdbId),
+        mediaType: e.mediaType,
+        tmdbId: e.tmdbId,
+        title: basics?.title ?? e.title,
+        year: basics?.year ?? e.year,
+        poster: basics?.poster,
+        backdrop: basics?.backdrop,
+        status: 'none',
+      };
+    }),
+  );
+}
+
+/** For the title page (admins): the file(s) Radarr/Sonarr have for it. */
+export function diskOf(mediaType: MediaType, managed: RadarrMovie | SonarrSeries | null | undefined): DiskInfo | undefined {
+  if (!managed) return undefined;
+  if (mediaType === 'movie') {
+    const m = managed as RadarrMovie;
+    return m.movieFile ? { size: m.movieFile.size ?? m.sizeOnDisk ?? 0 } : undefined;
+  }
+  const s = managed as SonarrSeries;
+  const seasons = (s.seasons ?? [])
+    .filter((x) => (x.statistics?.episodeFileCount ?? 0) > 0)
+    .map((x) => ({ seasonNumber: x.seasonNumber, size: x.statistics?.sizeOnDisk ?? 0, files: x.statistics?.episodeFileCount ?? 0 }));
+  return seasons.length ? { size: sum(seasons.map((x) => x.size)), seasons } : undefined;
+}
+
+// ---------- Settings → Storage ----------
+
+/** TMDB's original-size posters are megabytes; a list only needs a small one. */
+const small = (url?: string) => url?.replace(/\/t\/p\/original\//, '/t/p/w185/');
+
+function disksFor(roots: ArrRootFolder[], disks: ArrDisk[], mediaType: MediaType) {
+  return roots.map((root) => {
+    // The disk a folder lives on: the mount point that's the longest start of its path.
+    const disk = disks
+      .filter((d) => root.path.startsWith(d.path))
+      .sort((a, b) => b.path.length - a.path.length)[0];
+    return {
+      path: root.path,
+      free: disk?.freeSpace ?? root.freeSpace ?? 0,
+      total: disk?.totalSpace ?? root.totalSpace ?? 0,
+      holds: [mediaType],
+    };
+  });
+}
+
+export function storage(): Promise<StorageInfo> {
+  return storageCache.wrap('all', MINUTE, async () => {
+    const empty = <T,>(): T[] => [];
+    const [rRoots, rDisks, sRoots, sDisks, movies, series] = await Promise.all([
+      has.radarr() ? settle(radarr.rootFolders(), empty<ArrRootFolder>()) : empty<ArrRootFolder>(),
+      has.radarr() ? settle(radarr.diskSpace(), empty<ArrDisk>()) : empty<ArrDisk>(),
+      has.sonarr() ? settle(sonarr.rootFolders(), empty<ArrRootFolder>()) : empty<ArrRootFolder>(),
+      has.sonarr() ? settle(sonarr.diskSpace(), empty<ArrDisk>()) : empty<ArrDisk>(),
+      has.radarr() ? settle(radarr.movies(), undefined) : undefined,
+      has.sonarr() ? settle(sonarr.allSeries(), undefined) : undefined,
+    ]);
+
+    // Radarr and Sonarr often see the same disk (under different paths): show it once.
+    const disks: StorageInfo['disks'] = [];
+    for (const d of [...disksFor(rRoots, rDisks, 'movie'), ...disksFor(sRoots, sDisks, 'tv')]) {
+      if (!d.total) continue;
+      const same = disks.find((x) => x.total === d.total && Math.abs(x.free - d.free) < d.total * 0.005);
+      if (same) {
+        same.holds = [...new Set([...same.holds, ...d.holds])];
+        if (!same.path.split(' · ').includes(d.path)) same.path = `${same.path} · ${d.path}`;
+      } else disks.push(d);
+    }
+
+    const movieSizes = (movies ?? []).filter((m) => (m.sizeOnDisk ?? 0) > 0);
+    const showSizes = (series ?? []).filter((s) => (s.statistics?.sizeOnDisk ?? 0) > 0);
+    const biggest: StorageInfo['biggest'] = [
+      ...movieSizes.map((m) => ({
+        key: keyOf('movie', m.tmdbId),
+        mediaType: 'movie' as const,
+        tmdbId: m.tmdbId,
+        title: m.title,
+        year: m.year,
+        poster: small(posterOf(m.images)),
+        size: m.sizeOnDisk ?? 0,
+      })),
+      ...showSizes.map((s) => ({
+        key: s.tmdbId ? keyOf('tv', s.tmdbId) : `tvdb-${s.tvdbId}`,
+        mediaType: 'tv' as const,
+        tmdbId: s.tmdbId || undefined,
+        title: s.title,
+        year: s.year,
+        poster: small(posterOf(s.images)),
+        size: s.statistics?.sizeOnDisk ?? 0,
+      })),
+    ]
+      .sort((a, b) => b.size - a.size)
+      .slice(0, 12);
+
+    return {
+      disks,
+      movies: movies ? { count: movieSizes.length, size: sum(movieSizes.map((m) => m.sizeOnDisk)) } : undefined,
+      shows: series ? { count: showSizes.length, size: sum(showSizes.map((s) => s.statistics?.sizeOnDisk)) } : undefined,
+      biggest,
+      removed: Object.keys(removed).length,
+    };
+  });
+}

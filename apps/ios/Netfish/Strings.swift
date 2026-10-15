@@ -15,6 +15,17 @@ func L(_ english: String, _ values: [String: String] = [:]) -> String {
 enum Strings {
     /// Same terms as docs/i18n-glossary.md (informal "tu").
     static let italian: [String: String] = [
+        // Updating the Mac app
+        "Couldn't check for updates": "Non riesco a controllare gli aggiornamenti",
+        "This version can only be downloaded from its page.": "Questa versione si può scaricare solo dalla sua pagina.",
+        "Netfish can't update itself here.": "Netfish non può aggiornarsi da qui.",
+        "Move Netfish to your Applications folder, open it from there, then update.": "Sposta Netfish nella cartella Applicazioni, aprilo da lì e poi aggiorna.",
+        "Netfish can't replace itself in that folder. Download the new version from its page instead.": "Netfish non può sostituirsi in quella cartella. Scarica la nuova versione dalla sua pagina.",
+        "The download doesn't look like Netfish {version}.": "Il file scaricato non sembra Netfish {version}.",
+        "The update couldn't be checked or unpacked.": "Non sono riuscito a verificare o aprire l’aggiornamento.",
+        "Couldn't download the update": "Non riesco a scaricare l’aggiornamento",
+        "Netfish is up to date": "Netfish è aggiornato",
+
         // Mac menus (standard macOS wording)
         "About Netfish": "Informazioni su Netfish",
         "Change Server…": "Cambia server…",

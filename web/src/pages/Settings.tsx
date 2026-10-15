@@ -5,6 +5,8 @@ import { useLocation } from 'react-router';
 import type { ServerSettings } from '@netfish/shared';
 import { api } from '../api';
 import { Connections } from '../components/Connections';
+import { Storage } from '../components/Storage';
+import { AppUpdate } from '../components/AppUpdate';
 import { LanguageSelect } from '../components/LanguageSelect';
 import { Mark } from '../components/Logo';
 import { Spinner, StorageWarning, useToast } from '../components/ui';
@@ -214,7 +216,7 @@ export default function Settings() {
       </section>
 
       {desktop() && (
-        <section className="panel">
+        <section className="panel" id="app">
           <h2>{appKind().name}</h2>
           <div className="account">
             <MonitorCog size={22} />
@@ -224,6 +226,7 @@ export default function Settings() {
               {t('Change server…')}
             </button>
           </div>
+          {desktop()?.update && <AppUpdate />}
           {desktop()?.openOffline && <OfflineStorage />}
         </section>
       )}
@@ -235,6 +238,13 @@ export default function Settings() {
             {t("Where Netfish finds your other services. Saved here, these take over from the Portainer stack's variables and apply right away.")}
           </p>
           <Connections />
+        </section>
+      )}
+
+      {me?.isAdmin && config?.features.downloads && (
+        <section className="panel" id="storage">
+          <h2>{t('Storage')}</h2>
+          <Storage />
         </section>
       )}
 

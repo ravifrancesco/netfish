@@ -86,4 +86,8 @@ if [ "${1:-}" = "--dmg" ]; then
   rm -f "../../release/Netfish-$VERSION-mac.dmg"
   hdiutil create -volname Netfish -srcfolder build/dmg -ov -format UDZO "../../release/Netfish-$VERSION-mac.dmg" >/dev/null
   echo "Built release/Netfish-$VERSION-mac.dmg"
+  # What the app downloads to update itself (Settings → Update): no disk image to mount.
+  rm -f "../../release/Netfish-$VERSION-mac.zip"
+  ditto -c -k --keepParent "$APP" "../../release/Netfish-$VERSION-mac.zip"
+  echo "Built release/Netfish-$VERSION-mac.zip"
 fi

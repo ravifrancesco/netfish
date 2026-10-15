@@ -55,7 +55,10 @@ const SORTS: Record<string, string> = {
   name: 'SortName',
   year: 'ProductionYear,SortName',
   rating: 'CommunityRating,SortName',
+  shortest: 'Runtime,SortName',
+  longest: 'Runtime,SortName',
 };
+const ASCENDING = new Set(['name', 'shortest']);
 
 export async function libraryPage(user: SessionUser, mediaType: MediaType, sort: string, start: number, limit: number) {
   const sortBy = SORTS[sort] ?? SORTS.added;
@@ -66,7 +69,7 @@ export async function libraryPage(user: SessionUser, mediaType: MediaType, sort:
       includeItemTypes: mediaType === 'tv' ? 'Series' : 'Movie',
       recursive: true,
       sortBy,
-      sortOrder: sort === 'name' ? 'Ascending' : 'Descending',
+      sortOrder: ASCENDING.has(sort) ? 'Ascending' : 'Descending',
       startIndex: start,
       limit,
       fields: CARD_FIELDS,

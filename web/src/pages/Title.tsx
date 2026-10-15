@@ -8,6 +8,7 @@ import { Row } from '../components/Cards';
 import { DownloadButton } from '../components/DownloadButton';
 import { NameLinks, PeopleRow } from '../components/People';
 import { isNotAvailable, notOutText } from '../components/NotOut';
+import { DeleteFromDisk, DownloadAgain, RemovedNote, StopDownload } from '../components/Manage';
 import { RatingsStrip, TrailerPlayer } from '../components/Extras';
 import { RequestButton } from '../components/RequestButton';
 import { SubtitlesSheet } from '../components/SubtitlesSheet';
@@ -15,13 +16,13 @@ import { VersionsSheet } from '../components/VersionsSheet';
 import { ErrorState, Img, Progress, Spinner, StatusChip, useToast } from '../components/ui';
 import { AVAILABILITY_LABEL, DOWNLOAD_LABEL, ago, bytes, decimal, duration, percent } from '../lib/format';
 import { t, tn, locale } from '../i18n';
-import { useConfig, useRefreshTitle } from '../lib/hooks';
+import { useConfig, useMe, useRefreshTitle } from '../lib/hooks';
 
 type Sheet =
   | { kind: 'versions'; language?: string; seasonNumber?: number; episodeNumber?: number }
   | { kind: 'subtitles'; seasonNumber?: number };
 
-function DownloadLine({ d }: { d: DownloadItem }) {
+function DownloadLine({ d, canStop }: { d: DownloadItem; canStop: boolean }) {
   const bits = [
     d.state === 'downloading' ? percent(d.progress) : DOWNLOAD_LABEL[d.state],
     d.size ? t('{done} of {total}', { done: bytes(d.size - d.sizeLeft), total: bytes(d.size) }) : undefined,
@@ -33,6 +34,7 @@ function DownloadLine({ d }: { d: DownloadItem }) {
       <div className="dlline__top">
         <span className="dlline__label">{d.detail && d.mediaType === 'tv' ? d.detail : DOWNLOAD_LABEL[d.state]}</span>
         <span className="muted">{bits.join(' · ')}</span>
+        {canStop && <StopDownload d={d} small />}
       </div>
       <Progress value={d.progress} tone={d.state === 'stalled' || d.state === 'warning' ? 'warn' : 'accent'} />
       {d.message && (
@@ -45,17 +47,21 @@ function DownloadLine({ d }: { d: DownloadItem }) {
 }
 
 function StatusPanel({ d }: { d: TitleDetail }) {
+  const { data: me } = useMe();
+  // Admins, and whoever asked for it, can stop a download.
+  const canStop = Boolean(me?.isAdmin || d.requests.some((r) => r.mine));
   const inLibrary = d.status === 'available' || d.status === 'partial';
   const latest = inLibrary ? undefined : d.requests[0];
   // A new episode only arrives by itself when Sonarr manages the show.
   const notOut = d.notOut && (d.notOut.kind !== 'airing' || d.managed) && !d.downloads.length ? d.notOut : undefined;
   const waitingForRelease = isNotAvailable(notOut);
-  if (!d.downloads.length && !latest && d.status !== 'processing' && d.status !== 'pending' && !notOut) return null;
+  if (!d.downloads.length && !latest && d.status !== 'processing' && d.status !== 'pending' && !notOut && !d.removed) return null;
   return (
     <div className="statusbox">
       {d.downloads.map((dl) => (
-        <DownloadLine key={dl.id} d={dl} />
+        <DownloadLine key={dl.id} d={dl} canStop={canStop} />
       ))}
+      <RemovedNote d={d} />
       {notOut && (
         <p className="statusbox__note">
           <CalendarClock size={16} />
@@ -312,6 +318,8 @@ export default function Title() {
             )}
             {d.status === 'processing' && isNotAvailable(d.notOut) ? (
               <span className="avail avail--pending">{t('Not available')}</span>
+            ) : d.removed && !d.removed.seasons && d.status === 'none' ? (
+              <span className="avail avail--none">{t('Not on disk')}</span>
             ) : (
               <span className={`avail avail--${d.status}`}>{AVAILABILITY_LABEL[d.status]}</span>
             )}
@@ -328,7 +336,11 @@ export default function Title() {
               </Link>
             )}
             {d.play && d.mediaType === 'movie' && <DownloadButton itemId={d.play.itemId} />}
-            <RequestButton title={d} className={d.play ? 'btn btn--ghost btn--lg' : 'btn btn--accent btn--lg'} />
+            {d.removed && !d.removed.seasons && d.canManage ? (
+              <DownloadAgain d={d} className="btn btn--accent btn--lg" />
+            ) : (
+              <RequestButton title={d} className={d.play ? 'btn btn--ghost btn--lg' : 'btn btn--accent btn--lg'} />
+            )}
             {d.canChooseVersion && (
               <button className="btn btn--ghost btn--lg" onClick={() => setSheet({ kind: 'versions' })}>
                 <Layers size={20} /> {t('Versions')}
@@ -339,6 +351,7 @@ export default function Title() {
                 <Clapperboard size={20} /> {t('Trailer')}
               </button>
             )}
+            <DeleteFromDisk d={d} />
           </div>
           {d.play?.progress !== undefined && <Progress value={d.play.progress} tone="watch" className="tp__progress" />}
 

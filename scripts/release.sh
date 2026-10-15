@@ -29,7 +29,7 @@ if [ "${SKIP_BUILD:-}" != 1 ]; then
 fi
 
 STAGE=$(mktemp -d)
-for kind in server.tar.gz mac.dmg windows.exe android.apk samsung.wgt ios.ipa; do
+for kind in server.tar.gz mac.dmg mac.zip windows.exe android.apk samsung.wgt ios.ipa; do
   cp "release/Netfish-$VERSION-$kind" "$STAGE/Netfish-$kind"
 done
 cat > "$STAGE/notes.md" <<NOTES
@@ -53,7 +53,7 @@ NOTES
 git tag -a "$TAG" -m "Netfish $VERSION"
 git push origin "$TAG"
 gh release create "$TAG" --title "Netfish $VERSION" --notes-file "$STAGE/notes.md" --generate-notes \
-  "$STAGE/Netfish-server.tar.gz" "$STAGE/Netfish-mac.dmg" "$STAGE/Netfish-windows.exe" "$STAGE/Netfish-android.apk" \
+  "$STAGE/Netfish-server.tar.gz" "$STAGE/Netfish-mac.dmg" "$STAGE/Netfish-mac.zip" "$STAGE/Netfish-windows.exe" "$STAGE/Netfish-android.apk" \
   "$STAGE/Netfish-samsung.wgt" "$STAGE/Netfish-ios.ipa"
 rm -rf "$STAGE"
 echo "Published https://github.com/$OWNER/netfish/releases/tag/$TAG"

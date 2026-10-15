@@ -42,6 +42,7 @@ import { grabRelease, grabbedKeys, searchReleases } from './services/releases';
 import { jobsFor, requestSubtitles } from './services/subtitles';
 import { offlineInfo, playInfo, reportProgress, startPlayback } from './services/playback';
 import { personDetail } from './services/people';
+import { deleteFromDisk, downloadAgain, removedTitles, stopDownload, storage } from './services/manage';
 import { createRequest, listRequests, myRequestKeys } from './services/requests';
 import { scrobble, setScrobble, startImport, startLink, traktStatus, unlink } from './services/trakt';
 import { jellyfinDetail, jellyfinSeason, movieDetail, seasonDetail, tvDetail } from './services/titles';
@@ -224,6 +225,28 @@ export async function apiRoutes(app: FastifyInstance) {
         })),
       };
     });
+
+    api.post<{ Params: { id: string }; Body: { mode?: string } }>('/downloads/:id/stop', async (req) =>
+      stopDownload(userOf(req), clean(req.params.id, 120), req.body?.mode === 'replace' ? 'replace' : 'stop'),
+    );
+
+    // Files on disk (admins): delete to free space but keep the title listed, or download it again.
+    const seasonsOf = (body: unknown) =>
+      Array.isArray((body as { seasons?: unknown })?.seasons)
+        ? ((body as { seasons: unknown[] }).seasons.filter((n) => Number.isInteger(n) && (n as number) >= 0) as number[])
+        : undefined;
+    api.post<{ Params: TitleParams; Body: { seasons?: number[] } }>('/title/:type/:id/delete', { preHandler: requireAdmin }, async (req) => {
+      const { mediaType, tmdbId } = mediaTitle(req);
+      return deleteFromDisk(userOf(req), mediaType, tmdbId, seasonsOf(req.body));
+    });
+    api.post<{ Params: TitleParams; Body: { seasons?: number[] } }>('/title/:type/:id/redownload', { preHandler: requireAdmin }, async (req) => {
+      const { mediaType, tmdbId } = mediaTitle(req);
+      return downloadAgain(userOf(req), mediaType, tmdbId, seasonsOf(req.body));
+    });
+    api.get<{ Querystring: { type?: string } }>('/library/removed', async (req) => ({
+      items: await removedTitles(req.query.type === 'tv' ? 'tv' : 'movie'),
+    }));
+    api.get('/admin/storage', { preHandler: requireAdmin }, async () => storage());
 
     // Playback
     api.get<{ Params: { itemId: string } }>('/play/:itemId', async (req) => playInfo(userOf(req), clean(req.params.itemId, 64)));

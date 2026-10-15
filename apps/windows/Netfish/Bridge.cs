@@ -24,6 +24,9 @@ static class LocalPages
 /// </summary>
 sealed class Bridge(MainWindow window, OfflineStore store)
 {
+    /// <summary>The newer release the last check found.</summary>
+    Updater.Release? release;
+
     public static string Script(string version) => """
         (() => {
           if (window.top !== window || window.netfishDesktop || !window.chrome || !window.chrome.webview) return;
@@ -32,6 +35,7 @@ sealed class Bridge(MainWindow window, OfflineStore store)
           const waiting = new Map();
           const offline = new Set();
           const video = new Set();
+          const updates = new Set();
           host.addEventListener('message', (e) => {
             const m = e.data;
             if (!m || typeof m !== 'object') return;
@@ -40,7 +44,7 @@ sealed class Bridge(MainWindow window, OfflineStore store)
               waiting.delete(m.reply);
               if (call) 'error' in m ? call.reject(new Error(m.error)) : call.resolve(m.value);
             } else {
-              const listeners = m.push === 'offline' ? offline : m.push === 'video' ? video : null;
+              const listeners = m.push === 'offline' ? offline : m.push === 'video' ? video : m.push === 'update' ? updates : null;
               listeners?.forEach((cb) => { try { cb(m.value); } catch (err) { console.error(err); } });
             }
           });
@@ -70,6 +74,11 @@ sealed class Bridge(MainWindow window, OfflineStore store)
             openServer: () => send('openServer'),
             toggleFullscreen: () => send('fullscreen'),
             keepAwake: (on) => send('keepAwake', Boolean(on)),
+            update: {
+              check: () => call('updateCheck'),
+              install: () => call('updateInstall'),
+              onProgress: (cb) => { updates.add(cb); return () => updates.delete(cb); },
+            },
             videoOverlay: {
               name: 'mpv',
               profile: () => call('videoProfile'),
@@ -167,6 +176,28 @@ sealed class Bridge(MainWindow window, OfflineStore store)
             case "openServer":
                 window.ShowServer();
                 return null;
+
+            // Updates from GitHub Releases
+            case "updateCheck":
+                release = await Updater.Check();
+                return new JsonObject
+                {
+                    ["current"] = MainWindow.Version,
+                    ["latest"] = release?.Version,
+                    ["available"] = release != null,
+                    ["canInstall"] = release?.Download != null,
+                    ["page"] = release?.Page,
+                };
+            case "updateInstall":
+            {
+                release ??= await Updater.Check();
+                if (release == null) throw new Problem(L("Netfish is up to date"));
+                await Updater.Install(release, (received, total) =>
+                    window.BeginInvoke(() => Push("update", new Dictionary<string, object?> { ["received"] = received, ["total"] = total })));
+                // The installer closes whatever is left of Netfish and opens it again.
+                window.BeginInvoke(() => Application.Exit());
+                return null;
+            }
 
             // Window
             case "fullscreen":

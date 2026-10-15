@@ -8,8 +8,9 @@ import { AVAILABILITY_LABEL, DOWNLOAD_LABEL, ago, bytes, duration, percent } fro
 import { useConfig, useMe } from '../lib/hooks';
 import { t, tn } from '../i18n';
 import { isNotAvailable, notOutShort } from '../components/NotOut';
+import { StopDownload } from '../components/Manage';
 
-function DownloadRow({ d }: { d: DownloadItem }) {
+function DownloadRow({ d, canStop }: { d: DownloadItem; canStop: boolean }) {
   const href = d.tmdbId ? `/title/${d.mediaType}/${d.tmdbId}` : undefined;
   const stats = [
     d.state === 'downloading' ? percent(d.progress) : undefined,
@@ -39,11 +40,22 @@ function DownloadRow({ d }: { d: DownloadItem }) {
       </div>
     </>
   );
-  return <li className="item">{href ? <Link to={href} className="item__link">{body}</Link> : <div className="item__link">{body}</div>}</li>;
+  return (
+    <li className={`item${canStop ? ' item--actions' : ''}`}>
+      {href ? <Link to={href} className="item__link">{body}</Link> : <div className="item__link">{body}</div>}
+      {canStop && (
+        <div className="item__actions">
+          <StopDownload d={d} small />
+        </div>
+      )}
+    </li>
+  );
 }
 
 function Downloads() {
   const q = useQuery({ queryKey: ['downloads'], queryFn: api.downloads, refetchInterval: 3000 });
+  const { data: me } = useMe();
+  const canStop = (d: DownloadItem) => Boolean(me?.isAdmin || d.mine);
   if (q.isError) return <ErrorState error={q.error} retry={() => void q.refetch()} />;
   if (!q.data) return <Spinner size={28} />;
   const mine = q.data.items.filter((d) => d.mine);
@@ -54,13 +66,13 @@ function Downloads() {
       {mine.length > 0 && (
         <section className="section">
           <h2>{t('Requested by you')}</h2>
-          <ul className="items">{mine.map((d) => <DownloadRow key={d.id} d={d} />)}</ul>
+          <ul className="items">{mine.map((d) => <DownloadRow key={d.id} d={d} canStop={canStop(d)} />)}</ul>
         </section>
       )}
       {others.length > 0 && (
         <section className="section">
           <h2>{mine.length ? t('Everything else') : t('Downloading')}</h2>
-          <ul className="items">{others.map((d) => <DownloadRow key={d.id} d={d} />)}</ul>
+          <ul className="items">{others.map((d) => <DownloadRow key={d.id} d={d} canStop={canStop(d)} />)}</ul>
         </section>
       )}
     </>

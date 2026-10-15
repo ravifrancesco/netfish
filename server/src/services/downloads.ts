@@ -15,6 +15,8 @@ import { lang, t } from '../lib/i18n';
 
 const cache = new TTLCache<DownloadItem[]>(4);
 onConnectionChange(() => cache.clear());
+/** After stopping a download, so lists don't show it for another few seconds. */
+export const forgetDownloads = () => cache.clear();
 
 function parseTimeleft(t?: string): number | undefined {
   if (!t) return undefined;

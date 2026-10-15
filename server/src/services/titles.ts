@@ -19,6 +19,7 @@ import { HttpError } from '../lib/upstream';
 import { radarrMovie, sonarrSeries } from './arrLookup';
 import { canChooseVersion } from './releases';
 import { movieNotOut, showNotOut } from './notOut';
+import { diskOf, removedInfo } from './manage';
 import { availabilityFromSeerr, episodeLabel, resolveAvailability, seerrCards } from './cards';
 import { catalog } from './catalog';
 import { allDownloads, downloadsFor, progressByTitle } from './downloads';
@@ -138,7 +139,9 @@ export async function movieDetail(user: SessionUser, tmdbId: number): Promise<Ti
     settle(catalog.recommendations('movie', tmdbId), EMPTY_PAGE),
     settle(radarrMovie(tmdbId), null),
   ]);
-  const status = resolveAvailability(movie.mediaInfo, Boolean(entry));
+  const removed = removedInfo('movie', tmdbId);
+  // Deleted from disk through Netfish: not available, whatever Seerr still says.
+  const status = removed && !entry ? 'none' : resolveAvailability(movie.mediaInfo, Boolean(entry));
   const certification = movie.releases?.results
     ?.find((r) => r.iso_3166_1 === 'US')
     ?.release_dates?.find((d) => d.certification)?.certification;
@@ -171,6 +174,9 @@ export async function movieDetail(user: SessionUser, tmdbId: number): Promise<Ti
     recommendations: seerrCards(recs.results, index, progressByTitle(downloads)).slice(0, 18),
     managed: Boolean(managed),
     notOut: status === 'available' ? undefined : movieNotOut(movie, managed),
+    disk: user.isAdmin ? diskOf('movie', managed) : undefined,
+    removed,
+    canManage: user.isAdmin && Boolean(managed),
     canChooseVersion: Boolean(managed) && canChooseVersion(user),
     canRequest: status === 'none',
   };
@@ -216,7 +222,12 @@ export async function tvDetail(user: SessionUser, tmdbId: number): Promise<Title
       status: seasonStatus(tv, s.seasonNumber, jfByNumber.has(s.seasonNumber)),
       jellyfinId: jfByNumber.get(s.seasonNumber)?.Id,
     }));
-  const status = resolveAvailability(tv.mediaInfo, Boolean(entry));
+  // Seasons deleted from disk through Netfish: Seerr keeps calling them available until its next sync.
+  const removed = removedInfo('tv', tmdbId);
+  for (const s of seasons) {
+    if (removed && (!removed.seasons || removed.seasons.includes(s.seasonNumber)) && !jfByNumber.has(s.seasonNumber) && s.status === 'available') s.status = 'none';
+  }
+  const status = removed && !removed.seasons && !entry ? 'none' : resolveAvailability(tv.mediaInfo, Boolean(entry));
   const certification = tv.contentRatings?.results?.find((r) => r.iso_3166_1 === 'US')?.rating;
 
   return {
@@ -248,6 +259,9 @@ export async function tvDetail(user: SessionUser, tmdbId: number): Promise<Title
     recommendations: seerrCards(recs.results, index, progressByTitle(downloads)).slice(0, 18),
     managed: Boolean(managed),
     notOut: showNotOut(tv, managed),
+    disk: user.isAdmin ? diskOf('tv', managed) : undefined,
+    removed,
+    canManage: user.isAdmin && Boolean(managed),
     canChooseVersion: Boolean(managed) && canChooseVersion(user),
     canRequest: seasons.some((s) => s.seasonNumber > 0 && s.status === 'none'),
   };
@@ -374,6 +388,7 @@ export async function jellyfinDetail(user: SessionUser, itemId: string): Promise
     seasons,
     recommendations: [],
     managed: Boolean(managed),
+    canManage: false,
     canChooseVersion: Boolean(managed) && canChooseVersion(user),
     canRequest: false,
   };

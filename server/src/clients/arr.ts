@@ -66,6 +66,8 @@ export interface ArrRelease {
 export interface ArrFile {
   id: number;
   seasonNumber?: number;
+  /** Bytes on disk. */
+  size?: number;
   quality?: ArrQuality;
   languages?: ArrLanguage[];
   customFormatScore?: number;
@@ -84,6 +86,45 @@ export interface RadarrMovie {
   physicalRelease?: string;
   images?: ArrImage[];
   movieFile?: ArrFile;
+  year?: number;
+  monitored?: boolean;
+  sizeOnDisk?: number;
+}
+
+export interface SonarrSeason {
+  seasonNumber: number;
+  monitored: boolean;
+  statistics?: { episodeFileCount?: number; episodeCount?: number; totalEpisodeCount?: number; sizeOnDisk?: number };
+}
+
+/** A disk as Radarr/Sonarr see it (inside their containers). */
+export interface ArrDisk {
+  path: string;
+  label?: string;
+  freeSpace: number;
+  totalSpace: number;
+}
+
+/** Where the library lives: Radarr's movie folder, Sonarr's show folder. */
+export interface ArrRootFolder {
+  id: number;
+  path: string;
+  freeSpace?: number;
+  totalSpace?: number;
+}
+
+export interface SonarrEpisode {
+  id: number;
+  seasonNumber: number;
+  episodeNumber: number;
+  episodeFileId?: number;
+  monitored?: boolean;
+}
+
+/** Remove from the queue (and the torrent client). `skipRedownload: false` + `blocklist` makes Radarr/Sonarr look for another release. */
+export interface QueueRemoval {
+  blocklist: boolean;
+  skipRedownload: boolean;
 }
 
 export interface SonarrSeries {
@@ -91,6 +132,10 @@ export interface SonarrSeries {
   title: string;
   tvdbId: number;
   tmdbId?: number;
+  year?: number;
+  monitored?: boolean;
+  seasons?: SonarrSeason[];
+  statistics?: { sizeOnDisk?: number; episodeFileCount?: number };
   status?: 'continuing' | 'ended' | 'upcoming' | 'deleted';
   firstAired?: string;
   previousAiring?: string;
@@ -118,6 +163,15 @@ export const radarr = {
   releases: (movieId: number) => arrRequest<ArrRelease[]>('radarr', '/release', { query: { movieId }, timeoutMs: SEARCH_TIMEOUT }),
   grab: (guid: string, indexerId: number) =>
     arrRequest<unknown>('radarr', '/release', { method: 'POST', body: { guid, indexerId }, timeoutMs: 60_000 }),
+  movies: () => arrRequest<RadarrMovie[]>('radarr', '/movie', { timeoutMs: 30_000 }),
+  removeFromQueue: (ids: number[], opts: QueueRemoval) =>
+    arrRequest<void>('radarr', '/queue/bulk', { method: 'DELETE', query: { removeFromClient: true, ...opts }, body: { ids } }),
+  setMonitored: (movieIds: number[], monitored: boolean) =>
+    arrRequest<unknown>('radarr', '/movie/editor', { method: 'PUT', body: { movieIds, monitored } }),
+  deleteFile: (movieFileId: number) => arrRequest<void>('radarr', `/moviefile/${movieFileId}`, { method: 'DELETE' }),
+  search: (movieIds: number[]) => arrRequest<unknown>('radarr', '/command', { body: { name: 'MoviesSearch', movieIds } }),
+  rootFolders: () => arrRequest<ArrRootFolder[]>('radarr', '/rootfolder'),
+  diskSpace: () => arrRequest<ArrDisk[]>('radarr', '/diskspace'),
 };
 
 export const sonarr = {
@@ -128,16 +182,27 @@ export const sonarr = {
     }),
   seriesByTvdb: async (tvdbId: number) => (await arrRequest<SonarrSeries[]>('sonarr', '/series', { query: { tvdbId } }))[0],
   episodeFiles: (seriesId: number) => arrRequest<ArrFile[]>('sonarr', '/episodefile', { query: { seriesId } }),
-  episodes: (seriesId: number, seasonNumber: number) =>
-    arrRequest<Array<{ id: number; seasonNumber: number; episodeNumber: number; episodeFileId?: number }>>('sonarr', '/episode', {
-      query: { seriesId, seasonNumber },
-    }),
+  episodes: (seriesId: number, seasonNumber?: number) =>
+    arrRequest<SonarrEpisode[]>('sonarr', '/episode', { query: { seriesId, seasonNumber } }),
   releases: (seriesId: number, seasonNumber: number) =>
     arrRequest<ArrRelease[]>('sonarr', '/release', { query: { seriesId, seasonNumber }, timeoutMs: SEARCH_TIMEOUT }),
   episodeReleases: (episodeId: number) =>
     arrRequest<ArrRelease[]>('sonarr', '/release', { query: { episodeId }, timeoutMs: SEARCH_TIMEOUT }),
   grab: (guid: string, indexerId: number) =>
     arrRequest<unknown>('sonarr', '/release', { method: 'POST', body: { guid, indexerId }, timeoutMs: 60_000 }),
+  allSeries: () => arrRequest<SonarrSeries[]>('sonarr', '/series', { timeoutMs: 30_000 }),
+  removeFromQueue: (ids: number[], opts: QueueRemoval) =>
+    arrRequest<void>('sonarr', '/queue/bulk', { method: 'DELETE', query: { removeFromClient: true, ...opts }, body: { ids } }),
+  setEpisodesMonitored: (episodeIds: number[], monitored: boolean) =>
+    arrRequest<unknown>('sonarr', '/episode/monitor', { method: 'PUT', body: { episodeIds, monitored } }),
+  setSeriesMonitored: (seriesIds: number[], monitored: boolean) =>
+    arrRequest<unknown>('sonarr', '/series/editor', { method: 'PUT', body: { seriesIds, monitored } }),
+  deleteFiles: (episodeFileIds: number[]) =>
+    arrRequest<void>('sonarr', '/episodefile/bulk', { method: 'DELETE', body: { episodeFileIds } }),
+  searchSeason: (seriesId: number, seasonNumber: number) =>
+    arrRequest<unknown>('sonarr', '/command', { body: { name: 'SeasonSearch', seriesId, seasonNumber } }),
+  rootFolders: () => arrRequest<ArrRootFolder[]>('sonarr', '/rootfolder'),
+  diskSpace: () => arrRequest<ArrDisk[]>('sonarr', '/diskspace'),
 };
 
 export const posterOf = (images?: ArrImage[]) => images?.find((i) => i.coverType === 'poster')?.remoteUrl;
