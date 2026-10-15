@@ -68,6 +68,16 @@ export default {
   'PIN removed.': 'PIN rimosso.',
   you: 'tu',
   'Watched · mark as unwatched': 'Visto · segna come non visto',
+
+  // The round download button on a title's page
+  'Downloaded to {device}': 'Scaricato su {device}',
+  'Download deleted from {device}.': 'Download eliminato da {device}.',
+  'Download cancelled.': 'Download annullato.',
+  'Play the download': 'Riproduci il download',
+  'Delete the download': 'Elimina il download',
+  'Show downloads': 'Mostra i download',
+  'Delete the download of {title}?': 'Eliminare il download di {title}?',
+  'Only the copy on {device} goes; the film stays on your server.': 'Viene eliminata solo la copia su {device}; il film resta sul tuo server.',
   'Locked with a PIN': 'Bloccato con un PIN',
   'Sign {name} out on this device?': 'Disconnettere {name} da questo dispositivo?',
   Remove: 'Rimuovi',

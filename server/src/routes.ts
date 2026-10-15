@@ -46,7 +46,7 @@ import { grabRelease, grabbedKeys, searchReleases } from './services/releases';
 import { jobsFor, requestSubtitles } from './services/subtitles';
 import { offlineInfo, playInfo, reportProgress, startPlayback } from './services/playback';
 import { personDetail } from './services/people';
-import { hideFromContinue, setWatched } from './services/watched';
+import { hideFromContinue, setPosition, setWatched } from './services/watched';
 import { readyToWatch } from './services/ready';
 import { command, control, createRoom, endRoom, getRoom, leave, listRooms, openStream, setTracks, setWaiting } from './services/together';
 import { listScreens, openLive, playOn } from './services/screens';
@@ -318,6 +318,10 @@ export async function apiRoutes(app: FastifyInstance) {
       setWatched(userOf(req), clean(req.params.itemId, 64), req.body?.watched !== false),
     );
     api.post<{ Params: { itemId: string } }>('/items/:itemId/hide', async (req) => hideFromContinue(userOf(req), clean(req.params.itemId, 64)));
+    // Watched a download (on a phone, on a plane): where they got to, sent when back online.
+    api.post<{ Params: { itemId: string }; Body: { seconds?: number; finished?: boolean; at?: string } }>('/items/:itemId/position', async (req) =>
+      setPosition(userOf(req), clean(req.params.itemId, 64), Number(req.body?.seconds), Boolean(req.body?.finished), typeof req.body?.at === 'string' ? req.body.at : undefined),
+    );
 
     // Watch together: rooms where play, pause and seeking stay in step for everyone.
     type Room = { Params: { id: string } };

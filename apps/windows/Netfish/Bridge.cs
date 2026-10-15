@@ -72,6 +72,10 @@ sealed class Bridge(MainWindow window, OfflineStore store)
             clearOffline: () => call('clear'),
             openOffline: (target) => send('openOffline', target || {}),
             openServer: () => send('openServer'),
+            savePosition: (id, seconds, finished) => send('savePosition', { id, seconds, finished }),
+            takePositions: () => call('takePositions'),
+            saveSnapshot: (json) => send('saveSnapshot', json),
+            snapshot: () => call('snapshot'),
             toggleFullscreen: () => send('fullscreen'),
             keepAwake: (on) => send('keepAwake', Boolean(on)),
             notify: (n) => send('notify', n),
@@ -178,6 +182,19 @@ sealed class Bridge(MainWindow window, OfflineStore store)
             case "openServer":
                 window.ShowServer();
                 return null;
+            case "savePosition":
+            {
+                var p = args as JsonObject;
+                var seconds = p?["seconds"] is JsonValue v && v.TryGetValue<double>(out var d) ? d : 0;
+                var finished = p?["finished"] is JsonValue f && f.TryGetValue<bool>(out var b) && b;
+                store.SavePosition(Str(p?["id"]) ?? "", seconds, finished);
+                return null;
+            }
+            case "takePositions": return store.TakePositions();
+            case "saveSnapshot":
+                store.SaveSnapshot(Str(args) ?? "");
+                return null;
+            case "snapshot": return store.Snapshot() is { } snap ? JsonValue.Create(snap) : null;
 
             // Notifications
             case "notify":

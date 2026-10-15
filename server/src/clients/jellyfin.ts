@@ -194,6 +194,17 @@ export const jellyfin = {
       await jfRequest<unknown>(token, `/Users/${userId}/PlayedItems/${itemId}`, { method });
     }
   },
+  /** Where this person is in a film or episode (watched elsewhere, e.g. a download on a phone). */
+  setPosition: async (token: string, userId: string, itemId: string, seconds: number, at: Date) => {
+    const body = { PlaybackPositionTicks: secondsToTicks(seconds), LastPlayedDate: at.toISOString(), Played: false };
+    try {
+      await jfRequest<unknown>(token, `/UserItems/${itemId}/UserData`, { method: 'POST', query: { userId }, body });
+    } catch (err) {
+      // Jellyfin before 10.9 only has the older address.
+      if ((err as { status?: number }).status !== 404) throw err;
+      await jfRequest<unknown>(token, `/Users/${userId}/Items/${itemId}/UserData`, { method: 'POST', body });
+    }
+  },
   /** Scan the libraries for changes (e.g. files deleted through Radarr/Sonarr). Needs admin rights. */
   refreshLibrary: (token: string) => jfRequest<void>(token, '/Library/Refresh', { method: 'POST' }),
   /** Re-scan one item so newly downloaded subtitle files show up. Needs admin rights. */

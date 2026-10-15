@@ -32,6 +32,7 @@ import { useTogether } from '../lib/together';
 import { TogetherChip, TogetherNotes, TogetherPanel } from '../components/Together';
 import { PlayOnButton, SendToScreen } from '../components/PlayOn';
 import { castTarget, screenKind } from '../lib/screens';
+import { useDownloaded } from '../lib/offline';
 import { t } from '../i18n';
 
 const REPORT_EVERY = 10;
@@ -97,11 +98,54 @@ export default function Watch() {
   // connects to that screen, and that mustn't send it a second time.
   const [target] = useState(castTarget);
   const [here, setHere] = useState(false);
-  if (target && !here && !params.get('room') && screenKind() !== 'tv') {
+  // Downloaded on this device: the app plays its copy (no server needed, nothing to stream).
+  const downloaded = useDownloaded(itemId);
+  const room = params.get('room');
+  if (target && !here && !room && screenKind() !== 'tv') {
     const at = params.get('t');
     return <SendToScreen key={itemId} target={target} itemId={itemId} position={at !== null ? Number(at) : undefined} onFailed={() => setHere(true)} />;
   }
+  if (!room && downloaded === undefined) return <div className="player" />;
+  if (!room && downloaded) return <PlayDownload key={itemId} itemId={itemId} />;
   return <Player />;
+}
+
+/**
+ * Plays this device's downloaded copy in the app's own player, from where you got to (the
+ * server's resume point while online). Back from it, you're on the title's page again.
+ */
+function PlayDownload({ itemId }: { itemId: string }) {
+  const [params] = useSearchParams();
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const fromUrl = params.get('t');
+      let start = fromUrl !== null ? Number(fromUrl) : undefined;
+      let back = '/';
+      try {
+        const info = await api.playInfo(itemId);
+        back = info.detailHref ?? '/';
+        const resume = info.resumeSeconds ?? 0;
+        start ??= info.durationSeconds && resume < info.durationSeconds - 60 ? resume : 0;
+      } catch {
+        /* offline: the app remembers where you got to */
+      }
+      if (!alive) return;
+      // The downloads player goes back to the page it was opened from: the title, not this player.
+      window.history.replaceState(window.history.state, '', back);
+      desktop()?.openOffline?.({ play: itemId, start });
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="player">
+      <div className="player__center">
+        <Spinner size={48} />
+      </div>
+    </div>
+  );
 }
 
 function Player() {

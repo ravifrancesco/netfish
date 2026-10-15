@@ -36,6 +36,10 @@ final class MacBridge: NSObject, WKScriptMessageHandlerWithReply {
         clearOffline: () => call('clear'),
         openOffline: (target) => { call('openOffline', target || {}); },
         openServer: () => { call('openServer'); },
+        savePosition: (id, seconds, finished) => { call('savePosition', { id, seconds, finished }); },
+        takePositions: () => call('takePositions'),
+        saveSnapshot: (json) => { call('saveSnapshot', json); },
+        snapshot: () => call('snapshot'),
         toggleFullscreen: () => { call('fullscreen'); },
         notify: (n) => { call('notify', n); },
         update: {
@@ -122,6 +126,15 @@ final class MacBridge: NSObject, WKScriptMessageHandlerWithReply {
         case "openOffline":
             window.showOffline(args as? [String: Any] ?? [:])
             return nil
+        case "savePosition":
+            let p = args as? [String: Any] ?? [:]
+            store.savePosition(p["id"] as? String ?? "", seconds: (p["seconds"] as? NSNumber)?.doubleValue ?? 0, finished: p["finished"] as? Bool ?? false)
+            return nil
+        case "takePositions": return store.takePositions()
+        case "saveSnapshot":
+            store.saveSnapshot(args as? String ?? "")
+            return nil
+        case "snapshot": return store.snapshot() ?? NSNull()
         case "openServer":
             window.showServer()
             return nil

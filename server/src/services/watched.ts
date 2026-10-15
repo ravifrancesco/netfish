@@ -29,6 +29,20 @@ export async function setWatched(user: SessionUser, itemId: string, watched: boo
   return { ok: true };
 }
 
+/**
+ * Where someone got to in a download watched on their phone or computer (sent when the app
+ * is next online): Continue Watching and "watched" follow, as if they'd streamed it.
+ */
+export async function setPosition(user: SessionUser, itemId: string, seconds: number, finished: boolean, at?: string) {
+  if (!/^[\w-]{1,64}$/.test(itemId) || !Number.isFinite(seconds) || seconds < 0) throw new HttpError(400, t('Unknown item'));
+  if (finished) await jellyfin.setPlayed(user.token, user.id, itemId, true);
+  else {
+    const when = new Date(at ?? Date.now());
+    await jellyfin.setPosition(user.token, user.id, itemId, Math.min(seconds, 24 * 3600), Number.isNaN(when.getTime()) || when.getTime() > Date.now() ? new Date() : when);
+  }
+  return { ok: true };
+}
+
 export function hideFromContinue(user: SessionUser, id: string) {
   if (!/^[\w-]{1,64}$/.test(id)) throw new HttpError(400, t('Unknown item'));
   const mine = { ...hidden[user.id], [id]: Date.now() };

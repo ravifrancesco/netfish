@@ -82,8 +82,19 @@ export interface DesktopBridge {
   removeOfflineSeries?: (seriesKey: string) => Promise<OfflineItem[]>;
   offlineUsage?: () => Promise<number>;
   clearOffline?: () => Promise<OfflineItem[]>;
-  /** Open the downloads page, optionally straight into one movie (play) or one show. */
-  openOffline?: (target?: { play?: string; show?: string }) => void;
+  /**
+   * Open the downloads page, optionally straight into one movie (play, from `start`
+   * seconds) or one show; `offline`: the server can't be reached (offline mode).
+   */
+  openOffline?: (target?: OfflineTarget) => void;
+  /**
+   * Where someone got to in a download (kept by the app until Netfish is online again,
+   * then sent to the server by takePositions). Apps from 0.6 on.
+   */
+  savePosition?: (itemId: string, seconds: number, finished: boolean) => void;
+  takePositions?: () => Promise<OfflinePosition[]>;
+  /** What Home looked like last time (shown greyed out in offline mode). Apps from 0.6 on. */
+  saveSnapshot?: (snapshot: string) => void;
   /** A system notification; clicking it opens `path` in Netfish. */
   notify?: (n: { title: string; body: string; path: string }) => void;
   update?: {
@@ -94,6 +105,21 @@ export interface DesktopBridge {
     setAuto?: (on: boolean) => Promise<void>;
     onProgress: (callback: (p: { received: number; total: number }) => void) => () => void;
   };
+}
+
+export interface OfflineTarget {
+  play?: string;
+  show?: string;
+  start?: number;
+  offline?: boolean;
+}
+
+export interface OfflinePosition {
+  itemId: string;
+  seconds: number;
+  finished: boolean;
+  /** When (ISO). */
+  at: string;
 }
 
 /** The Android app's Java bridge (TVs, phones, tablets): methods only, strings in and out. */
@@ -115,6 +141,9 @@ interface AndroidNative {
   offlineUsage?(): number;
   openOffline?(target: string): void;
   openServer?(): void;
+  savePosition?(itemId: string, seconds: number, finished: boolean): void;
+  takePositions?(): string;
+  saveSnapshot?(snapshot: string): void;
   notify?(notification: string): void;
 }
 
@@ -173,7 +202,10 @@ function androidBridge(): DesktopBridge | undefined {
           retryOffline: async (id: string) => answer(native.retryOffline!(id)),
           clearOffline: async () => answer(native.clearOffline!()),
           offlineUsage: async () => Number(native.offlineUsage!()),
-          openOffline: (target?: { play?: string; show?: string }) => native.openOffline!(JSON.stringify(target ?? {})),
+          openOffline: (target?: OfflineTarget) => native.openOffline!(JSON.stringify(target ?? {})),
+          savePosition: native.savePosition ? (itemId: string, seconds: number, finished: boolean) => native.savePosition!(itemId, seconds, finished) : undefined,
+          takePositions: native.takePositions ? async () => JSON.parse(native.takePositions!() || '[]') as OfflinePosition[] : undefined,
+          saveSnapshot: native.saveSnapshot ? (snapshot: string) => native.saveSnapshot!(snapshot) : undefined,
           notify: native.notify ? (n: { title: string; body: string; path: string }) => native.notify!(JSON.stringify(n)) : undefined,
         }
       : {}),
@@ -201,7 +233,8 @@ export function appKind(): { name: string; device: string } {
   if (platform === 'firetv') return { name: t('TV app'), device: t('this TV') };
   return { name: t('Desktop app'), device: t('this computer') };
 }
-export const canDownloadHere = () => Boolean(window.netfishDesktop?.download);
+// (desktop(), not window.netfishDesktop: the Android app's phones download too.)
+export const canDownloadHere = () => Boolean(desktop()?.download);
 
 /** Live list of downloads on this computer (desktop app only). */
 export function useOffline(): OfflineItem[] {

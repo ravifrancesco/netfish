@@ -95,7 +95,23 @@
       .ios #player.idle .back { opacity: 1; pointer-events: auto; }
       .ios #player.idle { cursor: auto; }
       .ios .poster .play { opacity: 1; background: rgba(6, 8, 11, 0.45); }
+      /* Offline mode: the server can't be reached; downloads first, the last Home below, greyed out. */
+      .offline { display: flex; align-items: center; gap: 16px; padding: 14px 16px; margin: 0 0 24px; border-radius: 10px; background: rgba(255, 181, 71, 0.1); border: 1px solid rgba(255, 181, 71, 0.35); }
+      .offline[hidden] { display: none; }
+      .offline svg { width: 26px; height: 26px; flex: none; fill: none; stroke: var(--warn); stroke-width: 2; stroke-linecap: round; }
+      .offline__text { flex: 1; display: grid; gap: 2px; }
+      .offline__text span { color: var(--text-2); font-size: 14px; }
+      .snap-head { margin-top: 40px; }
+      .snap h3 { margin: 18px 0 10px; font-size: 15px; color: var(--text-2); }
+      .snap__items { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; }
+      .snap__item { flex: 0 0 130px; aspect-ratio: 2 / 3; display: grid; align-content: end; gap: 2px; padding: 10px; border-radius: 8px; border: 1px solid var(--line); background: linear-gradient(160deg, #1a212a, #0d1117); text-align: left; opacity: 0.38; filter: grayscale(1); cursor: default; position: relative; }
+      .snap__item.is-wide { flex-basis: 220px; aspect-ratio: 16 / 9; }
+      .snap__item.is-ready { opacity: 1; filter: none; cursor: pointer; border-color: rgba(54, 226, 198, 0.5); }
+      .snap__title { font-weight: 700; font-size: 13px; line-height: 1.25; }
+      .snap__sub { color: var(--text-3); font-size: 12px; }
+      .snap__badge { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #03221c; font-size: 12px; }
       @media (max-width: 640px) {
+        .offline { flex-wrap: wrap; }
         .bar { gap: 10px; }
         .bar h1, .usage { display: none; }
         .grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 16px; }
@@ -116,7 +132,15 @@
       <button class="btn btn--accent" id="home" data-t>Back to Netfish</button>
     </header>
     <main>
-      <p class="note" data-t>These play without a connection to your server. Download more from any movie or episode page.</p>
+      <div class="offline" id="offline" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 2l20 20M8.5 16.5a5 5 0 0 1 7 0M2 8.8a15 15 0 0 1 4.2-2.7M10.7 5.1A15 15 0 0 1 22 8.8M5 12.9a10 10 0 0 1 5.2-2.8M17.4 13.3a10 10 0 0 0-2.3-1.6M12 20h.01" /></svg>
+        <div class="offline__text">
+          <strong data-t>You're offline</strong>
+          <span data-t>Netfish can't reach your server. What's downloaded on this device still plays.</span>
+        </div>
+        <button class="btn btn--accent" id="retry" data-t>Try again</button>
+      </div>
+      <p class="note" id="note" data-t>These play without a connection to your server. Download more from any movie or episode page.</p>
       <div id="view"></div>
     </main>
     <div id="player" hidden>
@@ -186,6 +210,11 @@
         "This download couldn't play: {error}": 'Impossibile riprodurre questo download: {error}',
         'Track {id}': 'Traccia {id}',
         'Subtitles off': 'Sottotitoli disattivati',
+        "You're offline": 'Sei offline',
+        "Netfish can't reach your server. What's downloaded on this device still plays.": 'Netfish non raggiunge il tuo server. Quello che hai scaricato su questo dispositivo si guarda lo stesso.',
+        'Try again': 'Riprova',
+        'Your Home': 'La tua Home',
+        'needs your server': 'serve il tuo server',
       };
       /** t('Play {title}', { title }) → the Italian (or the English) with {placeholders} filled in. */
       const t = (text, values) =>
@@ -215,6 +244,28 @@
       const query = new URLSearchParams(location.search);
       let openShow = query.get('show') || undefined; // series key when looking at one show's episodes
       let autoplay = query.get('play') || undefined;
+      // From the app's Play: where to start (where you got to, per the server).
+      let startAt = query.has('start') && Number.isFinite(Number(query.get('start'))) ? Number(query.get('start')) : undefined;
+      // The server can't be reached: offline mode.
+      const offlineMode = ['1', 'true'].includes(query.get('offline') || '');
+      if (offlineMode) {
+        document.getElementById('offline').hidden = false;
+        document.getElementById('note').hidden = true;
+        document.getElementById('home').hidden = true;
+        document.getElementById('retry').onclick = () => desktop.openServer();
+      }
+      // What Home looked like last time, shown greyed out (what's downloaded stays playable).
+      let snapshot;
+      if (offlineMode && desktop.snapshot) {
+        desktop.snapshot().then((json) => {
+          try {
+            snapshot = json ? JSON.parse(json) : undefined;
+          } catch {
+            snapshot = undefined;
+          }
+          render();
+        }, () => {});
+      }
 
       const number = (n, digits) => n.toLocaleString(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits, useGrouping: false });
       const gb = (n) => (n ? (n / 1024 ** 3 >= 1 ? `${number(n / 1024 ** 3, 1)} GB` : `${number(Math.round(n / 1024 ** 2), 0)} MB`) : '');
@@ -310,8 +361,27 @@
 
       let items = [];
       const usage = document.getElementById('usage');
+      function snapshotView() {
+        if (!snapshot || !snapshot.rows || !snapshot.rows.length) return '';
+        const ready = new Set(items.filter((i) => i.state === 'done').map((i) => i.itemId));
+        const rows = snapshot.rows
+          .filter((row) => row.items && row.items.length)
+          .map(
+            (row) => `<section class="snap"><h3>${esc(row.title)}</h3><div class="snap__items">${row.items
+              .map((c) => {
+                const ok = Boolean(c.itemId && ready.has(c.itemId));
+                return `<button class="snap__item${ok ? ' is-ready' : ''}${c.wide ? ' is-wide' : ''}" ${ok ? `data-play="${esc(c.itemId)}"` : 'disabled'} aria-label="${esc(c.title)}">
+                  ${ok ? '<span class="snap__badge">▶</span>' : ''}
+                  <span class="snap__title">${esc(c.title)}</span>${c.subtitle ? `<span class="snap__sub">${esc(c.subtitle)}</span>` : ''}
+                </button>`;
+              })
+              .join('')}</div></section>`,
+          )
+          .join('');
+        return `<h2 class="snap-head">${t('Your Home')} <span class="meta">· ${t('needs your server')}</span></h2>${rows}`;
+      }
       function render() {
-        view.innerHTML = openShow ? showView(items, openShow) : homeView(items);
+        view.innerHTML = openShow ? showView(items, openShow) : homeView(items) + (offlineMode ? snapshotView() : '');
         desktop.offlineUsage().then((bytes) => (usage.textContent = items.length ? tn(items.length, '{n} download · {size} used', '{n} downloads · {size} used', { size: gb(bytes) || '0 MB' }) : ''));
       }
       const update = (list) => {
@@ -322,7 +392,8 @@
           autoplay = undefined;
           if (item) {
             launchedToPlay = true;
-            play(item);
+            play(item, startAt);
+            startAt = undefined;
           }
         }
       };
@@ -359,6 +430,17 @@
 
       // Remember where you stopped, per download.
       const posKey = (id) => `netfish.offline.pos.${id}`;
+      // ...and tell the app, which passes it to the server once Netfish is online (Continue
+      // Watching and "watched" then follow). Apps from 0.6 on.
+      let toldApp = 0;
+      function remember(item, seconds, finished, now) {
+        if (finished) localStorage.removeItem(posKey(item.itemId));
+        else localStorage.setItem(posKey(item.itemId), String(seconds));
+        if (!desktop.savePosition || (!now && !finished && Date.now() - toldApp < 15000)) return;
+        toldApp = Date.now();
+        desktop.savePosition(item.itemId, Math.floor(seconds), Boolean(finished));
+      }
+      const nearlyDone = (item, seconds) => Boolean(item.durationSeconds && seconds >= item.durationSeconds * 0.95);
 
       // The Windows app keeps downloads exactly as they are and plays them with mpv,
       // underneath this page (every format, every audio and subtitle track).
@@ -422,7 +504,10 @@
         if ('aid' in state || 'sid' in state || Array.isArray(state.tracks)) showTracks();
         if (state.ended) {
           if (typeof state.error === 'string') alert(t("This download couldn't play: {error}", { error: state.error }));
-          else if (state.finished && current) localStorage.removeItem(posKey(current.itemId));
+          else if (state.finished && current) {
+            remember(current, film.duration || 0, true, true);
+            current = undefined; // told already: closing mustn't say "not finished"
+          }
           close();
           return;
         }
@@ -483,25 +568,25 @@
         wake();
       });
 
-      function play(item) {
+      function play(item, from) {
         if (!item) return;
         current = item;
         if (engine) {
-          const pos = Number(localStorage.getItem(posKey(item.itemId)) || 0);
+          const pos = from ?? Number(localStorage.getItem(posKey(item.itemId)) || 0);
           player.hidden = false;
           playWithEngine(item, pos > 0 && (!item.durationSeconds || pos < item.durationSeconds - 30) ? pos : 0);
           return;
         }
         video.innerHTML = item.subtitles.map((s, n) => `<track kind="subtitles" src="${esc(s.url)}" srclang="${esc(s.code || '')}" label="${esc(s.label)}"${n === 0 ? '' : ''}>`).join('');
         video.src = item.video;
-        const pos = Number(localStorage.getItem(posKey(item.itemId)) || 0);
+        const pos = from ?? Number(localStorage.getItem(posKey(item.itemId)) || 0);
         video.addEventListener('loadedmetadata', () => { if (pos > 0 && pos < video.duration - 30) video.currentTime = pos; }, { once: true });
         player.hidden = false;
         video.focus();
         desktop.filmShowing?.(true); // phones: full screen, sideways
       }
       function close() {
-        if (current) localStorage.setItem(posKey(current.itemId), String(filmTime()));
+        if (current) remember(current, filmTime(), nearlyDone(current, filmTime()), true);
         if (engine) {
           stopListening?.();
           stopListening = undefined;
@@ -520,8 +605,12 @@
         // Came straight from the app to watch this? Go back there.
         if (launchedToPlay) desktop.openServer();
       }
-      setInterval(() => current && !filmPaused() && localStorage.setItem(posKey(current.itemId), String(filmTime())), 5000);
-      video.addEventListener('ended', () => { if (current) localStorage.removeItem(posKey(current.itemId)); close(); });
+      setInterval(() => current && !filmPaused() && remember(current, filmTime(), false, false), 5000);
+      video.addEventListener('ended', () => {
+        if (current) remember(current, video.duration || filmTime(), true, true);
+        current = undefined; // told already: closing mustn't say "not finished"
+        close();
+      });
       document.getElementById('close').onclick = close;
       // Like the app's own player: Back fades away while watching, comes back when the mouse moves.
       let idleTimer;

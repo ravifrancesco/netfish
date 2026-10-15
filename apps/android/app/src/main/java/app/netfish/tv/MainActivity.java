@@ -151,7 +151,15 @@ public class MainActivity extends Activity {
                 String url = request.getUrl().toString();
                 if (!request.isForMainFrame() || url.startsWith("file:") || url.startsWith(OfflineStore.ORIGIN)) return;
                 // Away from home with films downloaded: straight to them.
-                if (offline != null && offline.hasDownloads()) showOffline(new JSONObject());
+                if (offline != null && offline.hasDownloads()) {
+                    JSONObject target = new JSONObject();
+                    try {
+                        target.put("offline", true);
+                    } catch (JSONException ignored) {
+                        // can't happen
+                    }
+                    showOffline(target);
+                }
                 else showSetup(getString(R.string.error_server_unreachable, server(), error.getDescription()));
             }
         });
@@ -219,6 +227,8 @@ public class MainActivity extends Activity {
         Uri.Builder url = Uri.parse(OfflineStore.ORIGIN + "/offline.html").buildUpon();
         if (target.has("play")) url.appendQueryParameter("play", target.optString("play"));
         if (target.has("show")) url.appendQueryParameter("show", target.optString("show"));
+        if (target.has("start")) url.appendQueryParameter("start", String.valueOf(Math.max(0, (int) target.optDouble("start", 0))));
+        if (target.optBoolean("offline")) url.appendQueryParameter("offline", "1");
         web.loadUrl(url.toString());
     }
 
@@ -510,6 +520,26 @@ public class MainActivity extends Activity {
             }
             JSONObject finalTarget = parsed;
             runOnUiThread(() -> showOffline(finalTarget));
+        }
+
+        @JavascriptInterface
+        public void savePosition(String itemId, double seconds, boolean finished) {
+            if (offline != null && fromApp()) offline.savePosition(itemId, seconds, finished);
+        }
+
+        @JavascriptInterface
+        public String takePositions() {
+            return offline == null || !fromApp() ? "[]" : offline.takePositions();
+        }
+
+        @JavascriptInterface
+        public void saveSnapshot(String snapshot) {
+            if (offline != null && fromApp()) offline.saveSnapshot(snapshot);
+        }
+
+        @JavascriptInterface
+        public String snapshot() {
+            return offline == null || !fromApp() ? null : offline.snapshot();
         }
 
         @JavascriptInterface

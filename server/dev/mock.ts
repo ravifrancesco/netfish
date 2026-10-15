@@ -258,6 +258,16 @@ void app.register(
     };
     jf.post<{ Params: { id: string }; Querystring: Q }>('/UserPlayedItems/:id', async (req, reply) => (setPlayed(req, true) ? {} : reply.code(404).send()));
     jf.delete<{ Params: { id: string }; Querystring: Q }>('/UserPlayedItems/:id', async (req, reply) => (setPlayed(req, false) ? {} : reply.code(404).send()));
+    jf.post<{ Params: { id: string }; Querystring: Q; Body: { PlaybackPositionTicks?: number; Played?: boolean; LastPlayedDate?: string } }>('/UserItems/:id/UserData', async (req, reply) => {
+      const user = jfUser(req);
+      if (!user || !itemsById.get(req.params.id)) return reply.code(404).send();
+      setUd(user.id, req.params.id, {
+        pos: Number(req.body?.PlaybackPositionTicks) || 0,
+        played: Boolean(req.body?.Played),
+        lastPlayed: req.body?.LastPlayedDate ? Date.parse(req.body.LastPlayedDate) : Date.now(),
+      });
+      return {};
+    });
     jf.post('/Library/Refresh', async (req, reply) => (jfUser(req)?.admin ? reply.code(204).send() : reply.code(403).send()));
     jf.post('/Sessions/Logout', async (req, reply) => {
       sessions.delete(jfToken(req) ?? '');

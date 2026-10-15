@@ -105,6 +105,50 @@ sealed class OfflineStore
     string VideoFile(Entry e) => Path.Combine(root, e.Folder, e.FileName);
     public bool HasDownloads => entries.Any(e => e.State == "done");
 
+    // ---------- Where people got to, and Home as it last looked (offline mode) ----------
+
+    readonly string positionsFile = Path.Combine(AppData.Root, "offline-positions.json");
+    readonly string snapshotFile = Path.Combine(AppData.Root, "home-snapshot.json");
+
+    /// <summary>Where someone got to in a download, kept until Netfish is online to tell the server.</summary>
+    public void SavePosition(string itemId, double seconds, bool finished)
+    {
+        if (string.IsNullOrEmpty(itemId)) return;
+        var list = ReadPositions();
+        foreach (var old in list.Where(p => p?["itemId"]?.GetValue<string>() == itemId).ToList()) list.Remove(old);
+        list.Add(new JsonObject { ["itemId"] = itemId, ["seconds"] = Math.Max(0, seconds), ["finished"] = finished, ["at"] = DateTime.UtcNow.ToString("o") });
+        while (list.Count > 300) list.RemoveAt(0);
+        Directory.CreateDirectory(AppData.Root);
+        File.WriteAllText(positionsFile, list.ToJsonString());
+    }
+
+    /// <summary>The positions not yet sent, handed over (and forgotten here).</summary>
+    public JsonArray TakePositions()
+    {
+        var list = ReadPositions();
+        try { File.Delete(positionsFile); } catch { }
+        return list;
+    }
+
+    JsonArray ReadPositions()
+    {
+        try { return JsonNode.Parse(File.ReadAllText(positionsFile)) as JsonArray ?? new JsonArray(); }
+        catch { return new JsonArray(); }
+    }
+
+    public void SaveSnapshot(string json)
+    {
+        if (json.Length > 512_000) return;
+        Directory.CreateDirectory(AppData.Root);
+        File.WriteAllText(snapshotFile, json);
+    }
+
+    public string? Snapshot()
+    {
+        try { return File.ReadAllText(snapshotFile); }
+        catch { return null; }
+    }
+
     /// <summary>What the pages see (no file paths): the same shape as the other apps' lists.</summary>
     public JsonArray PublicList()
     {

@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Info, Play, Plug, Plus, Star, X } from 'lucide-react';
 import type { Card } from '@netfish/shared';
@@ -9,6 +9,7 @@ import { ErrorState, Img, StatusChip } from '../components/ui';
 import { decimal, titleHref } from '../lib/format';
 import { t } from '../i18n';
 import { useConfig, useMe } from '../lib/hooks';
+import { desktop } from '../lib/desktop';
 import { UpdateNudge } from '../components/AppUpdate';
 import { TogetherRow } from '../components/Together';
 
@@ -97,6 +98,29 @@ function Hero({ card }: { card: Card }) {
 
 export default function Home() {
   const home = useQuery({ queryKey: ['home'], queryFn: api.home, staleTime: 60_000, refetchInterval: 60_000 });
+  const me = useMe().data;
+  // The apps keep a copy of Home, shown greyed out (downloads aside) when offline.
+  useEffect(() => {
+    const save = desktop()?.saveSnapshot;
+    if (!save || !home.data) return;
+    const absolute = (url?: string) => (url ? new URL(url, location.origin).toString() : undefined);
+    save(
+      JSON.stringify({
+        at: new Date().toISOString(),
+        user: me?.name,
+        rows: home.data.rows.slice(0, 8).map((row) => ({
+          title: row.title,
+          items: row.items.slice(0, 14).map((c) => ({
+            title: c.title,
+            subtitle: c.subtitle ?? (c.year ? String(c.year) : undefined),
+            itemId: c.playItemId ?? c.jellyfinId,
+            poster: absolute(row.style === 'wide' ? (c.thumb ?? c.backdrop) : c.poster),
+            wide: row.style === 'wide',
+          })),
+        })),
+      }),
+    );
+  }, [home.data, me?.name]);
 
   if (home.isError) return <div className="page container"><ErrorState error={home.error} retry={() => void home.refetch()} /></div>;
   if (!home.data) {

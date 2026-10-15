@@ -56,6 +56,12 @@ export function setUnauthorizedHandler(fn: () => void) {
   onUnauthorized = fn;
 }
 
+/** Told when a request couldn't reach the server at all (the apps then check, and may go offline). */
+let onUnreachable: () => void = () => {};
+export function setUnreachableHandler(fn: () => void) {
+  onUnreachable = fn;
+}
+
 async function call<T>(path: string, init: { method?: string; body?: unknown; keepalive?: boolean } = {}): Promise<T> {
   let res: Response;
   try {
@@ -68,6 +74,7 @@ async function call<T>(path: string, init: { method?: string; body?: unknown; ke
       keepalive: init.keepalive,
     });
   } catch {
+    onUnreachable();
     throw new ApiError(0, t("Can't reach the Netfish server"));
   }
   if (res.status === 204) return undefined as T;
@@ -136,6 +143,9 @@ export const api = {
 
   setWatched: (itemId: string, watched: boolean) => call<{ ok: true }>(`/items/${enc(itemId)}/watched`, { body: { watched } }),
   hideFromContinue: (itemId: string) => call<{ ok: true }>(`/items/${enc(itemId)}/hide`, { method: 'POST' }),
+  /** Where someone got to in a download watched on this device. */
+  setPosition: (itemId: string, seconds: number, finished: boolean, at: string) =>
+    call<{ ok: true }>(`/items/${enc(itemId)}/position`, { body: { seconds, finished, at } }),
 
   // Watch together
   rooms: () => call<{ rooms: TogetherRoom[] }>('/together'),

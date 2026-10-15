@@ -20,6 +20,7 @@ import { t } from './i18n';
 import { useReadyNotifications, useTogetherNotifications } from './lib/notify';
 import { JoinRoom } from './components/Together';
 import { useLive } from './lib/together';
+import { useOfflineAware } from './lib/offline';
 import { RemoteBar } from './components/PlayOn';
 import { ProfilePicker, useProfiles, wasPicked } from './components/ProfilePicker';
 
@@ -62,6 +63,8 @@ function Shell({ user }: { user: NonNullable<ReturnType<typeof useMe>['data']> }
   const watching = pathname.startsWith('/watch/') || pathname.startsWith('/profiles');
   // Open as long as Netfish is: rooms, screens, and films sent here from another device.
   useLive();
+  // The apps: downloads watched offline reach the server, and a lost server means offline mode.
+  useOfflineAware();
   return (
     <>
       <ScrollToTop />

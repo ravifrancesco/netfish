@@ -183,6 +183,8 @@ sealed class MainWindow : Form
         var query = new Dictionary<string, string>();
         if (target?["play"] is JsonValue play && play.TryGetValue<string>(out var p)) query["play"] = p;
         if (target?["show"] is JsonValue show && show.TryGetValue<string>(out var s)) query["show"] = s;
+        if (target?["start"] is JsonValue start && start.TryGetValue<double>(out var at)) query["start"] = ((int)Math.Max(0, at)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (target?["offline"] is JsonValue offline && offline.TryGetValue<bool>(out var off) && off) query["offline"] = "1";
         Navigate(LocalPages.Page("offline.html", query));
     }
 
@@ -251,7 +253,7 @@ sealed class MainWindow : Form
         // Away from home with films downloaded: straight to them.
         if (store.HasDownloads)
         {
-            ShowOffline(null);
+            ShowOffline(new JsonObject { ["offline"] = true });
             return;
         }
         var why = e.WebErrorStatus switch

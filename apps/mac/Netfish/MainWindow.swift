@@ -97,6 +97,8 @@ final class MainWindow: NSWindowController, NSWindowDelegate, WKNavigationDelega
         var query: [String: String] = [:]
         if let play = target["play"] as? String { query["play"] = play }
         if let show = target["show"] as? String { query["show"] = show }
+        if let start = (target["start"] as? NSNumber)?.intValue { query["start"] = String(max(0, start)) }
+        if target["offline"] as? Bool == true { query["offline"] = "1" }
         web.load(URLRequest(url: LocalScheme.url("offline.html", query: query)))
     }
 
@@ -223,7 +225,7 @@ final class MainWindow: NSWindowController, NSWindowDelegate, WKNavigationDelega
         guard err.code != NSURLErrorCancelled, err.code != 102 else { return }
         if (err.userInfo[NSURLErrorFailingURLErrorKey] as? URL)?.scheme == LocalScheme.scheme { return }
         // Away from home with films downloaded: straight to them.
-        if store.hasDownloads { return showOffline([:]) }
+        if store.hasDownloads { return showOffline(["offline": true]) }
         showSetup(error: L("Couldn't reach {server} ({error}). Is it on?", [
             "server": Server.url?.absoluteString ?? L("the server"), "error": err.localizedDescription,
         ]))

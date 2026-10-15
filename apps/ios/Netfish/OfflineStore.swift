@@ -69,6 +69,45 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
         #endif
     }()
     private var manifest: URL { root.deletingLastPathComponent().appendingPathComponent("offline.json") }
+    /// Where people got to in downloads, until Netfish is online to tell the server.
+    private var positionsFile: URL { root.deletingLastPathComponent().appendingPathComponent("offline-positions.json") }
+    /// Home as it last looked, for offline mode (shown greyed out).
+    private var snapshotFile: URL { root.deletingLastPathComponent().appendingPathComponent("home-snapshot.json") }
+
+    // ---------- Positions and the Home snapshot (offline mode) ----------
+
+    func savePosition(_ itemId: String, seconds: Double, finished: Bool) {
+        guard !itemId.isEmpty else { return }
+        var list = readPositions().filter { ($0["itemId"] as? String) != itemId }
+        list.append(["itemId": itemId, "seconds": max(0, seconds), "finished": finished, "at": ISO8601DateFormatter().string(from: Date())])
+        writeJSON(Array(list.suffix(300)), to: positionsFile)
+    }
+
+    /// The positions not yet sent, handed over (and forgotten here).
+    func takePositions() -> [[String: Any]] {
+        let list = readPositions()
+        try? FileManager.default.removeItem(at: positionsFile)
+        return list
+    }
+
+    func saveSnapshot(_ json: String) {
+        guard json.utf8.count < 512_000 else { return }
+        try? FileManager.default.createDirectory(at: snapshotFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? Data(json.utf8).write(to: snapshotFile, options: .atomic)
+    }
+
+    func snapshot() -> String? { try? String(contentsOf: snapshotFile, encoding: .utf8) }
+
+    private func readPositions() -> [[String: Any]] {
+        guard let data = try? Data(contentsOf: positionsFile) else { return [] }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] ?? []
+    }
+
+    private func writeJSON(_ value: Any, to file: URL) {
+        guard let data = try? JSONSerialization.data(withJSONObject: value) else { return }
+        try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? data.write(to: file, options: .atomic)
+    }
 
     override private init() {
         super.init()
@@ -132,10 +171,14 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
     }
 
     private var pending: DispatchWorkItem?
+    /// At most one update every 0.4 s while bytes come in. (Not "0.4 s after the last
+    /// change": a fast download never pauses that long, so the page would hear nothing.)
     private func broadcast(now: Bool = false) {
+        if pending != nil && !now { return }
         pending?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
+            self.pending = nil
             self.onChange?(self.publicList())
         }
         pending = work

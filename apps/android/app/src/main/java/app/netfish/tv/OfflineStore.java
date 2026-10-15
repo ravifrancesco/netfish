@@ -63,7 +63,7 @@ final class OfflineStore {
         @Override
         public void run() {
             if (refresh()) notifyChanged();
-            if (anyDownloading()) handler.postDelayed(this, 1000);
+            if (anyDownloading()) handler.postDelayed(this, 500);
         }
     };
 
@@ -109,6 +109,67 @@ final class OfflineStore {
     private synchronized JSONObject entry(String itemId) {
         for (JSONObject e : entries) if (itemId.equals(e.optString("itemId"))) return e;
         return null;
+    }
+
+    // ---------- Where people got to, and Home as it last looked (offline mode) ----------
+
+    /** Where someone got to in a download, kept until Netfish is online to tell the server. */
+    synchronized void savePosition(String itemId, double seconds, boolean finished) {
+        if (itemId == null || itemId.isEmpty()) return;
+        JSONArray kept = readJson(positionsFile());
+        JSONArray list = new JSONArray();
+        for (int i = 0; i < kept.length(); i++) {
+            JSONObject p = kept.optJSONObject(i);
+            if (p != null && !itemId.equals(p.optString("itemId"))) list.put(p);
+        }
+        try {
+            SimpleDateFormat iso = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
+            iso.setTimeZone(TimeZone.getTimeZone("UTC"));
+            list.put(new JSONObject().put("itemId", itemId).put("seconds", Math.max(0, seconds)).put("finished", finished).put("at", iso.format(new Date())));
+        } catch (JSONException ignored) {
+            // can't happen
+        }
+        while (list.length() > 300) list.remove(0);
+        writeText(positionsFile(), list.toString());
+    }
+
+    /** The positions not yet sent, handed over (and forgotten here). */
+    synchronized String takePositions() {
+        String list = readJson(positionsFile()).toString();
+        delete(positionsFile());
+        return list;
+    }
+
+    void saveSnapshot(String json) {
+        if (json != null && json.length() < 512_000) writeText(new File(context.getFilesDir(), "home-snapshot.json"), json);
+    }
+
+    String snapshot() {
+        try (InputStream in = new FileInputStream(new File(context.getFilesDir(), "home-snapshot.json"))) {
+            return new String(readAll(in), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    private File positionsFile() {
+        return new File(context.getFilesDir(), "offline-positions.json");
+    }
+
+    private static JSONArray readJson(File file) {
+        try (InputStream in = new FileInputStream(file)) {
+            return new JSONArray(new String(readAll(in), StandardCharsets.UTF_8));
+        } catch (IOException | JSONException e) {
+            return new JSONArray();
+        }
+    }
+
+    private static void writeText(File file, String text) {
+        try (OutputStream out = new FileOutputStream(file)) {
+            out.write(text.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException ignored) {
+            // not this time
+        }
     }
 
     boolean hasDownloads() {
@@ -472,6 +533,7 @@ final class OfflineStore {
             + " removeOffline: async (id) => parse(n.removeOffline(id)), removeOfflineSeries: async (k) => parse(n.removeOfflineSeries(k)),"
             + " retryOffline: async (id) => parse(n.retryOffline(id)), offlineUsage: async () => Number(n.offlineUsage()),"
             + " clearOffline: async () => parse(n.clearOffline()), openServer: () => n.openServer(), openOffline: (t) => n.openOffline(JSON.stringify(t || {})),"
+            + " savePosition: (id, s, f) => n.savePosition(String(id), Number(s) || 0, Boolean(f)), snapshot: async () => n.snapshot() || null,"
             + " filmShowing: (on) => n.filmShowing(Boolean(on)) };"
             + "})();";
 }
