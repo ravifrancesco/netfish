@@ -77,7 +77,7 @@ cp build/mpv/VulkanRT-License.txt build/publish/licenses/vulkan.txt
 cp THIRD-PARTY.txt build/publish/licenses/
 # The setup and downloads pages are shared with the other apps.
 mkdir -p build/publish/pages
-cp ../common/setup.html ../common/offline.html ../common/loading.html build/publish/pages/
+cp ../common/setup.html ../common/offline.html ../common/loading.html ../common/player.js build/publish/pages/
 echo "Built $(pwd)/build/publish/Netfish.exe"
 
 # The installer.

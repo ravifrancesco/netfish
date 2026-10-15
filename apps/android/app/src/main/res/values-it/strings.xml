@@ -23,4 +23,13 @@
     <!-- Player -->
     <string name="error_cant_play">La TV non è riuscita a riprodurre questo video (%1$s)</string>
     <string name="notice_channel">Pronti da guardare</string>
+    <string name="update_cant_check">Impossibile controllare gli aggiornamenti (%1$s)</string>
+    <string name="update_not_this_build">Questa versione di prova non può aggiornarsi da sola</string>
+    <string name="update_no_file">La nuova versione non ha l\'app Android</string>
+    <string name="update_wrong_file">Quel file non è un aggiornamento di Netfish per quest\'app</string>
+    <string name="update_allow">Consenti a Netfish di installare app (si è appena aperta quell\'impostazione), poi premi di nuovo Aggiorna.</string>
+    <string name="update_allow_tv">Consenti a Netfish di installare app: Impostazioni → La mia Fire TV → Opzioni sviluppatore → Installa app sconosciute → Netfish. Poi premi di nuovo Aggiorna.</string>
+    <string name="update_download_failed">Il download dell\'aggiornamento non è riuscito (%1$s)</string>
+    <string name="update_failed">L\'aggiornamento non è stato installato (%1$s)</string>
+    <string name="update_cancelled">Aggiornamento annullato</string>
 </resources>

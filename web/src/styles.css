@@ -2691,6 +2691,73 @@ html.is-tv .switch:focus {
   color: var(--accent);
   flex: none;
 }
+.nudge strong {
+  color: var(--text);
+}
+/* An update that's needed, or an iPhone install about to stop opening. */
+.nudge--warn {
+  border-color: rgba(255, 181, 71, 0.45);
+}
+.nudge--warn > svg {
+  color: var(--warn);
+}
+.nudge__status {
+  display: block;
+  margin-top: 2px;
+  color: var(--accent);
+  font-size: 0.85rem;
+}
+.nudge__status.is-bad {
+  color: var(--danger);
+}
+/* Phones: the text gets the width, Update goes below it, Hide stays in the corner. */
+@media (max-width: 640px) {
+  .nudge {
+    position: relative;
+    flex-wrap: wrap;
+    padding-right: 44px;
+  }
+  .nudge > span {
+    flex-basis: calc(100% - 30px);
+  }
+  .nudge > .btn {
+    margin-left: 30px;
+  }
+  .nudge__hide {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+  }
+}
+
+/* Settings → Devices. */
+.devices {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.devices__row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.devices__row:first-child {
+  border-top: none;
+}
+.devices__row > svg {
+  flex: none;
+  color: var(--text-2);
+}
+.devices__text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
 .setup__title {
   font-size: 1.3rem;
 }

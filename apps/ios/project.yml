@@ -10,7 +10,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.6.2"
+    MARKETING_VERSION: "0.6.3"
     CURRENT_PROJECT_VERSION: "1"
 targets:
   Netfish:
@@ -18,12 +18,14 @@ targets:
     platform: iOS
     sources:
       - path: Netfish
-      # Shared with the other apps (apps/common): the setup, downloads and loading pages.
+      # Shared with the other apps (apps/common): the setup, downloads and loading pages, and the player.
       - path: ../common/setup.html
         buildPhase: resources
       - path: ../common/offline.html
         buildPhase: resources
       - path: ../common/loading.html
+        buildPhase: resources
+      - path: ../common/player.js
         buildPhase: resources
     settings:
       base:

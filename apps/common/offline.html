@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; media-src 'self'; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'" />
     <title>Netfish · Downloads</title>
     <style>
       :root {
@@ -61,39 +61,12 @@
       .episode .info { display: grid; min-width: 0; }
       .episode .row { display: flex; gap: 14px; align-items: center; }
       .empty { display: grid; justify-items: center; gap: 12px; padding: 90px 20px; color: var(--text-3); text-align: center; }
-      #player { position: fixed; inset: 0; z-index: 5; background: #000; display: grid; }
-      #player[hidden] { display: none; }
-      #player video { width: 100%; height: 100vh; object-fit: contain; background: #000; }
-      #player .back { position: absolute; top: 18px; left: 18px; z-index: 2; transition: opacity 0.3s; }
-      /* Beside the Mac window buttons, not underneath them. */
-      .mac #player .back { top: 13px; left: 92px; }
-      .mac.fullscreen #player .back { top: 18px; left: 18px; }
-      #player .drag { position: absolute; top: 0; left: 0; right: 0; height: 56px; -webkit-app-region: drag; }
-      #player .back { -webkit-app-region: no-drag; }
-      #player.idle .back { opacity: 0; pointer-events: none; }
-      #player.idle { cursor: none; }
-      video::cue { background: rgba(0, 0, 0, 0.55); font-size: clamp(18px, 2.4vw, 34px); }
-      /* Windows app: mpv draws the film underneath the page; these are its controls. */
-      html.overlay-playing, html.overlay-playing body, html.overlay-playing #player { background: transparent; }
-      html.overlay-playing .bar, html.overlay-playing main { visibility: hidden; }
-      .controls { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; display: grid; gap: 6px; padding: 48px clamp(16px, 3vw, 40px) 18px; background: linear-gradient(transparent, rgba(0, 0, 0, 0.78)); transition: opacity 0.3s; }
-      .controls[hidden] { display: none; }
-      #player.idle .controls { opacity: 0; pointer-events: none; }
-      .controls .row { display: flex; align-items: center; gap: 12px; }
-      .controls input[type='range'] { width: 100%; margin: 0; accent-color: var(--accent); cursor: pointer; }
-      .icon { width: 42px; height: 42px; border: 0; border-radius: 50%; background: none; color: #fff; display: grid; place-items: center; padding: 0; }
-      .icon:hover { background: rgba(255, 255, 255, 0.12); }
-      .icon svg { width: 24px; height: 24px; fill: currentColor; }
-      .clock { font-size: 13px; color: var(--text-2); font-variant-numeric: tabular-nums; }
-      .controls select { height: 32px; max-width: 220px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--line); background: rgba(18, 23, 30, 0.92); color: var(--text); font: inherit; font-size: 13px; }
-      .controls select[hidden] { display: none; }
+      /* Films play in Netfish's own player (player.js). Windows: mpv draws the film underneath a see-through page. */
+      html.is-overlay-video, html.is-overlay-video body { background: transparent; }
+      html.is-overlay-video .bar, html.is-overlay-video main { visibility: hidden; }
       /* iPhone / iPad: stay clear of the notch, the home bar and rounded corners. */
       .ios .bar { height: auto; min-height: 56px; padding: env(safe-area-inset-top) max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); }
       .ios main { padding: 20px max(16px, env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
-      .ios #player .back { top: calc(env(safe-area-inset-top) + 10px); left: calc(env(safe-area-inset-left) + 12px); }
-      /* The system's video controls take the taps on phones, so Back never comes back once hidden: keep it. */
-      .ios #player.idle .back { opacity: 1; pointer-events: auto; }
-      .ios #player.idle { cursor: auto; }
       .ios .poster .play { opacity: 1; background: rgba(6, 8, 11, 0.45); }
       /* Offline mode: the server can't be reached; downloads first, the last Home below, greyed out. */
       .offline { display: flex; align-items: center; gap: 16px; padding: 14px 16px; margin: 0 0 24px; border-radius: 10px; background: rgba(255, 181, 71, 0.1); border: 1px solid rgba(255, 181, 71, 0.35); }
@@ -161,22 +134,8 @@
       <p class="note" id="note" data-t>These play without a connection to your server. Download more from any movie or episode page.</p>
       <div id="view"></div>
     </main>
-    <div id="player" hidden>
-      <div class="drag"></div>
-      <button class="btn back" id="close" data-t>← Back</button>
-      <video id="video" controls autoplay playsinline></video>
-      <div class="controls" id="controls" hidden>
-        <input type="range" id="seek" min="0" max="0" step="1" value="0" aria-label="Position" />
-        <div class="row">
-          <button class="icon" id="toggle" aria-label="Pause"></button>
-          <span class="clock" id="clock"></span>
-          <span class="spacer"></span>
-          <select id="audio" aria-label="Audio" hidden></select>
-          <select id="subs" aria-label="Subtitles" hidden></select>
-          <button class="icon" id="fs" aria-label="Full screen"><svg viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4V4zm10 0h6v6h-2V6h-4V4zM4 14h2v4h4v2H4v-6zm14 0h2v6h-6v-2h4v-4z" /></svg></button>
-        </div>
-      </div>
-    </div>
+    <!-- Netfish's own player, built from the web app into every app (npm run build:player). -->
+    <script src="player.js"></script>
     <script>
       // Italian when the system language is Italian, English otherwise. Keys are the exact English text.
       const lang = (navigator.languages && navigator.languages[0]) || navigator.language || 'en';
@@ -189,13 +148,7 @@
         'Back to Netfish': 'Torna a Netfish',
         'These play without a connection to your server. Download more from any movie or episode page.':
           'Puoi guardarli anche senza connessione al tuo server. Scaricane altri dalla pagina di un film o di un episodio.',
-        '← Back': '← Indietro',
-        Position: 'Posizione',
         Play: 'Riproduci',
-        Pause: 'Pausa',
-        Audio: 'Audio',
-        Subtitles: 'Sottotitoli',
-        'Full screen': 'Schermo intero',
         'Ready · {size}': 'Pronto · {size}',
         'Downloading {pct}% · {received} of {size}': 'Download al {pct}% · {received} di {size}',
         'Downloading · {received}': 'Download in corso · {received}',
@@ -225,9 +178,6 @@
         'Delete "{name}" from this device?': 'Eliminare "{name}" da questo dispositivo?',
         'Delete all {n} downloaded episode of "{title}"?': 'Eliminare l\'episodio scaricato di "{title}"?',
         'Delete all {n} downloaded episodes of "{title}"?': 'Eliminare tutti i {n} episodi scaricati di "{title}"?',
-        "This download couldn't play: {error}": 'Impossibile riprodurre questo download: {error}',
-        'Track {id}': 'Traccia {id}',
-        'Subtitles off': 'Sottotitoli disattivati',
         "You're offline": 'Sei offline',
         "Netfish can't reach your server. What's downloaded on this device still plays.": 'Netfish non raggiunge il tuo server. Quello che hai scaricato su questo dispositivo si guarda lo stesso.',
         'Try again': 'Riprova',
@@ -260,8 +210,6 @@
       const device = mobile ? 'this device' : 'this computer';
       document.getElementById('heading').textContent = t(`Downloads on ${device}`);
       const view = document.getElementById('view');
-      const player = document.getElementById('player');
-      const video = document.getElementById('video');
       let current;
       // Opened from the app's Offline tab: straight into a show, or straight into playback.
       const query = new URLSearchParams(location.search);
@@ -510,201 +458,38 @@
       }
       const nearlyDone = (item, seconds) => Boolean(item.durationSeconds && seconds >= item.durationSeconds * 0.95);
 
-      // The Windows app keeps downloads exactly as they are and plays them with mpv,
-      // underneath this page (every format, every audio and subtitle track).
-      const engine = desktop.offlineFormat === 'original' ? desktop.videoOverlay : undefined;
-      const controls = document.getElementById('controls');
-      const seek = document.getElementById('seek');
-      const toggle = document.getElementById('toggle');
-      const clock = document.getElementById('clock');
-      const audioPick = document.getElementById('audio');
-      const subsPick = document.getElementById('subs');
-      const ICONS = {
-        play: '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>',
-        pause: '<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zm8 0h4v14h-4z" /></svg>',
-      };
-      let film = { time: 0, duration: 0, paused: false, aid: null, sid: null, tracks: [] };
-      let stopListening;
-      let seeking = false;
-      const hms = (t) => {
-        t = Math.max(0, Math.floor(t || 0));
-        const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), sec = String(t % 60).padStart(2, '0');
-        return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
-      };
-      let names;
-      const language = (code) => {
-        try {
-          names ??= new Intl.DisplayNames([locale], { type: 'language' });
-          const name = code && code !== 'und' ? names.of(code) : '';
-          return italian ? name.charAt(0).toLocaleUpperCase(locale) + name.slice(1) : name; // Italian names come lowercase: "inglese"
-        } catch {
-          return code || '';
-        }
-      };
-      const trackName = (track) =>
-        [language(track.lang), track.title && track.title !== language(track.lang) ? track.title : ''].filter(Boolean).join(' · ') || t('Track {id}', { id: track.id });
-      function showFilm() {
-        toggle.innerHTML = film.paused ? ICONS.play : ICONS.pause;
-        toggle.setAttribute('aria-label', film.paused ? t('Play') : t('Pause'));
-        if (!seeking) {
-          seek.max = String(Math.floor(film.duration || 0));
-          seek.value = String(Math.floor(film.time));
-        }
-        clock.textContent = `${hms(seeking ? Number(seek.value) : film.time)} / ${hms(film.duration)}`;
-      }
-      function showTracks() {
-        const audio = film.tracks.filter((t) => t.type === 'audio');
-        const subs = film.tracks.filter((t) => t.type === 'sub');
-        audioPick.hidden = audio.length < 2;
-        audioPick.innerHTML = audio.map((t) => `<option value="${t.id}">${esc(trackName(t))}</option>`).join('');
-        audioPick.value = String(film.aid ?? audio.find((t) => t.selected)?.id ?? '');
-        subsPick.hidden = !subs.length;
-        subsPick.innerHTML = `<option value="">${t('Subtitles off')}</option>` + subs.map((t) => `<option value="${t.id}">${esc(trackName(t))}</option>`).join('');
-        subsPick.value = film.sid ? String(film.sid) : '';
-      }
-      function filmState(state) {
-        if (typeof state['time-pos'] === 'number') film.time = state['time-pos'];
-        if (typeof state.duration === 'number') film.duration = state.duration;
-        if (typeof state.pause === 'boolean') film.paused = state.pause;
-        if ('aid' in state) film.aid = state.aid;
-        if ('sid' in state) film.sid = state.sid;
-        if (Array.isArray(state.tracks)) film.tracks = state.tracks;
-        if ('aid' in state || 'sid' in state || Array.isArray(state.tracks)) showTracks();
-        if (state.ended) {
-          if (typeof state.error === 'string') alert(t("This download couldn't play: {error}", { error: state.error }));
-          else if (state.finished && current) {
-            remember(current, film.duration || 0, true, true);
-            current = undefined; // told already: closing mustn't say "not finished"
-          }
-          close();
-          return;
-        }
-        showFilm();
-        if ('pause' in state) wake();
-      }
-      function playWithEngine(item, start) {
-        document.documentElement.classList.add('overlay-playing');
-        video.hidden = true;
-        controls.hidden = false;
-        film = { time: start, duration: item.durationSeconds || 0, paused: false, aid: null, sid: null, tracks: [] };
-        showFilm();
-        showTracks();
-        stopListening = engine.onState(filmState);
-        const request = {
-          url: item.video,
-          isHls: false,
-          title: item.title,
-          subtitle: item.subtitle,
-          startSeconds: start,
-          subtitles: { mode: 'off' },
-          externalSubtitles: item.subtitles.map((s) => ({ url: s.url, label: s.label, language: s.code })),
-          segments: [],
-        };
-        engine.load(request).catch((err) => {
-          alert(t("This download couldn't play: {error}", { error: err.message || err }));
-          close();
+      // Films play in Netfish's own player, the same one as online (player.js, from the web app):
+      // the downloaded file, from where you got to, with its audio tracks and subtitles.
+      function play(item, from) {
+        if (!item || !window.NetfishPlayer) return;
+        const pos = from ?? Number(localStorage.getItem(posKey(item.itemId)) || 0);
+        current = item;
+        desktop.filmShowing?.(true); // phones: full screen, sideways
+        NetfishPlayer.open({
+          item,
+          start: pos > 0 && (!item.durationSeconds || pos < item.durationSeconds - 30) ? pos : 0,
+          onPosition: (seconds, finished, now) => remember(item, seconds, finished, now),
+          onClose: () => {
+            current = undefined;
+            desktop.filmShowing?.(false);
+            // Came straight from the app to watch this? Go back there.
+            if (launchedToPlay) desktop.openServer();
+          },
+          next: nextEpisode(item),
         });
       }
-      const filmTime = () => (engine ? film.time : video.currentTime);
-      const filmPaused = () => (engine ? film.paused : video.paused);
-      const playPause = () => engine.command(film.paused ? 'play' : 'pause');
-      const jump = (by) => engine.command('seek', Math.max(0, Math.min(film.duration || Infinity, film.time + by)));
-      toggle.onclick = playPause;
-      document.getElementById('fs').onclick = () => desktop.toggleFullscreen?.();
-      seek.addEventListener('input', () => {
-        seeking = true;
-        showFilm();
-      });
-      seek.addEventListener('change', () => {
-        seeking = false;
-        film.time = Number(seek.value);
-        engine.command('seek', film.time);
-        showFilm();
-      });
-      audioPick.onchange = () => engine.command('audio', Number(audioPick.value));
-      subsPick.onchange = () => engine.command('subtitle', subsPick.value ? Number(subsPick.value) : null);
-      player.addEventListener('click', (e) => engine && current && e.target === player && playPause());
-      player.addEventListener('dblclick', (e) => engine && current && e.target === player && desktop.toggleFullscreen?.());
-      document.addEventListener('keydown', (e) => {
-        if (!engine || !current || e.target.closest?.('select, input')) return;
-        if (e.key === ' ' || e.key === 'k') playPause();
-        else if (e.key === 'ArrowLeft') jump(-10);
-        else if (e.key === 'ArrowRight') jump(10);
-        else if (e.key === 'f') desktop.toggleFullscreen?.();
-        else return;
-        e.preventDefault();
-        wake();
-      });
-
-      function play(item, from) {
-        if (!item) return;
-        current = item;
-        if (engine) {
-          const pos = from ?? Number(localStorage.getItem(posKey(item.itemId)) || 0);
-          player.hidden = false;
-          playWithEngine(item, pos > 0 && (!item.durationSeconds || pos < item.durationSeconds - 30) ? pos : 0);
-          return;
-        }
-        video.innerHTML = item.subtitles.map((s, n) => `<track kind="subtitles" src="${esc(s.url)}" srclang="${esc(s.code || '')}" label="${esc(s.label)}"${n === 0 ? '' : ''}>`).join('');
-        video.src = item.video;
-        const pos = from ?? Number(localStorage.getItem(posKey(item.itemId)) || 0);
-        video.addEventListener('loadedmetadata', () => { if (pos > 0 && pos < video.duration - 30) video.currentTime = pos; }, { once: true });
-        player.hidden = false;
-        video.focus();
-        desktop.filmShowing?.(true); // phones: full screen, sideways
+      /** The next downloaded episode of the same show, if there is one. */
+      function nextEpisode(item) {
+        if (item.kind !== 'Episode') return undefined;
+        const order = (i) => (i.seasonNumber || 0) * 10000 + (i.episodeNumber || 0);
+        const after = items
+          .filter((i) => i.kind === 'Episode' && i.state === 'done' && showKey(i) === showKey(item) && order(i) > order(item))
+          .sort((a, b) => order(a) - order(b))[0];
+        if (!after) return undefined;
+        return { title: after.seasonNumber !== undefined ? `S${after.seasonNumber}:E${after.episodeNumber} · ${after.title}` : after.title, go: () => play(after, 0) };
       }
-      function close() {
-        if (current) remember(current, filmTime(), nearlyDone(current, filmTime()), true);
-        if (engine) {
-          stopListening?.();
-          stopListening = undefined;
-          engine.command('stop');
-          document.documentElement.classList.remove('overlay-playing');
-          controls.hidden = true;
-          if (document.documentElement.classList.contains('fullscreen')) desktop.toggleFullscreen?.();
-        } else {
-          video.pause();
-          video.removeAttribute('src');
-          video.load();
-        }
-        player.hidden = true;
-        current = undefined;
-        desktop.filmShowing?.(false);
-        // Came straight from the app to watch this? Go back there.
-        if (launchedToPlay) desktop.openServer();
-      }
-      setInterval(() => current && !filmPaused() && remember(current, filmTime(), false, false), 5000);
-      video.addEventListener('ended', () => {
-        if (current) remember(current, video.duration || filmTime(), true, true);
-        current = undefined; // told already: closing mustn't say "not finished"
-        close();
-      });
-      document.getElementById('close').onclick = close;
-      // Like the app's own player: Back fades away while watching, comes back when the mouse moves.
-      let idleTimer;
-      const wake = () => {
-        player.classList.remove('idle');
-        engine?.command('controls', true); // subtitles move up, clear of the controls
-        clearTimeout(idleTimer);
-        idleTimer = setTimeout(() => {
-          if (filmPaused() || player.hidden) return;
-          player.classList.add('idle');
-          engine?.command('controls', false);
-        }, 2500);
-      };
-      for (const type of ['mousemove', 'mousedown', 'touchstart', 'keydown']) player.addEventListener(type, wake);
-      video.addEventListener('play', wake);
-      video.addEventListener('pause', wake);
-      const fullscreen = () => document.documentElement.classList.toggle('fullscreen', Boolean(document.fullscreenElement) || window.innerHeight === screen.height);
-      document.addEventListener('fullscreenchange', fullscreen);
-      window.addEventListener('resize', fullscreen);
-      // The app's full screen (Windows) tells the page, so Escape leaves it before closing the film.
-      engine?.onState((state) => typeof state.fullscreen === 'boolean' && document.documentElement.classList.toggle('fullscreen', state.fullscreen));
-      document.addEventListener('keydown', (e) => {
-        if (e.key !== 'Escape' || player.hidden) return;
-        if (engine && document.documentElement.classList.contains('fullscreen')) desktop.toggleFullscreen?.();
-        else close();
-      });
+      // Back (Android's Back key, and the apps' own back handling) closes the film first.
+      window.netfishBack = () => Boolean(window.NetfishPlayer?.isOpen() && (NetfishPlayer.back(), true));
       document.getElementById('home').onclick = () => desktop.openServer();
     </script>
   </body>

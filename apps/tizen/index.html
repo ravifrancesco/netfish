@@ -115,6 +115,8 @@
       (function () {
         var SERVER = 'netfish.server';
         var OPENED = 'netfish.opened';
+        // Filled in by scripts/build-tizen.sh; Netfish shows it in Settings → Devices.
+        var VERSION = '__VERSION__';
         var KEY = { up: 38, down: 40, enter: 13, back: 10009 };
         var opening = document.getElementById('opening');
         var openingText = document.getElementById('opening-text');
@@ -231,7 +233,7 @@
         function open(origin) {
           localStorage.setItem(SERVER, origin);
           sessionStorage.setItem(OPENED, '1');
-          location.href = origin + '/?tv=1';
+          location.href = origin + '/?tv=1' + (/^\d+\.\d+\.\d+$/.test(VERSION) ? '&app=samsung&v=' + VERSION : '');
         }
 
         function showSetup(message) {

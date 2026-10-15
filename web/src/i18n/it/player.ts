@@ -141,4 +141,8 @@ export default {
   'Bazarr searches your subtitle providers; Netfish refreshes the library when they arrive.':
     'Bazarr cerca tra i tuoi provider di sottotitoli; Netfish aggiorna la libreria quando arrivano.',
   '{done} of {total} searched…': '{done} di {total} cercati…',
+  // Downloads, in the same player
+  'Track {id}': 'Traccia {id}',
+  "This download couldn't play: {error}": 'Impossibile riprodurre questo download: {error}',
+  "this device can't open the file": 'questo dispositivo non riesce ad aprire il file',
 } as Record<string, string>;

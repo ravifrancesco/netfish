@@ -16,4 +16,4 @@ Films play with ExoPlayer and the device's hardware decoder, with every sound fo
 
 **Downloads** for offline viewing: the **Download** button on any movie or episode; find them in the profile menu → **Downloads on this device**. Away from home, the app opens your downloads.
 
-**Updating:** download and install the new APK the same way; your sign-in and downloads are kept.
+**Updating:** most new features arrive through your server, with no app update. When the app itself has something new worth having, Netfish says so on Home. From 0.6.3, **Update** there (or in **Settings → Android app**) downloads the new version and Android asks you to confirm; the first time, it asks to let Netfish install apps. Older versions: download and install the new APK the same way. Your sign-in and downloads are kept.

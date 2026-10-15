@@ -16,4 +16,4 @@ I film si riproducono con ExoPlayer e il decoder hardware del dispositivo, e l'a
 
 **Download** per guardare offline: c'è il pulsante **Scarica** su ogni film ed episodio; li trovi nel menu del profilo → **Download su questo dispositivo**. Quando sei fuori casa, l'app apre direttamente i tuoi download.
 
-**Aggiornare:** scarica e installa il nuovo APK allo stesso modo; accesso e download restano.
+**Aggiornare:** la maggior parte delle novità arriva tramite il tuo server, senza aggiornare l'app. Quando è l'app stessa ad avere qualcosa di nuovo che vale la pena installare, Netfish te lo dice nella Home. Dalla 0.6.3, **Aggiorna** lì (o in **Impostazioni → App Android**) scarica la nuova versione e Android ti chiede di confermare; la prima volta ti chiede di consentire a Netfish di installare app. Versioni precedenti: scarica e installa il nuovo APK allo stesso modo. Accesso e download restano.

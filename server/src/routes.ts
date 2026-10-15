@@ -49,7 +49,7 @@ import { personDetail } from './services/people';
 import { hideFromContinue, setPosition, setWatched } from './services/watched';
 import { readyToWatch } from './services/ready';
 import { command, control, createRoom, endRoom, getRoom, leave, listRooms, openStream, setTracks, setWaiting } from './services/together';
-import { listScreens, openLive, playOn } from './services/screens';
+import { listDevices, listScreens, openLive, playOn } from './services/screens';
 import { cleanupSuggestions, keepForGood } from './services/cleanup';
 import { cancelRequest, deleteFromDisk, downloadAgain, removedTitles, stopDownload, storage } from './services/manage';
 import { createRequest, listRequests, myRequestKeys } from './services/requests';
@@ -332,7 +332,7 @@ export async function apiRoutes(app: FastifyInstance) {
     type Room = { Params: { id: string } };
     api.get('/together', async () => ({ rooms: listRooms() }));
     // The live line every open Netfish keeps: rooms, screens, and "play this" (Play on TV).
-    api.get<{ Querystring: { screen?: string; name?: string; kind?: string } }>('/together/live', async (req, reply) => {
+    api.get<{ Querystring: { screen?: string; name?: string; kind?: string; app?: string; version?: string } }>('/together/live', async (req, reply) => {
       openLive(userOf(req), reply, req.query);
       return reply;
     });
@@ -402,6 +402,7 @@ export async function apiRoutes(app: FastifyInstance) {
 
     // Connections to the other services (addresses, API keys), editable by admins.
     api.get('/admin/connections', { preHandler: requireAdmin }, async () => ({ items: listConnections() }));
+    api.get('/admin/devices', { preHandler: requireAdmin }, async () => ({ devices: listDevices() }));
     api.put<{ Params: { id: string }; Body: ServiceConnectionUpdate }>('/admin/connections/:id', { preHandler: requireAdmin }, async (req) =>
       updateConnection(req.params.id, req.body ?? {}),
     );

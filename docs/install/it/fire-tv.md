@@ -53,7 +53,7 @@ Quando Downloader ti propone di eliminare il file scaricato, puoi farlo per risp
 
 ## Aggiornare
 
-La maggior parte delle novità arriva tramite il tuo server. Per una nuova versione dell'app, ripeti il passaggio 4 (il link porta sempre alla più recente) e scegli **Installa**: accesso e impostazioni restano.
+La maggior parte delle novità arriva tramite il tuo server. Quando è l'app stessa ad avere qualcosa di nuovo che vale la pena installare, Netfish te lo dice nella Home. Dalla 0.6.3, **Aggiorna** lì (o in **Impostazioni → App TV**) la scarica e la Fire TV ti chiede di confermare. La prima volta, consenti a Netfish di installare app: **Impostazioni → La mia Fire TV → Opzioni sviluppatore → Installa app sconosciute → Netfish**. Versioni precedenti: ripeti il passaggio 4 (il link porta sempre alla più recente) e scegli **Installa**. Accesso e impostazioni restano.
 
 Se poi il riquadro di Netfish nella schermata Home mostra ancora l'immagine vecchia, riavvia una volta la Fire TV (**Impostazioni → La mia Fire TV → Riavvia**): fino ad allora tiene le immagini delle app.
 

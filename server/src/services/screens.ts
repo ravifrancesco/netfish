@@ -1,6 +1,6 @@
 import type { ServerResponse } from 'node:http';
 import type { FastifyReply } from 'fastify';
-import type { LiveEvent, Screen, ScreenKind, TogetherRoom } from '@netfish/shared';
+import type { Device, LiveEvent, Screen, ScreenKind, TogetherRoom } from '@netfish/shared';
 import type { SessionUser } from '../auth';
 import { openLine, ping, send } from '../lib/sse';
 import { HttpError } from '../lib/upstream';
@@ -23,6 +23,8 @@ interface Line {
   userId: string;
   userName: string;
   screen?: { id: string; name: string; kind: ScreenKind };
+  /** The Netfish app it's open in, and its version (for Settings → Devices). */
+  app?: { name: string; version: string };
   since: number;
 }
 
@@ -49,6 +51,21 @@ function screensFor(userId: string): Screen[] {
 
 export const listScreens = (user: SessionUser) => screensFor(user.id);
 
+/** Every Netfish open right now, whoever's signed in, with its app and version (admins). */
+export function listDevices(): Device[] {
+  return [...screens().values()]
+    .map((line) => ({
+      id: line.screen!.id,
+      name: line.screen!.name,
+      kind: line.screen!.kind,
+      userName: line.userName,
+      app: line.app?.name,
+      version: line.app?.version,
+      since: new Date(line.since).toISOString(),
+    }))
+    .sort((a, b) => a.userName.localeCompare(b.userName) || a.name.localeCompare(b.name));
+}
+
 // Changes go out together, a moment later: a burst (a room filling up) is one message.
 let pending: { rooms: boolean; screens: boolean } | undefined;
 function announce(what: 'rooms' | 'screens') {
@@ -70,9 +87,12 @@ onRoomsChanged(() => announce('rooms'));
 
 const cleanId = (v: unknown) => (typeof v === 'string' && /^[a-z0-9-]{8,40}$/i.test(v) ? v : undefined);
 const cleanName = (v: unknown) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f]/g, '').trim().slice(0, 40) : '');
+const APPS = ['mac', 'windows', 'ios', 'android', 'samsung'];
+const cleanApp = (name: unknown, version: unknown) =>
+  typeof name === 'string' && APPS.includes(name) && typeof version === 'string' && /^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(version) ? { name, version } : undefined;
 
 /** Opens this Netfish's live line; with a screen id, name and kind it can also be played on. */
-export function openLive(user: SessionUser, reply: FastifyReply, query: { screen?: string; name?: string; kind?: string }) {
+export function openLive(user: SessionUser, reply: FastifyReply, query: { screen?: string; name?: string; kind?: string; app?: string; version?: string }) {
   const id = cleanId(query.screen);
   const kind = KINDS.find((k) => k === query.kind) ?? 'browser';
   const line: Line = {
@@ -80,6 +100,7 @@ export function openLive(user: SessionUser, reply: FastifyReply, query: { screen
     userId: user.id,
     userName: user.name,
     screen: id ? { id, name: cleanName(query.name) || 'Netfish', kind } : undefined,
+    app: cleanApp(query.app, query.version),
     since: Date.now(),
   };
   lines.add(line);

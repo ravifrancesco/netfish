@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { LiveEvent, TogetherAction, TogetherCommand, TogetherEvent, TogetherRoom } from '@netfish/shared';
 import { api, ApiError } from '../api';
 import { screenId, screenKind, useScreenName } from './screens';
+import { thisApp } from './appVersions';
 
 // ---------- The rooms on this server (Home, the top bar, title pages) ----------
 
@@ -40,6 +41,12 @@ export function useLive() {
   useEffect(() => {
     if (typeof EventSource === 'undefined') return;
     const query = new URLSearchParams({ screen: screenId(), name, kind: screenKind() });
+    // Which app and version (Settings → Devices shows who needs an update).
+    const app = thisApp();
+    if (app) {
+      query.set('app', app.name);
+      query.set('version', app.version);
+    }
     let source: EventSource | undefined;
     const open = () => {
       source?.close();

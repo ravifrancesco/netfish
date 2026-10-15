@@ -15,7 +15,7 @@ I film si riproducono con mpv sotto i controlli di Netfish, come in Jellyfin Med
 
 **Download** per guardare offline: c'è il pulsante **Scarica** su ogni film ed episodio. I file vengono salvati esattamente come sono sul server (nessuna conversione), in `%LOCALAPPDATA%\Netfish\Offline`. I download interrotti ripartono da dove si erano fermati.
 
-**Aggiornare:** dalla versione 0.3, Netfish ti avvisa nella Home quando esce una nuova versione: **Impostazioni → App desktop → Aggiorna** la scarica, la installa e riapre Netfish. Accesso e download restano. Versioni precedenti: avvia il nuovo programma di installazione; sostituisce l'app. Dalla 0.4 lì puoi anche attivare **Aggiornamento automatico**: le nuove versioni si scaricano in background e si installano quando chiudi Netfish, senza interrompere quello che stai guardando.
+**Aggiornare:** Netfish ti avvisa nella Home quando vale la pena installare una nuova versione (dalla 0.6.3, solo quando è l'app stessa ad avere novità; la maggior parte arriva tramite il tuo server). In qualsiasi momento, **Impostazioni → App desktop → Aggiorna** la scarica, la installa e riapre Netfish. Accesso e download restano. Versioni precedenti: avvia il nuovo programma di installazione; sostituisce l'app. Dalla 0.4 lì puoi anche attivare **Aggiornamento automatico**: le nuove versioni si scaricano in background e si installano quando chiudi Netfish, senza interrompere quello che stai guardando.
 
 **Disinstallare:** Impostazioni → App → Netfish → Disinstalla. Ti chiede se eliminare anche i download.
 

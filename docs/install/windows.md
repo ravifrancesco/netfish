@@ -15,7 +15,7 @@ Films play with mpv underneath Netfish's own controls, like Jellyfin Media Playe
 
 **Downloads** for offline viewing: the **Download** button on any movie or episode. Files are saved exactly as they are on the server (no conversion), in `%LOCALAPPDATA%\Netfish\Offline`. Interrupted downloads continue where they stopped.
 
-**Updating:** from version 0.3, Netfish tells you on Home when a new version is out: **Settings → Desktop app → Update** downloads it, installs it and reopens Netfish. Your sign-in and downloads are kept. Older versions: run the new installer; it replaces the app. From 0.4 you can also switch on **Auto-update** there: new versions download in the background and install when you close Netfish, so nothing you're watching is interrupted.
+**Updating:** Netfish tells you on Home when a new version is worth installing (from 0.6.3, only when the app itself has something new; most features arrive through your server). Any time, **Settings → Desktop app → Update** downloads it, installs it and reopens Netfish. Your sign-in and downloads are kept. Older versions: run the new installer; it replaces the app. From 0.4 you can also switch on **Auto-update** there: new versions download in the background and install when you close Netfish, so nothing you're watching is interrupted.
 
 **Uninstalling:** Settings → Apps → Netfish → Uninstall. It asks whether to delete your downloads too.
 

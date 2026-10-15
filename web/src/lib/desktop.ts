@@ -97,10 +97,19 @@ export interface DesktopBridge {
   saveSnapshot?: (snapshot: string) => void;
   /** A system notification; clicking it opens `path` in Netfish. */
   notify?: (n: { title: string; body: string; path: string }) => void;
+  /**
+   * iPhone and iPad, installed from a Mac: when this install stops opening (ISO date; every
+   * 7 days with a free Apple ID), or null when it doesn't expire. Apps from 0.6.3 on.
+   */
+  installExpires?: () => Promise<string | null>;
   update?: {
     check: () => Promise<UpdateStatus>;
-    /** Downloads and installs the new version; the app restarts when it's done. */
+    /**
+     * Downloads and installs the new version: the Mac and Windows apps restart when it's done;
+     * Android (asksToConfirm) hands it to the system, which asks you to confirm.
+     */
     install: () => Promise<void>;
+    asksToConfirm?: boolean;
     /** Turns "Update Netfish by itself" on or off (apps from 0.4 on). */
     setAuto?: (on: boolean) => Promise<void>;
     onProgress: (callback: (p: { received: number; total: number }) => void) => () => void;
@@ -145,6 +154,9 @@ interface AndroidNative {
   takePositions?(): string;
   saveSnapshot?(snapshot: string): void;
   notify?(notification: string): void;
+  /** Updates (apps from 0.6.3 on): both answer through window.__netfishUpdate. */
+  updateCheck?(): void;
+  updateInstall?(): void;
 }
 
 declare global {
@@ -171,6 +183,48 @@ function offlineChangesViaWindow(callback: (list: OfflineItem[]) => void) {
   (window as { __netfishOfflineChanged?: (list: OfflineItem[]) => void }).__netfishOfflineChanged = (list) => offlineListeners.forEach((cb) => cb(list));
   offlineListeners.add(callback);
   return () => void offlineListeners.delete(callback);
+}
+
+/** What the Android app says about updates: a check's result, download progress, done or a problem. */
+interface UpdateEvent {
+  for: 'check' | 'install';
+  status?: UpdateStatus;
+  received?: number;
+  total?: number;
+  /** The system is asking to confirm the install. */
+  done?: boolean;
+  error?: string;
+}
+const updateListeners = new Set<(e: UpdateEvent) => void>();
+
+/** Android's updater: the new APK from the release, handed to the system's installer. */
+function androidUpdate(native: AndroidNative): NonNullable<DesktopBridge['update']> {
+  (window as { __netfishUpdate?: (e: UpdateEvent) => void }).__netfishUpdate = (e) => updateListeners.forEach((cb) => cb(e));
+  const ask = <T>(kind: UpdateEvent['for'], start: () => void, answer: (e: UpdateEvent) => T | undefined) =>
+    new Promise<T>((resolve, reject) => {
+      const listener = (e: UpdateEvent) => {
+        if (e.for !== kind) return;
+        const value = e.error ? undefined : answer(e);
+        if (!e.error && value === undefined) return; // progress
+        updateListeners.delete(listener);
+        if (e.error) reject(new Error(e.error));
+        else resolve(value as T);
+      };
+      updateListeners.add(listener);
+      start();
+    });
+  return {
+    check: () => ask('check', () => native.updateCheck!(), (e) => e.status),
+    install: () => ask('install', () => native.updateInstall!(), (e) => (e.done ? true : undefined)).then(() => undefined),
+    asksToConfirm: true,
+    onProgress: (callback) => {
+      const listener = (e: UpdateEvent) => {
+        if (e.for === 'install' && e.total !== undefined) callback({ received: e.received ?? 0, total: e.total });
+      };
+      updateListeners.add(listener);
+      return () => void updateListeners.delete(listener);
+    },
+  };
 }
 
 /** The bridge's answers: a JSON list, or {"error": "…"}. */
@@ -209,6 +263,8 @@ function androidBridge(): DesktopBridge | undefined {
           notify: native.notify ? (n: { title: string; body: string; path: string }) => native.notify!(JSON.stringify(n)) : undefined,
         }
       : {}),
+    // Phones and TVs alike: a new version installs from inside the app.
+    update: native.updateCheck && native.updateInstall ? androidUpdate(native) : undefined,
     // ExoPlayer draws the film underneath the page; the page's player drives it.
     videoOverlay: native.videoLoad
       ? {

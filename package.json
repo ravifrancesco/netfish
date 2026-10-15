@@ -1,6 +1,6 @@
 {
   "name": "netfish",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "private": true,
   "description": "A Netflix-style front door for a Jellyfin + Seerr + *arr home media stack.",
   "license": "MIT",
@@ -24,7 +24,8 @@
     "build:android": "scripts/build-android.sh",
     "build:windows": "apps/windows/build.sh",
     "build:samsung": "scripts/build-tizen.sh",
-    "build:ios": "scripts/build-ios.sh"
+    "build:ios": "scripts/build-ios.sh",
+    "build:player": "npm run build:player -w web"
   },
   "engines": {
     "node": ">=22"

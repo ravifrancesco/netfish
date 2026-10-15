@@ -3,7 +3,7 @@ plugins {
 }
 
 // Version shown in Settings; keep in step with the root package.json.
-def netfishVersion = '0.6.2'
+def netfishVersion = '0.6.3'
 
 android {
     namespace 'app.netfish.tv'
@@ -51,7 +51,7 @@ android {
 }
 
 tasks.register('copyCommonPages', Copy) {
-    from('../../common') { include 'offline.html', 'loading.html' }
+    from('../../common') { include 'offline.html', 'loading.html', 'player.js' }
     into layout.buildDirectory.dir('generated/commonAssets')
 }
 tasks.named('preBuild') { dependsOn 'copyCommonPages' }

@@ -23,4 +23,13 @@
     <!-- Player -->
     <string name="error_cant_play">The TV couldn\'t play this (%1$s)</string>
     <string name="notice_channel">Ready to watch</string>
+    <string name="update_cant_check">Couldn\'t check for updates (%1$s)</string>
+    <string name="update_not_this_build">This test build can\'t update itself</string>
+    <string name="update_no_file">The new version has no Android app</string>
+    <string name="update_wrong_file">That download isn\'t a Netfish update for this app</string>
+    <string name="update_allow">Allow Netfish to install apps (that setting just opened), then press Update again.</string>
+    <string name="update_allow_tv">Allow Netfish to install apps: Settings → My Fire TV → Developer options → Install unknown apps → Netfish. Then press Update again.</string>
+    <string name="update_download_failed">The update didn\'t download (%1$s)</string>
+    <string name="update_failed">The update didn\'t install (%1$s)</string>
+    <string name="update_cancelled">Update cancelled</string>
 </resources>

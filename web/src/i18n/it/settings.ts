@@ -91,4 +91,30 @@ export default {
   Import: 'Importa',
   'Unlink {name}? Trakt keeps its history.': 'Scollegare {name}? Trakt conserva la sua cronologia.',
   Unlink: 'Scollega',
+  // Updates for the apps, and the devices list
+  'Confirm the update on screen.': "Conferma l'aggiornamento sullo schermo.",
+  'This install opens until {date}. To renew it, plug this device into the Mac it was installed from.':
+    'Questa installazione si apre fino a {date}. Per rinnovarla, collega questo dispositivo al Mac da cui è stata installata.',
+  'Netfish stops opening on this device on {date}. Plug it into the Mac it was installed from to renew it.':
+    'Su questo dispositivo Netfish smette di aprirsi {date}. Collegalo al Mac da cui è stato installato per rinnovarlo.',
+  'Update it the way you installed it: from your Mac, or in AltStore or SideStore.': "Aggiornala come l'hai installata: dal tuo Mac, oppure in AltStore o SideStore.",
+  'Download it again with the Downloader app, the same way you installed it.': "Scaricala di nuovo con l'app Downloader, come l'hai installata.",
+  'Download the new version from GitHub and install it, the same way you installed it.': "Scarica la nuova versione da GitHub e installala, come l'hai installata la prima volta.",
+  'Reinstall it from your computer, the same way you installed it.': "Reinstallala dal computer, come l'hai installata.",
+  'Downloading the update…': 'Scarico l’aggiornamento…',
+  'This app needs an update.': "Quest'app va aggiornata.",
+  'An update for this app is worth installing.': "Vale la pena aggiornare quest'app.",
+  "Downloads play in Netfish's own player, and it opens faster away from home.": 'I download si guardano nel player di Netfish, e fuori casa si apre più in fretta.',
+  "Downloads play in Netfish's own player, it opens faster away from home, and it installs its own updates from now on.":
+    "I download si guardano nel player di Netfish, fuori casa si apre più in fretta, e d'ora in poi si aggiorna da sola.",
+  'opened {ago}': 'aperto {ago}',
+  'Needs an update': 'Da aggiornare',
+  'Update recommended': 'Aggiornamento consigliato',
+  'No update needed': 'Non serve aggiornare',
+  'Mac app': 'App per Mac',
+  'Windows app': 'App per Windows',
+  'Samsung TV app': 'App per TV Samsung',
+  Browser: 'Browser',
+  Devices: 'Dispositivi',
+  'Where Netfish is open right now, and whether its app should be updated.': "Dove Netfish è aperto in questo momento, e se la sua app va aggiornata.",
 } as Record<string, string>;

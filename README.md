@@ -51,7 +51,7 @@ A Netflix-style front door for a home media server. One app to browse, discover,
 
 ### Apps
 - **Everywhere:** the web app at `http://<pi>:7777` (phones too), plus apps for Mac, Windows, iPhone/iPad, Android (phones, tablets, Fire TV, Android TV) and Samsung TVs.
-- **Up to date by themselves:** the TV and phone apps get new features from the server; the Mac and Windows apps install new versions in one click, or on their own with **Auto-update**.
+- **Up to date by themselves:** the TV and phone apps get new features from the server. When an app itself has something new worth having, Netfish says so on that device, and the Mac, Windows and Android apps (Fire TV too) update in one click; the Mac and Windows apps can also do it on their own with **Auto-update**. Admins see every open device and its version in **Settings → Devices**, and an iPhone installed from a Mac warns before its 7 days run out.
 
 Sign-in uses your Jellyfin accounts. Jellyfin keeps doing the heavy lifting (library, streaming, users) behind the scenes; nobody needs to open it.
 
@@ -127,7 +127,7 @@ The apps show the interface from your server, so most new features arrive by upd
 
 **1. Portainer → Stacks → Add stack**, name it `netfish`, paste [`docker-compose.yml`](docker-compose.yml), and **Deploy**. No variables are needed: Portainer pulls the ready-made image `ghcr.io/ravifrancesco/netfish:latest` (built by GitHub for Raspberry Pi and PCs).
 
-**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.6.2`.
+**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.6.3`.
 
 <details>
 <summary>Or build the image on the Pi yourself</summary>

@@ -25,7 +25,7 @@ swiftc -O -swift-version 5 -target arm64-apple-macos15.0 \
 
 sed "s/__VERSION__/$VERSION/g" Netfish/Info.plist > "$APP/Contents/Info.plist"
 # The setup and downloads pages are shared with the other apps.
-cp ../common/setup.html ../common/offline.html ../common/loading.html "$APP/Contents/Resources/"
+cp ../common/setup.html ../common/offline.html ../common/loading.html ../common/player.js "$APP/Contents/Resources/"
 # English and Italian (shared with the iPhone app): macOS then shows its own menu items, alerts and
 # the local network prompt in Italian too when that's your language.
 cp -R ../ios/Netfish/en.lproj ../ios/Netfish/it.lproj "$APP/Contents/Resources/"

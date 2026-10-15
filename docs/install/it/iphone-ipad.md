@@ -43,7 +43,7 @@ Ti serve un Mac. La prima volta ci vogliono circa 30 minuti, soprattutto per sca
 8. **Autorizza l'app:** la prima volta l'iPhone si rifiuta di aprirla. Vai in **Impostazioni → Generali → VPN e gestione dispositivi**, tocca il tuo Apple ID sotto *App sviluppatore* e tocca **Autorizza**.
 9. Apri **Netfish**, permettile di trovare i dispositivi sulla tua **rete locale** e inserisci l'indirizzo del tuo server.
 
-**Ogni 7 giorni** (con l'Apple ID gratuito) l'app smette di aprirsi. Collega l'iPhone e premi di nuovo **▶ Run** in Xcode; download e accesso restano. Un [account Apple Developer](https://developer.apple.com/programs/) a pagamento (99 $/anno) fa durare ogni installazione un anno e ti permette di usare TestFlight invece del cavo.
+**Ogni 7 giorni** (con l'Apple ID gratuito) l'app smette di aprirsi. Collega l'iPhone e premi di nuovo **▶ Run** in Xcode; download e accesso restano. Dalla 0.6.3 Netfish ti avvisa nella Home un paio di giorni prima, e le **Impostazioni** mostrano la data. Un [account Apple Developer](https://developer.apple.com/programs/) a pagamento (99 $/anno) fa durare ogni installazione un anno e ti permette di usare TestFlight invece del cavo.
 
 ## Opzione 3: AltStore o SideStore
 

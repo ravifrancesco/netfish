@@ -472,6 +472,8 @@ final class OfflineStore {
                 page = page.replaceFirst("<head>", "<head><script>" + BRIDGE + "</script>");
                 return new WebResourceResponse("text/html", "utf-8", new ByteArrayInputStream(page.getBytes(StandardCharsets.UTF_8)));
             }
+            // Netfish's player for downloads, built from the web app (apps/common/player.js).
+            if ("player.js".equals(parts.get(0))) return new WebResourceResponse("text/javascript", "utf-8", context.getAssets().open("player.js"));
             if (!"media".equals(parts.get(0)) || parts.size() < 3) return notFound();
             JSONObject e = entry(parts.get(1));
             if (e == null) return notFound();

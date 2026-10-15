@@ -53,7 +53,7 @@ You can delete the downloaded file when Downloader offers to, to save space.
 
 ## Updating
 
-Most new features arrive through your server. For a new app version, repeat step 4 (the link always gives the newest one) and choose **Install**: your sign-in and settings are kept.
+Most new features arrive through your server. When the app itself has something new worth having, Netfish says so on Home. From 0.6.3, **Update** there (or in **Settings → TV app**) downloads it and the Fire TV asks you to confirm. The first time, allow Netfish to install apps: **Settings → My Fire TV → Developer options → Install unknown apps → Netfish**. Older versions: repeat step 4 (the link always gives the newest one) and choose **Install**. Your sign-in and settings are kept.
 
 If the Netfish tile on the Home screen still shows the old picture afterwards, restart the Fire TV once (**Settings → My Fire TV → Restart**): it keeps app pictures until then.
 

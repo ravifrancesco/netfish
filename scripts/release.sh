@@ -13,11 +13,25 @@ TAG="v$VERSION"
 OWNER=$(gh repo view --json owner -q .owner.login)
 
 [ -z "$(git status --porcelain)" ] || { echo "Commit your changes first." >&2; exit 1; }
+# The downloads page's player is built from the web app and committed, so the apps build without Node.
+npm run build:player >/dev/null
+git diff --quiet -- apps/common/player.js || { echo "apps/common/player.js was out of date: commit the rebuilt copy." >&2; exit 1; }
 if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
   echo "$TAG already exists: raise the version in package.json first." >&2
   exit 1
 fi
 grep -q "netfishVersion = '$VERSION'" apps/android/app/build.gradle || { echo "Set netfishVersion to '$VERSION' in apps/android/app/build.gradle." >&2; exit 1; }
+# The app versions Netfish asks devices to update to can't be newer than this release.
+node -e '
+const [file, version] = process.argv.slice(1);
+const n = (v) => v.split(".").reduce((sum, part) => sum * 1000 + Number(part), 0);
+const asked = [...require("fs").readFileSync(file, "utf8").matchAll(/(?:recommended|needed): .(\d+\.\d+\.\d+)./g)].map((m) => m[1]);
+const ahead = asked.filter((v) => n(v) > n(version));
+if (ahead.length) {
+  console.error(`web/src/lib/appVersions.ts asks for ${[...new Set(ahead)].join(", ")}, newer than ${version}.`);
+  process.exit(1);
+}
+' web/src/lib/appVersions.ts "$VERSION"
 
 if [ "${SKIP_BUILD:-}" != 1 ]; then
   npm run pack:pi

@@ -7,6 +7,18 @@ import Foundation
 enum Bridge {
     static let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
 
+    /// Installed from a Mac (or AltStore, SideStore): when the app stops opening, from the
+    /// provisioning profile inside it (every 7 days with a free Apple ID). Nil from the App Store.
+    static let installExpires: Date? = {
+        guard let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
+              let data = try? Data(contentsOf: url),
+              let start = data.range(of: Data("<?xml".utf8)),
+              let end = data.range(of: Data("</plist>".utf8), in: start.lowerBound..<data.endIndex),
+              let plist = try? PropertyListSerialization.propertyList(from: data[start.lowerBound..<end.upperBound], format: nil) as? [String: Any]
+        else { return nil }
+        return plist["ExpirationDate"] as? Date
+    }()
+
     static let script = """
     (() => {
       if (window.netfishDesktop) return;
@@ -33,6 +45,7 @@ enum Bridge {
         saveSnapshot: (json) => { call('saveSnapshot', json); },
         snapshot: () => call('snapshot'),
         serverReachable: () => call('serverReachable'),
+        installExpires: () => call('installExpires'),
         changeServer: () => { call('changeServer'); },
         connect: (input) => call('connect', input),
         currentServer: () => call('currentServer'),
@@ -104,6 +117,8 @@ final class BridgeHandler: NSObject, WKScriptMessageHandlerWithReply {
         case "serverReachable":
             guard let server = Server.url else { return false }
             return await Server.reachable(server)
+        case "installExpires":
+            return Bridge.installExpires.map { ISO8601DateFormatter().string(from: $0) } ?? NSNull()
         case "openServer":
             controller?.showServer()
             return nil

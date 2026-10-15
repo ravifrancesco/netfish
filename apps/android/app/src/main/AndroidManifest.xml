@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- "Ready to watch" notifications on phones and tablets (Android 13+ asks once). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Updates from inside the app: the new version goes to Android's installer, which asks to confirm. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Phones, tablets and TVs: no touchscreen required, and it shows up on Fire TV / Android TV home screens. -->
     <uses-feature android:name="android.software.leanback" android:required="false" />

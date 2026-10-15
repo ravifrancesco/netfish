@@ -507,6 +507,19 @@ export interface Screen {
   mine: boolean;
 }
 
+/** Settings → Devices (admins): every Netfish open right now, and which app it runs. */
+export interface Device {
+  id: string;
+  name: string;
+  kind: ScreenKind;
+  userName: string;
+  /** The Netfish app around it (mac, windows, ios, android, samsung); none in a browser. */
+  app?: string;
+  version?: string;
+  /** Open since (ISO). */
+  since: string;
+}
+
 /**
  * The live line every open Netfish keeps to the server: the rooms (Home, the top bar and
  * title pages follow them), the screens you can play on, and "open this" when someone

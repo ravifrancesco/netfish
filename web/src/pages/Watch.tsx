@@ -1,33 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import Hls from 'hls.js';
-import {
-  ArrowLeft,
-  Captions,
-  Check,
-  Maximize,
-  Minimize,
-  Pause,
-  Play,
-  RotateCcw,
-  RotateCw,
-  SkipForward,
-  Users,
-  Volume2,
-  VolumeX,
-} from 'lucide-react';
+import { Play, Users } from 'lucide-react';
 import type { PlaybackSession, ProgressReport, StreamTrack, TogetherCommand } from '@netfish/shared';
 import { api } from '../api';
 import { useToast } from '../components/ui';
 import { SwimmingFish } from '../components/Logo';
-import { clock } from '../lib/format';
 import { getPrefs, setPrefs, usePrefs } from '../lib/prefs';
 import { desktop } from '../lib/desktop';
-import { isTV } from '../lib/tv';
 import { buildDeviceProfile } from '../player/profile';
 import { OverlayVideo, trackPositions } from '../player/overlay';
-import { parseVtt, type Cue } from '../player/vtt';
+import { PlayerView, useVolume } from '../player/PlayerView';
 import { explainReasons } from '../player/reasons';
 import { useTogether } from '../lib/together';
 import { TogetherChip, TogetherNotes, TogetherPanel } from '../components/Together';
@@ -48,33 +32,6 @@ function pickSubtitle(s: PlaybackSession, current: StreamTrack | undefined, anyK
   if (fromServer) return fromServer;
   if (!getPrefs().subtitlesByDefault) return s.subtitleTracks.find((t) => t.forced && usable(t));
   return s.subtitleTracks.find((t) => t.code === getPrefs().subtitleLanguage && !t.forced && usable(t));
-}
-
-/** Subtitles drawn by the page over the app's player, for players that can't draw them (Apple's). */
-function PageSubtitles({ url, time, raised }: { url: string; time: number; raised: boolean }) {
-  const [cues, setCues] = useState<Cue[]>([]);
-  useEffect(() => {
-    let alive = true;
-    setCues([]);
-    fetch(url)
-      .then((r) => r.text())
-      .then((text) => alive && setCues(parseVtt(text)))
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [url]);
-  const showing = cues.filter((c) => time >= c.start && time <= c.end);
-  if (!showing.length) return null;
-  return (
-    <div className={`player__cues${raised ? ' is-raised' : ''}`} aria-live="polite">
-      {showing.map((c) => (
-        <span key={`${c.start}-${c.text}`} className="player__cue">
-          {c.text}
-        </span>
-      ))}
-    </div>
-  );
 }
 
 interface LoadOptions {
@@ -155,7 +112,6 @@ function Player() {
   const navigate = useNavigate();
   const prefs = usePrefs();
 
-  const container = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const hls = useRef<Hls | null>(null);
   const sessionRef = useRef<PlaybackSession | undefined>(undefined);
@@ -190,14 +146,8 @@ function Player() {
   const [time, setTime] = useState(0);
   const [length, setLength] = useState(0);
   const [buffered, setBuffered] = useState(0);
-  const [volume, setVolume] = useState(prefs.volume);
-  const [muted, setMuted] = useState(false);
-  const [showUi, setShowUi] = useState(true);
-  const [menu, setMenu] = useState(false);
+  const volume = useVolume(video);
   const [why, setWhy] = useState(false);
-  const [fullscreen, setFullscreen] = useState(false);
-  const [scrub, setScrub] = useState<number>();
-  const [nextCountdown, setNextCountdown] = useState<number>();
   const subtitleRef = useRef<StreamTrack | undefined>(undefined);
   subtitleRef.current = subtitle;
 
@@ -462,7 +412,7 @@ function Player() {
     readyToSync();
   };
   const onDurationChange = () => setLength(video.current?.duration ?? 0);
-  const onVolumeChange = () => setMuted(video.current?.muted ?? false);
+  const onVolumeChange = volume.onVolumeChange;
   const onLoaded = () => {
     overlayLoaded.current = true;
     setPictureShown(true);
@@ -476,7 +426,6 @@ function Player() {
     if (!started.current) {
       started.current = true;
       report('start');
-      poke(); // the controls fade away a few seconds into the film
     }
   };
 
@@ -497,22 +446,6 @@ function Player() {
   };
 
   handlers.current = { onPlaying, onPause, onWaiting, onCanPlay, onTimeUpdate, onDurationChange, onEnded, onVideoError, onVolumeChange, onLoaded };
-
-  // "Next episode" countdown near the end.
-  const credits = info.data?.segments.find((s) => s.type === 'Outro')?.start ?? (duration ? duration - 25 : Infinity);
-  const nearEnd = Boolean(next && duration && time >= credits && time < duration - 0.5);
-  useEffect(() => {
-    if (!nearEnd || !getPrefs().autoplayNext) {
-      setNextCountdown(undefined);
-      return;
-    }
-    setNextCountdown((c) => c ?? 10);
-    const timer = setInterval(() => setNextCountdown((c) => (c === undefined ? c : c - 1)), 1000);
-    return () => clearInterval(timer);
-  }, [nearEnd]);
-  useEffect(() => {
-    if (nextCountdown !== undefined && nextCountdown <= 0) goNext();
-  }, [nextCountdown, goNext]);
 
   // ---------- controls ----------
 
@@ -619,31 +552,6 @@ function Player() {
     const timer = setInterval(() => follow(false), 2000);
     return () => clearInterval(timer);
   }, [roomId, follow]);
-  const setVol = (val: number) => {
-    const v = video.current!;
-    v.volume = val;
-    v.muted = val === 0;
-    setVolume(val);
-    setMuted(val === 0);
-    setPrefs({ volume: val });
-  };
-  const toggleFullscreen = useCallback(() => {
-    // The Mac app: the whole window (mpv's picture is underneath the page, not part of it).
-    if (overlayActive.current && desktop()?.toggleFullscreen) return desktop()!.toggleFullscreen!();
-    if (document.fullscreenElement) void document.exitFullscreen();
-    else void container.current?.requestFullscreen();
-  }, []);
-
-  useEffect(() => {
-    const onFs = () => setFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener('fullscreenchange', onFs);
-    const stop = overlay?.onState((state) => typeof state.fullscreen === 'boolean' && setFullscreen(state.fullscreen));
-    return () => {
-      document.removeEventListener('fullscreenchange', onFs);
-      stop?.();
-    };
-  }, [overlay]);
-
   // mpv mode: the page is see-through where the picture is.
   useEffect(() => {
     if (!useOverlay) return;
@@ -669,23 +577,10 @@ function Player() {
     return () => desktop()?.keepAwake?.(false);
   }, [playing]);
 
-  // Auto-hide the controls while playing.
-  const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const poke = useCallback(() => {
-    setShowUi(true);
-    clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => setShowUi(false), 3000);
-  }, []);
-  useEffect(() => () => clearTimeout(hideTimer.current), []);
-  const uiVisible = showUi || !playing || menu || roomPanel || Boolean(error);
-
   // The app's player keeps its subtitles above the controls while they show (like the web player does).
-  useEffect(() => {
-    if (useOverlay) overlay?.command('controls', uiVisible);
-  }, [useOverlay, uiVisible, overlay]);
+  const onControls = useCallback((showing: boolean) => useOverlay && overlay?.command('controls', showing), [useOverlay, overlay]);
 
   const chooseAudio = (track: StreamTrack) => {
-    setMenu(false);
     if (track.index === audioIndex) return;
     const s = sessionRef.current;
     if (overlayActive.current && appSwitchesTracks && s) {
@@ -700,7 +595,6 @@ function Player() {
     void load({ start: video.current?.currentTime ?? 0, audio: track.index, subtitle: subtitle?.burnIn ? subtitle.index : undefined, allowDirectPlay: s?.method === 'DirectPlay' && track.default ? true : false });
   };
   const chooseSubtitle = (track?: StreamTrack) => {
-    setMenu(false);
     const wasBurned = subtitle?.burnIn;
     setSubtitle(track);
     if (track) setPrefs({ subtitleLanguage: track.code ?? getPrefs().subtitleLanguage });
@@ -736,397 +630,169 @@ function Player() {
       .catch(() => {});
   }, [remote, roomId, session, joined, audioIndex, subtitle]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
-      const v = video.current;
-      poke();
-      if (e.defaultPrevented) return; // TV: focus moved between the controls
-      switch (e.key) {
-        case 'MediaPlayPause':
-          toggle();
-          return;
-        case 'MediaPlay':
-          if (!playing) toggle();
-          return;
-        case 'MediaPause':
-          if (playing) toggle();
-          return;
-        case 'MediaFastForward':
-          seekTo((v?.currentTime ?? 0) + 30);
-          return;
-        case 'MediaRewind':
-          seekTo((v?.currentTime ?? 0) - 30);
-          return;
-      }
-      if (isTV()) {
-        // Remote: with the controls hidden (or nothing chosen), Select pauses, left/right
-        // skip 10 s, and up/down bring up the controls on the most useful button.
-        const onControl = uiVisible && (e.target as HTMLElement).closest?.('button, a, [tabindex]');
-        if (!onControl) {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            toggle();
-            return;
-          }
-          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-            e.preventDefault();
-            container.current?.querySelector<HTMLElement>('.player__skip, .player__next .btn--primary, .player__controls button')?.focus();
-            return;
-          }
-        }
-        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') return;
-      }
-      switch (e.key) {
-        case ' ':
-        case 'k':
-          e.preventDefault();
-          toggle();
-          break;
-        case 'ArrowLeft':
-          e.preventDefault();
-          seekTo((v?.currentTime ?? 0) - 10);
-          break;
-        case 'ArrowRight':
-          e.preventDefault();
-          seekTo((v?.currentTime ?? 0) + 10);
-          break;
-        case 'ArrowUp':
-          e.preventDefault();
-          setVol(Math.min(1, (v?.volume ?? 1) + 0.1));
-          break;
-        case 'ArrowDown':
-          e.preventDefault();
-          setVol(Math.max(0, (v?.volume ?? 1) - 0.1));
-          break;
-        case 'f':
-          toggleFullscreen();
-          break;
-        case 'm':
-          if (v) {
-            v.muted = !v.muted;
-            setMuted(v.muted);
-          }
-          break;
-        case 'Escape':
-          if (menu) setMenu(false);
-          else if (roomPanel) setRoomPanel(false);
-          else if (fullscreen) toggleFullscreen();
-          else navigate(-1);
-          break;
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }); // re-bind every render: cheap and always sees current state
-
-  // ---------- seek bar ----------
-
-  const bar = useRef<HTMLDivElement>(null);
-  const fractionAt = (clientX: number) => {
-    const r = bar.current!.getBoundingClientRect();
-    return Math.max(0, Math.min(1, (clientX - r.left) / r.width));
-  };
-  const onBarDown = (e: ReactPointerEvent) => {
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    setScrub(fractionAt(e.clientX) * duration);
-  };
-  const onBarMove = (e: ReactPointerEvent) => scrub !== undefined && setScrub(fractionAt(e.clientX) * duration);
-  const onBarUp = () => {
-    if (scrub !== undefined) seekTo(scrub);
-    setScrub(undefined);
-  };
-
-  const shownTime = scrub ?? time;
-  const intro = info.data?.segments.find((s) => (s.type === 'Intro' || s.type === 'Recap') && time >= s.start && time < s.end - 1);
   const d = info.data;
   const heading = d?.type === 'Episode' ? d.seriesTitle : d?.title;
   const subheading = d?.type === 'Episode' ? `S${d.seasonNumber}:E${d.episodeNumber} · ${d.title}` : undefined;
 
   return (
-    <div
-      ref={container}
-      className={`player${uiVisible ? ' show-ui' : ''}${useOverlay ? ' player--overlay' : ''}`}
-      onMouseMove={poke}
-      onPointerDown={(e) => e.pointerType !== 'mouse' && poke()}
-    >
-      {useOverlay ? (
-        // mpv draws the picture underneath; this only catches clicks (and shows the artwork until it starts).
-        <div
-          className="player__surface"
-          style={!pictureShown && d?.backdrop ? { backgroundImage: `url(${d.backdrop})` } : undefined}
-          onClick={() => (uiVisible ? toggle() : poke())}
-          onDoubleClick={toggleFullscreen}
-        />
-      ) : (
-        <video
-          ref={video}
-          className="player__video"
-          playsInline
-          preload="auto"
-          // In a paused room nothing starts it, so it's ready as soon as it knows the film.
-          onLoadedMetadata={() => startPaused.current && (setWaiting(false), readyToSync())}
-          poster={d?.backdrop}
-          // While the controls are hidden, a click/tap only brings them back (like Netflix).
-          onClick={() => (uiVisible ? toggle() : poke())}
-          onDoubleClick={toggleFullscreen}
-          onPlaying={onPlaying}
-          onPause={onPause}
-          onWaiting={onWaiting}
-          onCanPlay={onCanPlay}
-          onTimeUpdate={onTimeUpdate}
-          onDurationChange={onDurationChange}
-          onEnded={onEnded}
-          onError={onVideoError}
-          onVolumeChange={onVolumeChange}
-        >
-          {subtitle?.vttUrl && <track key={subtitle.vttUrl} kind="subtitles" src={subtitle.vttUrl} srcLang={subtitle.code} label={subtitle.label} default />}
-        </video>
-      )}
-      {useOverlay && !appDrawsSubtitles && subtitle?.vttUrl && <PageSubtitles url={subtitle.vttUrl} time={time} raised={uiVisible} />}
-
-      {needsTap && !error && (
-        <div className="player__center">
+    <PlayerView
+      video={video}
+      overlay={useOverlay}
+      videoProps={{
+        // In a paused room nothing starts it, so it's ready as soon as it knows the film.
+        onLoadedMetadata: () => startPaused.current && (setWaiting(false), readyToSync()),
+        onPlaying,
+        onPause,
+        onWaiting,
+        onCanPlay,
+        onTimeUpdate,
+        onDurationChange,
+        onEnded,
+        onError: onVideoError,
+        onVolumeChange,
+        children: subtitle?.vttUrl && <track key={subtitle.vttUrl} kind="subtitles" src={subtitle.vttUrl} srcLang={subtitle.code} label={subtitle.label} default />,
+      }}
+      backdrop={d?.backdrop}
+      pictureShown={pictureShown}
+      appFullscreen={useOverlay}
+      heading={heading}
+      subheading={subheading}
+      playing={playing}
+      waiting={waiting || info.isLoading}
+      time={time}
+      duration={duration}
+      buffered={buffered}
+      toggle={toggle}
+      seekTo={seekTo}
+      volume={volume}
+      onBack={() => navigate(-1)}
+      error={
+        error || info.isError
+          ? { message: error ?? (info.error as Error).message, retry: () => void load({ start: time, audio: audioIndex, allowDirectPlay: false }) }
+          : undefined
+      }
+      center={
+        needsTap && !error ? (
           <button className="btn btn--primary btn--lg" onClick={() => (setNeedsTap(false), follow(true))}>
             <Play size={22} fill="currentColor" /> {t('Join in')}
           </button>
-        </div>
-      )}
-      {roomId && !remote && <TogetherNotes together={together} />}
-
-      {(waiting || info.isLoading) && !error && !needsTap && (
-        <div className="player__center">
-          <SwimmingFish size={56} className="swimming-fish--player" />
-        </div>
-      )}
-      {(error || info.isError) && (
-        <div className="player__center player__error">
-          <p>{error ?? (info.error as Error).message}</p>
-          <div className="row-gap">
-            <button className="btn btn--primary" onClick={() => void load({ start: time, audio: audioIndex, allowDirectPlay: false })}>
-              {t('Try again')}
-            </button>
-            <button className="btn btn--ghost" onClick={() => navigate(-1)}>
-              {t('Go back')}
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="player__top">
-        <button className="icon-btn icon-btn--lg" onClick={() => navigate(-1)} aria-label={t('Back')}>
-          <ArrowLeft size={28} />
-        </button>
-        <div className="player__heading">
-          <span className="player__title">{heading}</span>
-          {subheading && <span className="player__subtitle">{subheading}</span>}
-        </div>
-        {!roomId && d && (
-          // Watch together, from here: this film becomes a room, from where it is now.
-          <button
-            className="icon-btn icon-btn--lg"
-            aria-label={t('Watch together')}
-            title={t('Watch together')}
-            onClick={() => {
-              const at = video.current?.currentTime ?? 0;
-              api.createRoom(itemId, at).then(
-                (room) => {
-                  becomingRoom.current = true;
-                  setRoomPanel(true);
-                  navigate(`/watch/${itemId}?room=${room.id}`, { replace: true });
-                },
-                (err: Error) => toast('error', err.message),
-              );
-            }}
-          >
-            <Users size={24} />
-          </button>
-        )}
-        {!roomId && d && (
-          // Hand the film over to another screen, from where it is now.
-          <PlayOnButton
-            itemId={itemId}
-            title={heading ?? d.title}
-            position={() => video.current?.currentTime ?? 0}
-            onSent={() => video.current?.pause()}
-            className="icon-btn icon-btn--lg"
-            iconOnly
-          />
-        )}
-        {roomId && !remote && (
-          <div className="together-wrap">
-            <TogetherChip together={together} open={roomPanel} onToggle={() => setRoomPanel((o) => !o)} />
-            {roomPanel && (
-              <TogetherPanel
-                together={together}
-                onClose={() => setRoomPanel(false)}
-                onLeave={() => {
-                  // Out of the room, still watching: the film carries on from here.
-                  void together.leave();
-                  setRoomPanel(false);
-                  navigate(`/watch/${itemId}`, { replace: true });
-                }}
-              />
-            )}
-          </div>
-        )}
-        {session && session.method !== 'DirectPlay' && (
-          <div className="player__why-wrap">
+        ) : undefined
+      }
+      holdUi={roomPanel}
+      onEscape={() => roomPanel && (setRoomPanel(false), true)}
+      segments={d?.segments}
+      next={next ? { title: d?.nextTitle, go: goNext } : undefined}
+      audio={session?.audioTracks ?? []}
+      audioIndex={audioIndex}
+      chooseAudio={(index) => {
+        const track = session?.audioTracks.find((tr) => tr.index === index);
+        if (track) chooseAudio(track);
+      }}
+      subtitles={(session?.subtitleTracks ?? []).map((track) => ({ ...track, note: track.burnIn ? t('picture subtitles, heavy for the server') : undefined }))}
+      subtitleIndex={subtitle?.index}
+      chooseSubtitle={(index) => chooseSubtitle(index === undefined ? undefined : session?.subtitleTracks.find((tr) => tr.index === index))}
+      tracksKnown={Boolean(session)}
+      audioMore={
+        d?.detailHref && (
+          <Link className="player__link" to={`${d.detailHref}?sheet=versions`}>
+            {t('Get another language…')}
+          </Link>
+        )
+      }
+      subtitlesMore={
+        d?.detailHref && (
+          <Link className="player__link" to={`${d.detailHref}?sheet=subtitles`}>
+            {t('Find more subtitles…')}
+          </Link>
+        )
+      }
+      pageSubtitles={useOverlay && !appDrawsSubtitles ? subtitle?.vttUrl : undefined}
+      onControls={onControls}
+      actions={
+        <>
+          {!roomId && d && (
+            // Watch together, from here: this film becomes a room, from where it is now.
             <button
-              className={`badge ${session.method === 'Transcode' ? 'badge--warn' : 'badge--dim'}`}
-              onClick={() => setWhy((w) => !w)}
-              aria-expanded={why}
-              title={t('Why is the server working on this video?')}
+              className="icon-btn icon-btn--lg"
+              aria-label={t('Watch together')}
+              title={t('Watch together')}
+              onClick={() => {
+                const at = video.current?.currentTime ?? 0;
+                api.createRoom(itemId, at).then(
+                  (room) => {
+                    becomingRoom.current = true;
+                    setRoomPanel(true);
+                    navigate(`/watch/${itemId}?room=${room.id}`, { replace: true });
+                  },
+                  (err: Error) => toast('error', err.message),
+                );
+              }}
             >
-              {session.method === 'DirectStream' ? t('Repackaged') : t('Transcoding')}
+              <Users size={24} />
             </button>
-            {why && (
-              <div className="player__why" role="note">
-                <strong>{session.method === 'Transcode' ? t('The server is re-encoding this video') : t('The server is lightly repackaging this video')}</strong>
-                <ul>
-                  {explainReasons(session.transcodeReasons).map((text) => (
-                    <li key={text}>{text}</li>
-                  ))}
-                </ul>
-                {subtitle?.burnIn && (
-                  <button className="btn btn--sm btn--ghost" onClick={() => (setWhy(false), chooseSubtitle(session.subtitleTracks.find((t) => !t.burnIn && t.code === subtitle.code)))}>
-                    {session.subtitleTracks.some((t) => !t.burnIn && t.code === subtitle.code) ? t('Use text subtitles instead') : t('Turn subtitles off')}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
+          )}
+          {!roomId && d && (
+            // Hand the film over to another screen, from where it is now.
+            <PlayOnButton
+              itemId={itemId}
+              title={heading ?? d.title}
+              position={() => video.current?.currentTime ?? 0}
+              onSent={() => video.current?.pause()}
+              className="icon-btn icon-btn--lg"
+              iconOnly
+            />
+          )}
+          {roomId && !remote && (
+            <div className="together-wrap">
+              <TogetherChip together={together} open={roomPanel} onToggle={() => setRoomPanel((o) => !o)} />
+              {roomPanel && (
+                <TogetherPanel
+                  together={together}
+                  onClose={() => setRoomPanel(false)}
+                  onLeave={() => {
+                    // Out of the room, still watching: the film carries on from here.
+                    void together.leave();
+                    setRoomPanel(false);
+                    navigate(`/watch/${itemId}`, { replace: true });
+                  }}
+                />
+              )}
+            </div>
+          )}
+          {session && session.method !== 'DirectPlay' && (
+            <div className="player__why-wrap">
+              <button
+                className={`badge ${session.method === 'Transcode' ? 'badge--warn' : 'badge--dim'}`}
+                onClick={() => setWhy((w) => !w)}
+                aria-expanded={why}
+                title={t('Why is the server working on this video?')}
+              >
+                {session.method === 'DirectStream' ? t('Repackaged') : t('Transcoding')}
+              </button>
+              {why && (
+                <div className="player__why" role="note">
+                  <strong>{session.method === 'Transcode' ? t('The server is re-encoding this video') : t('The server is lightly repackaging this video')}</strong>
+                  <ul>
+                    {explainReasons(session.transcodeReasons).map((text) => (
+                      <li key={text}>{text}</li>
+                    ))}
+                  </ul>
+                  {subtitle?.burnIn && (
+                    <button className="btn btn--sm btn--ghost" onClick={() => (setWhy(false), chooseSubtitle(session.subtitleTracks.find((t) => !t.burnIn && t.code === subtitle.code)))}>
+                      {session.subtitleTracks.some((t) => !t.burnIn && t.code === subtitle.code) ? t('Use text subtitles instead') : t('Turn subtitles off')}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      }
+    >
+      {roomId && !remote && <TogetherNotes together={together} />}
       {roomId && !remote && together.room?.playback.action === 'start' && !playing && !together.ended && (
         <div className="together-hint">{t("Everyone's player starts together: press play when you're all here.")}</div>
       )}
-
-      {intro && (
-        <button className="player__skip btn btn--ghost" onClick={() => seekTo(intro.end)}>
-          {intro.type === 'Recap' ? t('Skip recap') : t('Skip intro')} <SkipForward size={18} />
-        </button>
-      )}
-      {nearEnd && next && (
-        <div className="player__next">
-          <span className="muted small">{nextCountdown !== undefined ? t('Next episode in {n}', { n: nextCountdown }) : t('Next episode')}</span>
-          <strong>{d?.nextTitle}</strong>
-          <div className="row-gap">
-            <button className="btn btn--primary btn--sm" onClick={goNext}>
-              <Play size={16} fill="currentColor" /> {t('Play now')}
-            </button>
-            {nextCountdown !== undefined && (
-              <button className="btn btn--ghost btn--sm" onClick={() => setNextCountdown(undefined)}>
-                {t('Cancel')}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="player__bottom">
-        <div
-          ref={bar}
-          className="seek"
-          onPointerDown={onBarDown}
-          onPointerMove={onBarMove}
-          onPointerUp={onBarUp}
-          role="slider"
-          aria-label={t('Seek')}
-          aria-valuemin={0}
-          aria-valuemax={Math.round(duration)}
-          aria-valuenow={Math.round(shownTime)}
-        >
-          <div className="seek__track">
-            <div className="seek__buffer" style={{ width: `${duration ? (buffered / duration) * 100 : 0}%` }} />
-            <div className="seek__fill" style={{ width: `${duration ? (shownTime / duration) * 100 : 0}%` }} />
-            {d?.segments
-              .filter((s) => s.type === 'Intro')
-              .map((s) => (
-                <div key={s.start} className="seek__segment" style={{ left: `${(s.start / duration) * 100}%`, width: `${((s.end - s.start) / duration) * 100}%` }} />
-              ))}
-          </div>
-          <div className="seek__thumb" style={{ left: `${duration ? (shownTime / duration) * 100 : 0}%` }} />
-          {scrub !== undefined && (
-            <div className="seek__tip" style={{ left: `${(scrub / duration) * 100}%` }}>
-              {clock(scrub)}
-            </div>
-          )}
-        </div>
-
-        <div className="player__controls">
-          <button className="icon-btn icon-btn--lg" onClick={toggle} aria-label={playing ? t('Pause') : t('Play')}>
-            {playing ? <Pause size={30} fill="currentColor" /> : <Play size={30} fill="currentColor" />}
-          </button>
-          <button className="icon-btn" onClick={() => seekTo(time - 10)} aria-label={t('Back 10 seconds')}>
-            <RotateCcw size={24} />
-          </button>
-          <button className="icon-btn" onClick={() => seekTo(time + 10)} aria-label={t('Forward 10 seconds')}>
-            <RotateCw size={24} />
-          </button>
-          <div className="volume">
-            <button className="icon-btn" onClick={() => setVol(muted || volume === 0 ? Math.max(volume, 0.5) : 0)} aria-label={muted ? t('Unmute') : t('Mute')}>
-              {muted || volume === 0 ? <VolumeX size={24} /> : <Volume2 size={24} />}
-            </button>
-            <input className="volume__slider" type="range" min={0} max={1} step={0.05} value={muted ? 0 : volume} onChange={(e) => setVol(Number(e.target.value))} aria-label={t('Volume')} />
-          </div>
-          <span className="player__time">
-            {clock(shownTime)} <span className="muted">/ {clock(duration)}</span>
-          </span>
-          <span className="spacer" />
-          {next && (
-            <button className="icon-btn" onClick={goNext} aria-label={t('Next episode')} title={t('Next episode')}>
-              <SkipForward size={24} />
-            </button>
-          )}
-          <div className="player__menu-wrap">
-            <button className={`icon-btn${menu ? ' is-active' : ''}`} onClick={() => setMenu((m) => !m)} aria-label={t('Audio and subtitles')} aria-expanded={menu}>
-              <Captions size={24} />
-            </button>
-            {menu && session && (
-              <div className="player__menu">
-                <div className="player__menu-col">
-                  <h3>{t('Audio')}</h3>
-                  {session.audioTracks.map((track) => (
-                    <button key={track.index} className={`player__opt${track.index === audioIndex ? ' is-on' : ''}`} onClick={() => chooseAudio(track)}>
-                      <Check size={16} className="player__tick" />
-                      {track.label}
-                    </button>
-                  ))}
-                  {d?.detailHref && (
-                    <Link className="player__link" to={`${d.detailHref}?sheet=versions`}>
-                      {t('Get another language…')}
-                    </Link>
-                  )}
-                </div>
-                <div className="player__menu-col">
-                  <h3>{t('Subtitles')}</h3>
-                  <button className={`player__opt${!subtitle ? ' is-on' : ''}`} onClick={() => chooseSubtitle(undefined)}>
-                    <Check size={16} className="player__tick" />
-                    {t('Off')}
-                  </button>
-                  {session.subtitleTracks.map((track) => (
-                    <button key={track.index} className={`player__opt${subtitle?.index === track.index ? ' is-on' : ''}`} onClick={() => chooseSubtitle(track)}>
-                      <Check size={16} className="player__tick" />
-                      {track.label}
-                      {track.burnIn && <span className="muted small"> · {t('picture subtitles, heavy for the server')}</span>}
-                    </button>
-                  ))}
-                  {d?.detailHref && (
-                    <Link className="player__link" to={`${d.detailHref}?sheet=subtitles`}>
-                      {t('Find more subtitles…')}
-                    </Link>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-          <button className="icon-btn" onClick={toggleFullscreen} aria-label={fullscreen ? t('Exit full screen') : t('Full screen')}>
-            {fullscreen ? <Minimize size={24} /> : <Maximize size={24} />}
-          </button>
-        </div>
-      </div>
-    </div>
+    </PlayerView>
   );
 }

@@ -43,7 +43,7 @@ You need a Mac. It takes about 30 minutes the first time, mostly downloading Xco
 8. **Trust the app:** the first time, the iPhone refuses to open it. Go to **Settings → General → VPN & Device Management**, tap your Apple ID under *Developer App*, and tap **Trust**.
 9. Open **Netfish**, allow it to find devices on your **local network**, and enter your server's address.
 
-**Every 7 days** (free Apple ID): the app stops opening. Plug the iPhone in and press **▶ Run** in Xcode again; your downloads and sign-in are kept. A paid [Apple Developer account](https://developer.apple.com/programs/) ($99/year) makes each install last a year and lets you use TestFlight instead of a cable.
+**Every 7 days** (free Apple ID): the app stops opening. Plug the iPhone in and press **▶ Run** in Xcode again; your downloads and sign-in are kept. From 0.6.3 Netfish warns you on Home a couple of days before, and **Settings** shows the date. A paid [Apple Developer account](https://developer.apple.com/programs/) ($99/year) makes each install last a year and lets you use TestFlight instead of a cable.
 
 ## Option 3: AltStore or SideStore
 

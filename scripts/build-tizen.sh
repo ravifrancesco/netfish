@@ -9,7 +9,7 @@ WORK="${XDG_CACHE_HOME:-$HOME/Library/Caches}/netfish-build/tizen"
 rm -rf "$WORK"
 mkdir -p "$WORK" release
 sed "s/__VERSION__/$VERSION/" apps/tizen/config.xml > "$WORK/config.xml"
-cp apps/tizen/index.html "$WORK/"
+sed "s/__VERSION__/$VERSION/" apps/tizen/index.html > "$WORK/index.html"
 # The launcher icon, from the shared artwork.
 sips -z 512 512 apps/common/icon.png --out "$WORK/icon.png" >/dev/null 2>&1 || cp apps/common/icon.png "$WORK/icon.png"
 rm -f "release/Netfish-$VERSION-samsung.wgt"

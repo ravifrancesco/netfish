@@ -64,6 +64,7 @@ public class MainActivity extends Activity {
     private WebView web;
     private VideoEngine video;
     private OfflineStore offline;
+    private Updater updater;
     private SharedPreferences prefs;
     private boolean tv;
     private volatile String currentUrl = "";
@@ -104,6 +105,7 @@ public class MainActivity extends Activity {
         if (offline != null) {
             offline.setListener(list -> web.evaluateJavascript("window.__netfishOfflineChanged&&window.__netfishOfflineChanged(" + list + ")", null));
         }
+        updater = new Updater(this, tv, event -> web.evaluateJavascript("window.__netfishUpdate&&window.__netfishUpdate(" + event + ")", null));
 
         WebSettings settings = web.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -122,7 +124,16 @@ public class MainActivity extends Activity {
                 String url = request.getUrl().toString();
                 String server = server();
                 // Stay on the Netfish server (and the app's own pages).
-                return !(url.startsWith("file:///android_asset/") || url.startsWith(OfflineStore.ORIGIN) || (server != null && url.startsWith(server)));
+                if (url.startsWith("file:///android_asset/") || url.startsWith(OfflineStore.ORIGIN) || (server != null && url.startsWith(server))) return false;
+                // Anything else (IMDb, What's new…) opens in the browser, where there is one.
+                if (request.isForMainFrame() && (url.startsWith("https://") || url.startsWith("http://"))) {
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW, request.getUrl()));
+                    } catch (android.content.ActivityNotFoundException ignored) {
+                        // TVs often have no browser
+                    }
+                }
+                return true;
             }
 
             @Override
@@ -197,6 +208,11 @@ public class MainActivity extends Activity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        // The system's installer, about an update started from Settings or Home.
+        if (Updater.ACTION_STATUS.equals(intent.getAction())) {
+            updater.onStatus(intent);
+            return;
+        }
         setIntent(intent);
         String path = intent.getStringExtra("path");
         if (path != null && path.startsWith("/")) web.evaluateJavascript("window.__netfishOpen && window.__netfishOpen(" + JSONObject.quote(path) + ")", null);
@@ -591,6 +607,17 @@ public class MainActivity extends Activity {
                 boolean up = reachable(server);
                 runOnUiThread(() -> web.evaluateJavascript("window.__netfishReach&&window.__netfishReach(" + up + ")", null));
             }, "netfish-check").start();
+        }
+
+        /** Updates, from the Netfish pages only (apps from 0.6.3 on): answer through window.__netfishUpdate. */
+        @JavascriptInterface
+        public void updateCheck() {
+            if (fromServer()) updater.check();
+        }
+
+        @JavascriptInterface
+        public void updateInstall() {
+            if (fromServer()) updater.install();
         }
 
         @JavascriptInterface

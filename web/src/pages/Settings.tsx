@@ -6,7 +6,8 @@ import type { ServerSettings } from '@netfish/shared';
 import { api } from '../api';
 import { Connections } from '../components/Connections';
 import { Storage } from '../components/Storage';
-import { AppUpdate } from '../components/AppUpdate';
+import { AppUpdate, InstallExpiry } from '../components/AppUpdate';
+import { Devices } from '../components/Devices';
 import { notifySupport } from '../lib/notify';
 import { DeviceProfiles } from '../components/DeviceProfiles';
 import { LanguageSelect } from '../components/LanguageSelect';
@@ -289,7 +290,16 @@ export default function Settings() {
             </button>
           </div>
           {desktop()?.update && <AppUpdate />}
+          <InstallExpiry />
           {desktop()?.openOffline && <OfflineStorage />}
+        </section>
+      )}
+
+      {me?.isAdmin && (
+        <section className="panel" id="devices">
+          <h2>{t('Devices')}</h2>
+          <p className="muted small">{t('Where Netfish is open right now, and whether its app should be updated.')}</p>
+          <Devices />
         </section>
       )}
 
