@@ -27,8 +27,11 @@ import type {
   ServerSettings,
   StopMode,
   StorageInfo,
+  Screen,
+  TogetherCommand,
   TogetherControl,
   TogetherRoom,
+  TogetherTracks,
   ServiceConnection,
   ServiceConnectionUpdate,
   ServiceStatus,
@@ -143,6 +146,13 @@ export const api = {
   roomWaiting: (id: string, clientId: string, waiting: boolean) => call<{ ok: true }>(`/together/${enc(id)}/waiting`, { body: { clientId, waiting } }),
   leaveRoom: (id: string, clientId: string) => call<{ ok: true }>(`/together/${enc(id)}/leave`, { body: { clientId } }),
   endRoom: (id: string) => call<{ ok: true }>(`/together/${enc(id)}`, { method: 'DELETE' }),
+  roomTracks: (id: string, clientId: string, tracks: TogetherTracks) => call<{ ok: true }>(`/together/${enc(id)}/tracks`, { body: { clientId, tracks } }),
+  roomCommand: (id: string, body: { clientId: string; to: string; action: TogetherCommand['action']; index?: number | null }) =>
+    call<{ ok: true }>(`/together/${enc(id)}/command`, { body }),
+
+  // Play on TV
+  screens: () => call<{ screens: Screen[] }>('/screens'),
+  playOn: (screenId: string, itemId: string, position?: number) => call<TogetherRoom>(`/screens/${enc(screenId)}/play`, { body: { itemId, position } }),
   stopDownload: (id: string, mode: StopMode) => call<{ ok: true }>(`/downloads/${enc(id)}/stop`, { body: { mode } }),
   deleteFromDisk: (type: MediaType, tmdbId: number, seasons?: number[]) =>
     call<{ freed: number }>(`/title/${type}/${tmdbId}/delete`, { body: { seasons } }),

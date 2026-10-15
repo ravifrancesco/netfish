@@ -19,11 +19,13 @@ import Title from './pages/Title';
 import { t } from './i18n';
 import { useReadyNotifications, useTogetherNotifications } from './lib/notify';
 import { JoinRoom } from './components/Together';
-import { useLiveRooms } from './lib/together';
+import { useLive } from './lib/together';
+import { RemoteBar } from './components/PlayOn';
 import { ProfilePicker, useProfiles, wasPicked } from './components/ProfilePicker';
 
 // The player pulls in hls.js; only load it when someone presses play.
 const Watch = lazy(() => import('./pages/Watch'));
+const Remote = lazy(() => import('./pages/Remote'));
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -58,7 +60,8 @@ function Shell({ user }: { user: NonNullable<ReturnType<typeof useMe>['data']> }
   useTogetherNotifications(user.id);
   // The player and the profile picker fill the screen without the menu bar.
   const watching = pathname.startsWith('/watch/') || pathname.startsWith('/profiles');
-  useLiveRooms(!pathname.startsWith('/watch/'));
+  // Open as long as Netfish is: rooms, screens, and films sent here from another device.
+  useLive();
   return (
     <>
       <ScrollToTop />
@@ -77,12 +80,15 @@ function Shell({ user }: { user: NonNullable<ReturnType<typeof useMe>['data']> }
             <Route path="/settings" element={<Settings />} />
             <Route path="/watch/:itemId" element={<Watch />} />
             <Route path="/together/:id" element={<JoinRoom />} />
+            <Route path="/remote/:id" element={<Remote />} />
             <Route path="/profiles" element={<SwitchProfile />} />
             <Route path="/profiles/add" element={<AddProfile />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
       </main>
+      {/* Playing on another device from here: a way back to its remote. */}
+      {!watching && !pathname.startsWith('/remote/') && <RemoteBar />}
     </>
   );
 }

@@ -1,0 +1,24 @@
+// Italian for Play on TV (sending a film to another device, and the remote).
+export default {
+  'Play on another device': 'Riproduci su un altro dispositivo',
+  'Play on…': 'Riproduci su…',
+  'Play on': 'Riproduci su',
+  'Playing on {screen}': 'In riproduzione su {screen}',
+  'Paused on {screen}': 'In pausa su {screen}',
+  'Opening on {screen}…': 'Apertura su {screen}…',
+  'Loading on {screen}…': 'Caricamento su {screen}…',
+  'Stopped on {screen}.': 'Interrotto su {screen}.',
+  'Stop playing on {screen}': 'Interrompi la riproduzione su {screen}',
+  'the TV': 'la TV',
+  'Watch here instead': 'Guarda qui',
+  TV: 'TV',
+  'Windows PC': 'PC Windows',
+  Computer: 'Computer',
+  'Android phone': 'Telefono Android',
+  'Android tablet': 'Tablet Android',
+  'A browser': 'Un browser',
+  '{browser} on {os}': '{browser} su {os}',
+  "This device's name": 'Nome di questo dispositivo',
+  'Shown when you or someone at home picks where to play something, like "Living room TV".':
+    'Compare quando tu o qualcuno in casa sceglie dove guardare qualcosa, ad esempio "TV del soggiorno".',
+} as Record<string, string>;

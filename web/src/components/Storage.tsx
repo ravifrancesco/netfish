@@ -122,9 +122,12 @@ function Cleanup({ onDone }: { onDone: () => void }) {
                 {s.title}
               </Link>{' '}
               {s.year && <span className="muted">({s.year})</span>}
-              <span className="big__why muted small">{why(s)}</span>
+              <span className="big__why muted small">
+                {why(s)}
+                <span className="big__size-inline"> · {bytes(s.size)}</span>
+              </span>
             </span>
-            <span className="muted small">{bytes(s.size)}</span>
+            <span className="muted small big__size">{bytes(s.size)}</span>
             <button className="link-btn small" disabled={keep.isPending} onClick={() => keep.mutate(s.key)} title={t("Don't suggest it again")}>
               {t('Keep')}
             </button>

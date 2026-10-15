@@ -16,7 +16,7 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import type { PlaybackSession, ProgressReport, StreamTrack } from '@netfish/shared';
+import type { PlaybackSession, ProgressReport, StreamTrack, TogetherCommand } from '@netfish/shared';
 import { api } from '../api';
 import { Spinner } from '../components/ui';
 import { clock } from '../lib/format';
@@ -29,6 +29,7 @@ import { parseVtt, type Cue } from '../player/vtt';
 import { explainReasons } from '../player/reasons';
 import { useTogether } from '../lib/together';
 import { TogetherChip, TogetherNotes, TogetherPanel } from '../components/Together';
+import { PlayOnButton } from '../components/PlayOn';
 import { t } from '../i18n';
 
 const REPORT_EVERY = 10;
@@ -137,7 +138,11 @@ export default function Watch() {
 
   // Watch together: this player follows the room, and tells it when you play, pause or skip.
   const roomId = params.get('room') ?? undefined;
-  const together = useTogether(roomId);
+  // Play on TV: this screen plays, run from someone's phone (a room of its own).
+  const remote = Boolean(roomId) && params.get('remote') === '1';
+  const roomQuery = roomId ? `?room=${roomId}${remote ? '&remote=1' : ''}` : '';
+  const commandRef = useRef<(command: TogetherCommand) => void>(() => {});
+  const together = useTogether(roomId, { onCommand: (command) => commandRef.current(command) });
   const togetherRef = useRef(together);
   togetherRef.current = together;
   const inRoom = () => Boolean(roomId && togetherRef.current.room && !togetherRef.current.ended);
@@ -406,8 +411,8 @@ export default function Watch() {
   const goNext = useCallback(() => {
     if (!next) return;
     togetherRef.current.send('next', undefined, next);
-    navigate(`/watch/${next}${roomId ? `?room=${roomId}` : ''}`, { replace: true });
-  }, [next, navigate, roomId]);
+    navigate(`/watch/${next}${roomQuery}`, { replace: true });
+  }, [next, navigate, roomQuery]);
 
   const onEnded = () => {
     report('stop');
@@ -493,8 +498,33 @@ export default function Watch() {
       synced.current = true;
       startPaused.current = false;
       follow(true);
+      // Play on TV: the film starts by itself once it's ready here.
+      const v = video.current;
+      if (remote && v && togetherRef.current.room?.playback.action === 'start') {
+        void Promise.resolve(v.play()).catch((err: Error) => err.name === 'NotAllowedError' && setNeedsTap(true));
+        togetherRef.current.send('play', v.currentTime);
+      }
     }
   }
+
+  // Play on TV: done when the phone stops it, or when this player closes.
+  const leavePlayer = useCallback(() => {
+    if (window.history.length > 1) navigate(-1);
+    else navigate('/', { replace: true });
+  }, [navigate]);
+  useEffect(() => {
+    if (remote && together.ended) leavePlayer();
+  }, [remote, together.ended, leavePlayer]);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      const tg = togetherRef.current;
+      // A moment later: React's development mode unmounts and remounts once on purpose.
+      if (remote) setTimeout(() => !alive.current && void tg.leave(), 0);
+    };
+  }, [remote]);
 
   // Someone changed something: follow it. The room moved on to another episode: go there.
   const rev = together.room?.playback.rev;
@@ -502,7 +532,7 @@ export default function Watch() {
   useEffect(() => {
     if (!roomId || !roomItem || together.ended) return;
     if (roomItem !== itemId) {
-      navigate(`/watch/${roomItem}?room=${roomId}`, { replace: true });
+      navigate(`/watch/${roomItem}${roomQuery}`, { replace: true });
       return;
     }
     follow(true);
@@ -604,6 +634,32 @@ export default function Watch() {
       void load({ start: video.current?.currentTime ?? 0, audio: audioIndex, subtitle: track?.burnIn ? track.index : undefined, allowDirectPlay: !track?.burnIn });
     }
   };
+
+  // Play on TV: the phone changes audio and subtitles here, and sees what there is to choose.
+  commandRef.current = (command) => {
+    const s = sessionRef.current;
+    if (command.action === 'stop') return leavePlayer();
+    if (!s) return;
+    if (command.action === 'audio') {
+      const track = s.audioTracks.find((tr) => tr.index === command.index);
+      if (track) chooseAudio(track);
+    } else if (command.action === 'subtitle') {
+      chooseSubtitle(command.index === null ? undefined : s.subtitleTracks.find((tr) => tr.index === command.index));
+    }
+  };
+  const joined = Boolean(together.room);
+  useEffect(() => {
+    if (!remote || !roomId || !session || !joined) return;
+    const list = (tracks: StreamTrack[]) => tracks.map(({ index, label }) => ({ index, label }));
+    void api
+      .roomTracks(roomId, together.clientId, {
+        audio: list(session.audioTracks),
+        subtitles: list(session.subtitleTracks),
+        audioIndex,
+        subtitleIndex: subtitle?.index ?? null,
+      })
+      .catch(() => {});
+  }, [remote, roomId, session, joined, audioIndex, subtitle]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -761,7 +817,7 @@ export default function Watch() {
           </button>
         </div>
       )}
-      {roomId && <TogetherNotes together={together} />}
+      {roomId && !remote && <TogetherNotes together={together} />}
 
       {(waiting || info.isLoading) && !error && !needsTap && (
         <div className="player__center">
@@ -790,7 +846,18 @@ export default function Watch() {
           <span className="player__title">{heading}</span>
           {subheading && <span className="player__subtitle">{subheading}</span>}
         </div>
-        {roomId && (
+        {!roomId && d && (
+          // Hand the film over to another screen, from where it is now.
+          <PlayOnButton
+            itemId={itemId}
+            title={heading ?? d.title}
+            position={() => video.current?.currentTime ?? 0}
+            onSent={() => video.current?.pause()}
+            className="icon-btn icon-btn--lg"
+            iconOnly
+          />
+        )}
+        {roomId && !remote && (
           <div className="together-wrap">
             <TogetherChip together={together} open={roomPanel} onToggle={() => setRoomPanel((o) => !o)} />
             {roomPanel && (
@@ -836,7 +903,7 @@ export default function Watch() {
         )}
       </div>
 
-      {roomId && together.room?.playback.action === 'start' && !playing && !together.ended && (
+      {roomId && !remote && together.room?.playback.action === 'start' && !playing && !together.ended && (
         <div className="together-hint">{t("Everyone's player starts together: press play when you're all here.")}</div>
       )}
 

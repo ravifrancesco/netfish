@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { TogetherAction, TogetherEvent, TogetherRoom, TogetherRoomsEvent } from '@netfish/shared';
+import type { LiveEvent, TogetherAction, TogetherCommand, TogetherEvent, TogetherRoom } from '@netfish/shared';
 import { api, ApiError } from '../api';
+import { screenId, screenKind, useScreenName } from './screens';
 
 // ---------- The rooms on this server (Home, the top bar, title pages) ----------
 
@@ -22,29 +24,37 @@ export const roomPosition = (room: TogetherRoom) =>
 export const roomHref = (room: TogetherRoom) => `/watch/${room.playback.itemId}?room=${room.id}`;
 
 /**
- * Follows the server's live list of rooms, so a room someone opens shows up for everyone
- * at once, without reloading. Off while watching (the player has its own line, and
- * browsers allow only a few open connections to one server).
+ * The live line to the server, open as long as Netfish is: the rooms (so a room someone
+ * opens shows up for everyone at once), the screens you can play on, and this device as a
+ * screen, which opens the player when someone sends it something (Play on TV).
  */
-export function useLiveRooms(enabled: boolean) {
+export function useLive() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  const name = useScreenName();
   useEffect(() => {
-    if (!enabled || typeof EventSource === 'undefined') return;
-    const source = new EventSource('/api/together/live');
+    if (typeof EventSource === 'undefined') return;
+    const query = new URLSearchParams({ screen: screenId(), name, kind: screenKind() });
+    const source = new EventSource(`/api/together/live?${query}`);
     source.onmessage = (e) => {
+      let event: LiveEvent;
       try {
-        const event = JSON.parse(e.data) as TogetherRoomsEvent;
-        if (!event.rooms) return;
-        roomsClock = event.now - Date.now();
-        qc.setQueryData(['rooms'], { rooms: event.rooms });
+        event = JSON.parse(e.data);
       } catch {
-        /* not for us */
+        return;
       }
+      roomsClock = event.now - Date.now();
+      if (event.rooms) qc.setQueryData(['rooms'], { rooms: event.rooms });
+      if (event.screens) qc.setQueryData(['screens'], { screens: event.screens });
+      if (event.open) navigate(event.open.path);
     };
     // Back from a dropped line: catch up on what was missed.
-    source.onopen = () => void qc.invalidateQueries({ queryKey: ['rooms'] });
+    source.onopen = () => {
+      void qc.invalidateQueries({ queryKey: ['rooms'] });
+      void qc.invalidateQueries({ queryKey: ['screens'] });
+    };
     return () => source.close();
-  }, [enabled, qc]);
+  }, [name, qc, navigate]);
 }
 
 /** Re-renders every so often (for things that move with time, like a room's progress). */
@@ -77,9 +87,12 @@ export interface Together {
 
 /**
  * The live line to a Watch together room: the room as it is (who's here, where the film
- * is), kept current over server-sent events, plus the calls a player makes to it.
+ * is), kept current over server-sent events, plus the calls a player makes to it. A remote
+ * (Play on TV) joins as a controller, and a player hears its commands through onCommand.
  */
-export function useTogether(roomId: string | undefined): Together {
+export function useTogether(roomId: string | undefined, options: { controller?: boolean; onCommand?: (command: TogetherCommand) => void } = {}): Together {
+  const onCommand = useRef(options.onCommand);
+  onCommand.current = options.onCommand;
   const clientId = useMemo(newClientId, []);
   const [room, setRoom] = useState<TogetherRoom>();
   const [ended, setEnded] = useState(false);
@@ -99,7 +112,7 @@ export function useTogether(roomId: string | undefined): Together {
     let retry: ReturnType<typeof setTimeout> | undefined;
     let stopped = false;
     const connect = () => {
-      source = new EventSource(`/api/together/${encodeURIComponent(roomId)}/events?client=${clientId}`);
+      source = new EventSource(`/api/together/${encodeURIComponent(roomId)}/events?client=${clientId}${options.controller ? '&role=remote' : ''}`);
       source.onmessage = (e) => {
         let event: TogetherEvent;
         try {
@@ -109,6 +122,7 @@ export function useTogether(roomId: string | undefined): Together {
         }
         offsets.current = [...offsets.current.slice(-19), event.now - Date.now()];
         offset.current = Math.max(...offsets.current);
+        if (event.command) onCommand.current?.(event.command);
         if (event.ended) {
           setEnded(true);
           source?.close();

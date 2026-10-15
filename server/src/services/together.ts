@@ -1,10 +1,11 @@
 import crypto from 'node:crypto';
 import type { ServerResponse } from 'node:http';
 import type { FastifyReply } from 'fastify';
-import type { TogetherAction, TogetherControl, TogetherEvent, TogetherPlayback, TogetherRoom, TogetherRoomsEvent } from '@netfish/shared';
+import type { TogetherAction, TogetherCommand, TogetherControl, TogetherEvent, TogetherPlayback, TogetherRoom, TogetherTracks } from '@netfish/shared';
 import type { SessionUser } from '../auth';
 import { jellyfin, ticksToSeconds } from '../clients/jellyfin';
 import { jfImage } from '../lib/images';
+import { openLine, send } from '../lib/sse';
 import { HttpError } from '../lib/upstream';
 import { t } from '../lib/i18n';
 import { episodeLabel } from './cards';
@@ -15,6 +16,9 @@ import { episodeLabel } from './cards';
  * server only keeps where the film is (playing or paused, at which second, as of when);
  * each player loads its own stream from Jellyfin, so every person's progress and
  * "watched" are their own. Rooms live in memory: a restart ends them.
+ *
+ * Play on TV uses the same rooms ("remote" ones, not listed for others): the TV is the
+ * one player, and the phone that sent it there joins as its remote control.
  */
 
 const CODE_LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // nothing that reads like 0/O or 1/I
@@ -32,12 +36,18 @@ interface Player {
   name: string;
   avatar?: string;
   waiting: boolean;
+  /** A remote (Play on TV), not a player. */
+  controller: boolean;
+  tracks?: TogetherTracks;
   streams: Set<ServerResponse>;
   lastSeen: number;
 }
 
 interface Room {
   id: string;
+  kind: 'together' | 'remote';
+  /** Play on TV: the screen it plays on. */
+  screen?: { id: string; name: string };
   hostId: string;
   hostName: string;
   title: string;
@@ -60,6 +70,8 @@ const cleanClient = (id: unknown) => (typeof id === 'string' && /^[a-z0-9-]{8,40
 function view(room: Room): TogetherRoom {
   return {
     id: room.id,
+    kind: room.kind,
+    screenName: room.screen?.name,
     hostId: room.hostId,
     hostName: room.hostName,
     title: room.title,
@@ -75,41 +87,28 @@ function view(room: Room): TogetherRoom {
       avatar: p.avatar,
       here: p.streams.size > 0,
       waiting: p.waiting,
+      controller: p.controller || undefined,
+      tracks: p.tracks,
     })),
     createdAt: new Date(room.createdAt).toISOString(),
   };
 }
 
-// Everyone's Home, top bar and title pages: told when rooms open, change and close.
-const watchers = new Set<ServerResponse>();
-let announcing: ReturnType<typeof setTimeout> | undefined;
-
-function announce() {
-  if (announcing) return; // a burst of changes goes out as one
-  announcing = setTimeout(() => {
-    announcing = undefined;
-    const event: TogetherRoomsEvent = { rooms: listRooms(), now: Date.now() };
-    for (const s of watchers) send(s, event);
-  }, 300);
-}
-
-function send(stream: ServerResponse, event: TogetherEvent | TogetherRoomsEvent) {
-  try {
-    stream.write(`data: ${JSON.stringify(event)}\n\n`);
-  } catch {
-    /* gone: the close handler tidies up */
-  }
-}
+// Everyone's Home, top bar and title pages hear when rooms open, change and close (see screens.ts).
+let changed: () => void = () => {};
+export const onRoomsChanged = (fn: () => void) => {
+  changed = fn;
+};
 
 function broadcast(room: Room) {
   const event: TogetherEvent = { room: view(room), now: Date.now() };
   for (const p of room.players.values()) for (const s of p.streams) send(s, event);
-  announce();
+  changed();
 }
 
 function end(room: Room) {
   rooms.delete(room.id);
-  announce();
+  changed();
   const event: TogetherEvent = { ended: true, now: Date.now() };
   for (const p of room.players.values())
     for (const s of p.streams) {
@@ -162,16 +161,25 @@ const setPlayback = (room: Room, change: Partial<TogetherPlayback> & { action: T
 
 /**
  * Opens a room for a film or episode, starting paused at `position` (or where the host
- * left off); a host has one room at a time.
+ * left off). A host has one Watch together room at a time, and a screen plays one thing.
  */
-export async function createRoom(user: SessionUser, itemId: string, position?: number): Promise<TogetherRoom> {
+export async function createRoom(
+  user: SessionUser,
+  itemId: string,
+  position?: number,
+  remote?: { screen: { id: string; name: string } },
+): Promise<TogetherRoom> {
   const { resume, ...about } = await describe(user, itemId);
-  for (const old of rooms.values()) if (old.hostId === user.id) end(old);
+  for (const old of rooms.values()) {
+    if (remote ? old.screen?.id === remote.screen.id : old.kind === 'together' && old.hostId === user.id) end(old);
+  }
   if (rooms.size >= MAX_ROOMS) throw new HttpError(429, t('Too many rooms are open. Try again later.'));
   let id = newCode();
   while (rooms.has(id)) id = newCode();
   const room: Room = {
     id,
+    kind: remote ? 'remote' : 'together',
+    screen: remote?.screen,
     hostId: user.id,
     hostName: user.name,
     ...about,
@@ -184,44 +192,21 @@ export async function createRoom(user: SessionUser, itemId: string, position?: n
   return view(room);
 }
 
-/** Rooms on this server that have someone in them (everyone signed in can see and join them). */
+/** Watch together rooms that have someone in them (everyone signed in can see and join them). */
 export function listRooms(): TogetherRoom[] {
   return [...rooms.values()]
-    .filter((r) => [...r.players.values()].some((p) => p.streams.size > 0))
+    .filter((r) => r.kind === 'together' && [...r.players.values()].some((p) => p.streams.size > 0))
     .sort((a, b) => b.createdAt - a.createdAt)
     .map(view);
 }
 
 export const getRoom = (id: string) => view(roomOf(id));
 
-/** Opens a server-sent events line: no buffering on the way, reconnect quickly if it drops. */
-function openLine(reply: FastifyReply): ServerResponse {
-  reply.hijack();
-  const stream = reply.raw;
-  stream.writeHead(200, {
-    'content-type': 'text/event-stream; charset=utf-8',
-    'cache-control': 'no-cache, no-transform',
-    connection: 'keep-alive',
-    // nginx and friends: pass every message on at once.
-    'x-accel-buffering': 'no',
-  });
-  stream.write('retry: 2000\n\n');
-  return stream;
-}
-
-/** The live list of rooms: all of them now, then again whenever one opens, changes or closes. */
-export function watchRooms(reply: FastifyReply) {
-  const stream = openLine(reply);
-  watchers.add(stream);
-  send(stream, { rooms: listRooms(), now: Date.now() });
-  stream.on('close', () => watchers.delete(stream));
-}
-
 /**
  * A player's live line to the room (server-sent events): the room now, then every change.
  * Being connected is what "here" means; the line drops when the player closes.
  */
-export function openStream(user: SessionUser, id: string, clientId: unknown, reply: FastifyReply) {
+export function openStream(user: SessionUser, id: string, clientId: unknown, reply: FastifyReply, controller = false) {
   const room = roomOf(id);
   const client = cleanClient(clientId);
   if (!client) throw new HttpError(400, 'Bad request');
@@ -229,7 +214,7 @@ export function openStream(user: SessionUser, id: string, clientId: unknown, rep
   if (player && player.userId !== user.id) throw new HttpError(403, 'Forbidden');
   if (!player) {
     if (room.players.size >= MAX_PLAYERS) throw new HttpError(429, t('This room is full'));
-    player = { clientId: client, userId: user.id, name: user.name, avatar: user.avatar, waiting: true, streams: new Set(), lastSeen: Date.now() };
+    player = { clientId: client, userId: user.id, name: user.name, avatar: user.avatar, waiting: !controller, controller, streams: new Set(), lastSeen: Date.now() };
     room.players.set(client, player);
   }
 
@@ -296,16 +281,53 @@ export function leave(user: SessionUser, id: string, clientId: unknown) {
   const player = playerOf(room, user, clientId);
   room.players.delete(player.clientId);
   for (const s of player.streams) s.end();
-  if (!room.players.size) end(room);
+  // Play on TV is over once the TV stops playing.
+  const players = [...room.players.values()].filter((p) => !p.controller);
+  if (!room.players.size || (room.kind === 'remote' && !player.controller && !players.length)) end(room);
   else broadcast(room);
   return { ok: true };
 }
 
-/** Ends the room for everyone: whoever opened it, or an admin. */
+/** Ends the room for everyone: whoever opened it, or an admin (Play on TV: the TV or the remote too). */
 export function endRoom(user: SessionUser, id: string) {
   const room = roomOf(id);
-  if (room.hostId !== user.id && !user.isAdmin) throw new HttpError(403, t('Only {name} can end this room', { name: room.hostName }));
+  const inIt = [...room.players.values()].some((p) => p.userId === user.id);
+  if (room.hostId !== user.id && !user.isAdmin && !(room.kind === 'remote' && inIt)) {
+    throw new HttpError(403, t('Only {name} can end this room', { name: room.hostName }));
+  }
   end(room);
+  return { ok: true };
+}
+
+const cleanTracks = (list: unknown) =>
+  (Array.isArray(list) ? list : [])
+    .slice(0, 60)
+    .map((t) => ({ index: Number((t as { index?: unknown })?.index), label: String((t as { label?: unknown })?.label ?? '').slice(0, 80) }))
+    .filter((t) => Number.isInteger(t.index));
+
+/** A player's audio and subtitle tracks, for a remote to show. */
+export function setTracks(user: SessionUser, id: string, clientId: unknown, tracks: Partial<TogetherTracks> | undefined) {
+  const room = roomOf(id);
+  const player = playerOf(room, user, clientId);
+  player.tracks = {
+    audio: cleanTracks(tracks?.audio),
+    subtitles: cleanTracks(tracks?.subtitles),
+    audioIndex: Number.isInteger(tracks?.audioIndex) ? tracks!.audioIndex : undefined,
+    subtitleIndex: tracks?.subtitleIndex === null ? null : Number.isInteger(tracks?.subtitleIndex) ? tracks!.subtitleIndex : undefined,
+  };
+  broadcast(room);
+  return { ok: true };
+}
+
+/** From a remote to one player in its room: change audio or subtitles, or stop. */
+export function command(user: SessionUser, id: string, body: { clientId?: string; to?: string; action?: string; index?: number | null }) {
+  const room = roomOf(id);
+  const from = playerOf(room, user, body.clientId);
+  const target = room.players.get(cleanClient(body.to) ?? '');
+  if (!target || !['audio', 'subtitle', 'stop'].includes(String(body.action))) throw new HttpError(400, 'Bad request');
+  const index = body.index === null ? null : Number.isInteger(body.index) ? body.index : undefined;
+  const event: TogetherEvent = { command: { action: body.action as TogetherCommand['action'], index, by: from.name }, now: Date.now() };
+  for (const s of target.streams) send(s, event);
   return { ok: true };
 }
 
@@ -323,12 +345,5 @@ setInterval(() => {
     }
     if ((room.emptySince && now - room.emptySince > EMPTY_FOR) || now - room.createdAt > MAX_AGE) end(room);
     else if (changed) broadcast(room);
-  }
-  for (const s of watchers) {
-    try {
-      s.write(': still here\n\n');
-    } catch {
-      /* gone */
-    }
   }
 }, 15_000).unref();

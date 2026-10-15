@@ -13,6 +13,7 @@ import type {
   ServiceConnectionUpdate,
   SubtitleRequest,
   TogetherControl,
+  TogetherTracks,
   TraktStatus,
   User,
 } from '@netfish/shared';
@@ -47,7 +48,8 @@ import { offlineInfo, playInfo, reportProgress, startPlayback } from './services
 import { personDetail } from './services/people';
 import { hideFromContinue, setWatched } from './services/watched';
 import { readyToWatch } from './services/ready';
-import { control, createRoom, endRoom, getRoom, leave, listRooms, openStream, setWaiting, watchRooms } from './services/together';
+import { command, control, createRoom, endRoom, getRoom, leave, listRooms, openStream, setTracks, setWaiting } from './services/together';
+import { listScreens, openLive, playOn } from './services/screens';
 import { cleanupSuggestions, keepForGood } from './services/cleanup';
 import { deleteFromDisk, downloadAgain, removedTitles, stopDownload, storage } from './services/manage';
 import { createRequest, listRequests, myRequestKeys } from './services/requests';
@@ -320,16 +322,17 @@ export async function apiRoutes(app: FastifyInstance) {
     // Watch together: rooms where play, pause and seeking stay in step for everyone.
     type Room = { Params: { id: string } };
     api.get('/together', async () => ({ rooms: listRooms() }));
-    api.get('/together/live', async (_req, reply) => {
-      watchRooms(reply);
+    // The live line every open Netfish keeps: rooms, screens, and "play this" (Play on TV).
+    api.get<{ Querystring: { screen?: string; name?: string; kind?: string } }>('/together/live', async (req, reply) => {
+      openLive(userOf(req), reply, req.query);
       return reply;
     });
     api.post<{ Body: { itemId?: string; position?: number } }>('/together', async (req) =>
       createRoom(userOf(req), clean(req.body?.itemId, 64), Number.isFinite(req.body?.position) ? Number(req.body?.position) : undefined),
     );
     api.get<Room>('/together/:id', async (req) => getRoom(clean(req.params.id, 12)));
-    api.get<Room & { Querystring: { client?: string } }>('/together/:id/events', async (req, reply) => {
-      openStream(userOf(req), clean(req.params.id, 12), req.query.client, reply);
+    api.get<Room & { Querystring: { client?: string; role?: string } }>('/together/:id/events', async (req, reply) => {
+      openStream(userOf(req), clean(req.params.id, 12), req.query.client, reply, req.query.role === 'remote');
       return reply;
     });
     api.post<Room & { Body: TogetherControl }>('/together/:id/control', async (req) =>
@@ -340,6 +343,18 @@ export async function apiRoutes(app: FastifyInstance) {
     );
     api.post<Room & { Body: { clientId?: string } }>('/together/:id/leave', async (req) => leave(userOf(req), clean(req.params.id, 12), req.body?.clientId));
     api.delete<Room>('/together/:id', async (req) => endRoom(userOf(req), clean(req.params.id, 12)));
+    api.post<Room & { Body: { clientId?: string; tracks?: TogetherTracks } }>('/together/:id/tracks', async (req) =>
+      setTracks(userOf(req), clean(req.params.id, 12), req.body?.clientId, req.body?.tracks),
+    );
+    api.post<Room & { Body: { clientId?: string; to?: string; action?: string; index?: number | null } }>('/together/:id/command', async (req) =>
+      command(userOf(req), clean(req.params.id, 12), req.body ?? {}),
+    );
+
+    // Play on TV: the screens you can send something to, and sending it.
+    api.get('/screens', async (req) => ({ screens: listScreens(userOf(req)) }));
+    api.post<{ Params: { id: string }; Body: { itemId?: string; position?: number } }>('/screens/:id/play', async (req) =>
+      playOn(userOf(req), clean(req.params.id, 40), clean(req.body?.itemId, 64), Number.isFinite(req.body?.position) ? Number(req.body?.position) : undefined),
+    );
 
     // Playback
     api.get<{ Params: { itemId: string } }>('/play/:itemId', async (req) => playInfo(userOf(req), clean(req.params.itemId, 64)));

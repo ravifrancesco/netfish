@@ -6,39 +6,54 @@ A Netflix-style front door for a home media server. One app to browse, discover,
 
 ![Netfish home screen](docs/screenshots/home.jpg)
 
-- **Home like a streaming service:** Continue Watching, *Top picks for you* (blended from what you watched recently), *Because you watched…*, new arrivals, trending and popular titles, coming soon.
-- **Everything in one search:** your library and everything TMDB knows, with clear badges (in library, requested, downloading 45%, partly available).
-- **Suggestions that learn, for free:** *Top picks* blends TMDB's "people who liked this also liked" with the genres, directors and actors each person watches most, and with what's popular on your server. Home also gets *Popular on this server*, *More from* a favourite director and *Because you like* a favourite actor. No account or subscription needed; it all runs on the Pi.
-- **Directors and actors:** search a name to see their films and shows, what's in your library first. Every name on a title page opens that person's page too.
-- **Watch together:** start a room from any film or episode. It shows up at once for everyone on your server (a *Watch together* row on Home, the top bar, the title's page, a notification), and play, pause, skipping and the next episode stay in step on every device: TVs, phones, computers, browsers. Everyone's progress and *watched* stay their own.
-- **Who's watching?:** several people can stay signed in on one device (the living-room TV) and switch with a click; anyone can lock their profile with a 4-digit PIN.
-- **Ready to watch:** what you asked for gets its own row on Home as soon as it arrives, and the Mac, Windows and Android apps (or your browser) can tell you with a notification.
-- **Mark as watched:** a film, an episode or a whole season, and take anything off *Continue Watching* with one click.
-- **Request in one click:** movies, or pick seasons of a show. Filed in Seerr as *your* user, so approvals and quotas still apply.
-- **Manage downloads and disk space:** stop a download, or throw it away and let Radarr/Sonarr find another release. Admins can delete a movie or some seasons from disk to free space: the title stays in the library as *Not on disk*, ready to download again with one tap. Settings shows how full each disk is, what takes the most room, and what could go: titles everyone finished long ago, or that nobody has started in a year. Tick and delete, or keep one for good.
-- **Live download progress:** from Radarr/Sonarr's queues, with speed and ETA from qBittorrent. Season packs show as one item, and stalls and import problems are explained. When Radarr says a film is *Not Available* (still only in cinemas, or not out yet) or a show hasn't started, Netfish says so, with the date it should arrive.
-- **Versions:** Radarr/Sonarr's Interactive Search, inside Netfish. See every release from every indexer, filter by audio language, quality or text, and download the one you want. Netfish warns when a release probably won't replace your current copy, and admins can cap how big a release people may pick.
-- **Another audio language:** the same panel with a language filter, highlighting multi-audio releases that keep the original language.
-- **Subtitles in any language:** fetched through Bazarr for a movie, a season or one episode; the library refreshes when they arrive.
-- **Scores and trailers:** TMDB, IMDb, Rotten Tomatoes (critics and audience), Metacritic and Letterboxd, plus in-app trailers for any title.
-- **A real player:** direct play when the browser can handle the file. Otherwise Jellyfin repackages it (cheap on a Pi), and only transcodes as a last resort. It supports audio and subtitle switching, resume, skip intro, next-episode autoplay and keyboard shortcuts.
-- **Apps:** the web app at `http://<pi>:7777` (works on phones too), plus apps for Mac, Windows, iPhone/iPad, Android (phones, tablets, Fire TV and Android TV) and Samsung TVs. The Mac, Windows, iPhone/iPad and Android phone apps can also **download movies and episodes for offline viewing**.
-- **Updates itself:** the Mac and Windows apps tell you when a new version is out and install it with one click, or, with **Auto-update** on, download it in the background and install it when you quit.
-- **In English and Italian:** every app, the server's messages and the install guides; Netfish follows your device's language, or pick one in Settings. Titles and plots from TMDB come in your language too.
-- **Trakt, optional:** link one Trakt account for the whole server. What anyone watches is added to it, past history can be imported once, and its recommendations become rows on everyone's Home. Needs Trakt VIP (see *Good to know*).
-- **Set up from the app:** a first-run screen, then **Settings → Connections** for every service's address and API key, with a test button.
-
-Sign-in uses your Jellyfin accounts. Jellyfin keeps doing the heavy lifting (library, streaming, users) behind the scenes; nobody needs to open it.
-
 ## Contents
 
-- [Download](#download) · [Screenshots](#screenshots) · [Install guides](docs/install/README.md) ([italiano](docs/install/it/README.md))
+- [Features](#features) · [Download](#download) · [Screenshots](#screenshots) · [Install guides](docs/install/README.md) ([italiano](docs/install/it/README.md))
 - [How it fits together](#how-it-fits-together) · [What's where](#whats-where)
 - [Install on the Pi (Portainer)](#install-on-the-pi-portainer) · [Admin settings](#admin-settings-in-the-app) · [Stack variables](#optional-stack-variables)
 - [Playback: who does the work?](#playback-who-does-the-work)
 - Apps: [Mac](#mac-app) · [Windows](#windows-app) · [Android, Fire TV, Android TV](#android-app-phones-tablets-fire-tv-android-tv) · [Samsung TV](#samsung-tv-app) · [iPhone & iPad](#iphone--ipad-app)
 - [Developing](#developing) · [Building and releasing](#building-the-apps-and-releasing)
 - [Good to know](#good-to-know) · [Licence](#licence) · [Roadmap](#roadmap)
+
+## Features
+
+### Watching
+- **Home like a streaming service:** Continue Watching, *Ready to watch*, *Top picks for you*, *Because you watched…*, new arrivals, trending and coming soon.
+- **A real player:** plays the file as it is when it can; otherwise Jellyfin repackages it (cheap on a Pi) and only transcodes as a last resort. Audio and subtitle switching, resume, skip intro, next episode, keyboard shortcuts.
+- **Play on TV:** send a film from your phone to the TV, or to any device with Netfish open. Your phone becomes the remote: pause, skip, audio and subtitles. Works mid-film too.
+- **Watch together:** a room for any film or episode. Play, pause, skipping and the next episode stay in step on every device, and the room shows up for everyone on your server right away.
+- **Mark as watched:** a film, an episode or a whole season; take anything off *Continue Watching* with one click.
+- **Offline:** download movies and episodes in the Mac, Windows, iPhone/iPad and Android phone apps.
+
+### Finding something
+- **One search for everything:** your library and all of TMDB, with clear badges (in library, requested, downloading 45%).
+- **Directors and actors:** search a name for their films and shows; every name on a title page opens its own page.
+- **Suggestions that learn, for free:** TMDB's "people who liked this also liked", blended with each person's favourite genres, directors and actors, plus *Popular on this server*. Runs on the Pi, no subscription.
+- **Scores and trailers:** TMDB, IMDb, Rotten Tomatoes, Metacritic and Letterboxd, and trailers in the app.
+
+### Getting it
+- **Request in one click:** a movie, or some seasons of a show, filed in Seerr as *you*, so approvals and quotas still apply.
+- **Live download progress:** speed and ETA, stalls and import problems explained, and *Not available yet* with the date it should arrive.
+- **Versions:** every release from every indexer (Radarr/Sonarr's Interactive Search), filtered by quality, size or **audio language**.
+- **Subtitles in any language:** fetched through Bazarr for a movie, a season or one episode.
+- **Ready to watch:** a notification when something you asked for arrives.
+
+### For the household
+- **Who's watching?:** several people signed in on one device (the living-room TV), switching with a click, each with an optional PIN.
+- **Everyone's own:** sign in with your Jellyfin account; progress, requests and suggestions are yours.
+- **English and Italian:** every app, server message and guide; Netfish follows your device's language.
+
+### For the admin
+- **Set up from the app:** a first-run screen, then **Settings → Connections** for every service, with a test button.
+- **Disk space:** stop or replace downloads, delete a movie or some seasons from disk (it stays in the library, ready to download again), see how full each disk is and what could go.
+- **Trakt, optional:** one Trakt account for the whole server: history, scrobbling and its recommendations on Home (needs Trakt VIP, see *Good to know*).
+
+### Apps
+- **Everywhere:** the web app at `http://<pi>:7777` (phones too), plus apps for Mac, Windows, iPhone/iPad, Android (phones, tablets, Fire TV, Android TV) and Samsung TVs.
+- **Up to date by themselves:** the TV and phone apps get new features from the server; the Mac and Windows apps install new versions in one click, or on their own with **Auto-update**.
+
+Sign-in uses your Jellyfin accounts. Jellyfin keeps doing the heavy lifting (library, streaming, users) behind the scenes; nobody needs to open it.
 
 ## Download
 
@@ -110,7 +125,7 @@ The apps show the interface from your server, so most new features arrive by upd
 
 **1. Portainer → Stacks → Add stack**, name it `netfish`, paste [`docker-compose.yml`](docker-compose.yml), and **Deploy**. No variables are needed: Portainer pulls the ready-made image `ghcr.io/ravifrancesco/netfish:latest` (built by GitHub for Raspberry Pi and PCs).
 
-**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.4.1`.
+**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.5.0`.
 
 <details>
 <summary>Or build the image on the Pi yourself</summary>
@@ -256,6 +271,7 @@ The Android and Windows builds run from a copy in `~/Library/Caches/netfish-buil
 - **Raspberry Pi and transcoding:** Netfish asks Jellyfin to direct-play or repackage whenever possible. Burned-in (image) subtitles or very high bitrates force real transcoding, which is slow on a Pi.
 - **Popular on this server** shows what the other people on your server watched lately (titles only, never who). Each person counts once they open Netfish; with `JELLYFIN_API_KEY` set, people who watch in other Jellyfin apps count too.
 - **Trakt needs VIP.** Since August 2026 Trakt only lets VIP accounts create the API app whose Client ID and secret Netfish needs, and a free account can connect only one outside app. Netfish works the same without Trakt: its own suggestions (*Top picks*, *Because you watched…*) come from TMDB through Seerr.
+- **Play on TV** lists your own devices (signed in as you) and every TV on your server, since a TV is usually the household's. The film plays under the profile signed in on that TV. Name each device in **Settings → Playback on this device**.
 - **Watch together** keeps a live connection to the server open while you watch (server-sent events). Behind a reverse proxy that buffers responses, turn buffering off for `/api/together/`; Netfish already tells nginx not to.
 - **Letterboxd** has no public API; its score comes from MDBList when a key is set, otherwise Netfish links to the film's page.
 - **Artwork cache:** Netfish keeps a copy of every poster it has shown (and fetches library posters ahead of time) in `/config/cache/images`, up to 1 GB by default (`IMAGE_CACHE_MB` to change). Covers load instantly after the first time, and apps keep them too.

@@ -1439,6 +1439,27 @@ html.is-tv .pinpad__key:focus {
 }
 .big__why {
   display: block;
+  white-space: normal; /* the reason can take two lines on a phone */
+}
+@media (max-width: 600px) {
+  /* Phones: the whole title, on two lines if need be, rather than "The Marine…". */
+  .bigs .big__title {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .bigs .big {
+    gap: 10px;
+  }
+  /* Clean-up: the size goes under the title, leaving the title more room. */
+  .cleanup .big__size {
+    display: none;
+  }
+  .cleanup .big__size-inline {
+    display: inline;
+  }
+}
+.big__size-inline {
+  display: none;
 }
 .big input[type='checkbox'] {
   flex: none;
@@ -1546,6 +1567,14 @@ html.is-tv .pinpad__key:focus {
 .storage {
   display: grid;
   gap: 14px;
+}
+/* Every column here is as wide as the panel, never wider: a long title shortens with "…"
+   instead of pushing the whole panel off a phone's screen. */
+.storage,
+.disk,
+.cleanup,
+.bigs {
+  grid-template-columns: minmax(0, 1fr);
 }
 .disk {
   display: grid;
@@ -3658,4 +3687,195 @@ html.is-tv .together-pill:focus {
   .together-pill__label {
     display: none;
   }
+}
+
+/* The phone and tablet apps: taps are taps, never a double-tap zoom. */
+html.is-ios-app {
+  touch-action: manipulation;
+}
+
+/* How many Watch together rooms are open, when there's more than one. */
+.together-pill__count {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 0.72rem;
+  font-weight: 800;
+  display: inline-grid;
+  place-items: center;
+}
+
+/* ---------- Play on TV ---------- */
+.play-on {
+  position: relative;
+}
+.play-on__menu {
+  min-width: 240px;
+  z-index: 6;
+}
+.play-on__menu .menu__item {
+  color: var(--text);
+}
+.play-on__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.player__top .play-on__menu {
+  top: calc(100% + 8px);
+}
+
+/* The bar at the bottom while a film plays elsewhere from here. */
+.remote-bar {
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
+  bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  margin: 0 auto;
+  max-width: 560px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 8px 8px 14px;
+  border-radius: var(--radius);
+  background: rgba(18, 23, 30, 0.96);
+  border: 1px solid var(--accent-soft);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+  animation: pop-in 0.2s var(--ease);
+}
+.remote-bar__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.remote-bar__text > svg {
+  color: var(--accent);
+  flex: none;
+}
+.remote-bar__text > span {
+  min-width: 0;
+  display: grid;
+}
+.remote-bar__text strong,
+.remote-bar__text .small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  /* Above the tab bar on phones. */
+  .remote-bar {
+    bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* The remote itself */
+.remote {
+  max-width: 560px;
+  margin: 0 auto;
+  display: grid;
+  gap: 22px;
+  padding-top: calc(var(--nav-h) + 20px);
+  padding-bottom: 120px;
+}
+.remote--ended {
+  min-height: 60vh;
+  place-items: center;
+  align-content: center;
+  text-align: center;
+  color: var(--text-2);
+}
+.remote--ended > svg {
+  color: var(--accent);
+}
+.remote__art {
+  border-radius: var(--radius);
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.remote__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.remote__title {
+  display: grid;
+  gap: 4px;
+}
+.remote__title h1 {
+  font-size: clamp(1.5rem, 5vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.remote__title p {
+  margin: 0;
+}
+.remote__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+.remote__seek input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.remote__times {
+  display: flex;
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+}
+.remote__controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+}
+.remote__play {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--text);
+  color: var(--bg);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.remote__play:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+.remote__tracks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+.remote__tracks select {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.remote__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
 }

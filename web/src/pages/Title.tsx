@@ -8,6 +8,7 @@ import { api, type TitleRef } from '../api';
 import { Row } from '../components/Cards';
 import { DownloadButton } from '../components/DownloadButton';
 import { TogetherOnTitle, WatchTogetherButton } from '../components/Together';
+import { PlayOnButton } from '../components/PlayOn';
 import { NameLinks, PeopleRow } from '../components/People';
 import { isNotAvailable, notOutText } from '../components/NotOut';
 import { DeleteFromDisk, DownloadAgain, RemovedNote, StopDownload } from '../components/Manage';
@@ -377,6 +378,7 @@ export default function Title() {
                 <Play size={22} fill="currentColor" /> {d.play.label}
               </Link>
             )}
+            {d.play && <PlayOnButton itemId={d.play.itemId} title={d.title} />}
             {d.play && <WatchTogetherButton itemId={d.play.itemId} />}
             {d.play && d.mediaType === 'movie' && <DownloadButton itemId={d.play.itemId} />}
             {d.removed && !d.removed.seasons && d.canManage ? (

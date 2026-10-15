@@ -27,7 +27,12 @@ if (/NetfishDesktop/.test(navigator.userAgent)) {
 }
 
 // Phone & tablet apps (iPhone, iPad, Android): room for notches, no volume slider (the device buttons do that).
-if (/NetfishiOS|NetfishAndroid/.test(navigator.userAgent)) document.documentElement.classList.add('is-ios-app');
+// And they're apps, not web pages: no pinch or double-tap zoom, nor zooming in on a text field.
+if (/NetfishiOS|NetfishAndroid/.test(navigator.userAgent)) {
+  document.documentElement.classList.add('is-ios-app');
+  const viewport = document.querySelector('meta[name="viewport"]');
+  viewport?.setAttribute('content', `${viewport.getAttribute('content')}, maximum-scale=1, user-scalable=no`);
+}
 
 // The Fire TV app (or ?tv=1 in a browser): remote-control navigation.
 if (isTV()) startTV();

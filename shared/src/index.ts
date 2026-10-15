@@ -424,6 +424,20 @@ export interface TogetherPlayback {
   rev: number;
 }
 
+export interface TogetherTrack {
+  index: number;
+  label: string;
+}
+
+/** A player's audio and subtitle choices (so a remote can show and change them). */
+export interface TogetherTracks {
+  audio: TogetherTrack[];
+  subtitles: TogetherTrack[];
+  audioIndex?: number;
+  /** null: subtitles off. */
+  subtitleIndex?: number | null;
+}
+
 export interface TogetherMember {
   /** One per open player (the same person can join from two devices). */
   clientId: string;
@@ -434,11 +448,26 @@ export interface TogetherMember {
   here: boolean;
   /** Loading or buffering. */
   waiting: boolean;
+  /** A remote control (Play on TV), not a player. */
+  controller?: boolean;
+  tracks?: TogetherTracks;
+}
+
+/** Sent to one player: change its audio or subtitles, or stop (from a remote). */
+export interface TogetherCommand {
+  action: 'audio' | 'subtitle' | 'stop';
+  /** The track; null turns subtitles off. */
+  index?: number | null;
+  by: string;
 }
 
 export interface TogetherRoom {
   /** Six letters and digits: the invite code. */
   id: string;
+  /** "remote": Play on TV, a film on one screen run from a phone (not listed for others). */
+  kind: 'together' | 'remote';
+  /** Play on TV: the screen it's playing on. */
+  screenName?: string;
   hostId: string;
   hostName: string;
   /** "Dune", or the show's name for an episode. */
@@ -454,17 +483,39 @@ export interface TogetherRoom {
   createdAt: string;
 }
 
-/** One message on a room's live stream: the room as it is now, or that it ended. */
+/** One message on a room's live stream: the room as it is now, that it ended, or a command for this player. */
 export interface TogetherEvent {
   room?: TogetherRoom;
   ended?: boolean;
+  command?: TogetherCommand;
   /** The server's clock (ms), so players agree on where the film is. */
   now: number;
 }
 
-/** The live list of rooms (Home, the top bar and title pages follow it). */
-export interface TogetherRoomsEvent {
-  rooms: TogetherRoom[];
+// ---------- Screens (Play on TV) ----------
+
+export type ScreenKind = 'tv' | 'computer' | 'phone' | 'tablet' | 'browser';
+
+/** A Netfish that's open somewhere and can be told to play something. */
+export interface Screen {
+  id: string;
+  name: string;
+  kind: ScreenKind;
+  /** Who's signed in there. */
+  userName: string;
+  /** Signed in as you. */
+  mine: boolean;
+}
+
+/**
+ * The live line every open Netfish keeps to the server: the rooms (Home, the top bar and
+ * title pages follow them), the screens you can play on, and "open this" when someone
+ * sends this screen something to play.
+ */
+export interface LiveEvent {
+  rooms?: TogetherRoom[];
+  screens?: Screen[];
+  open?: { path: string; by: string };
   now: number;
 }
 

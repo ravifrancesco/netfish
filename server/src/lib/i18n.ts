@@ -210,6 +210,7 @@ const IT: Record<string, string> = {
   'Too many rooms are open. Try again later.': 'Ci sono troppe stanze aperte. Riprova più tardi.',
   'This room is full': 'Questa stanza è piena',
   'Only {name} can end this room': 'Solo {name} può chiudere questa stanza',
+  "That device isn't open any more": 'Quel dispositivo non è più aperto',
   'Sign in to {name} again': 'Accedi di nuovo come {name}',
   'A PIN is four digits': 'Il PIN è di quattro cifre',
   'Only that person can remove a profile with a PIN': 'Solo quella persona può rimuovere un profilo con il PIN',

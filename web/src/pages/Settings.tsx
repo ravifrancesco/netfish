@@ -15,6 +15,7 @@ import { Spinner, StorageWarning, useToast } from '../components/ui';
 import { useConfig, useMe } from '../lib/hooks';
 import { appKind, desktop, useOffline } from '../lib/desktop';
 import { bytes } from '../lib/format';
+import { defaultScreenName, savedScreenName, setScreenName } from '../lib/screens';
 import { setPrefs, usePrefs } from '../lib/prefs';
 import { LANGUAGES, languageSetting, setLanguage, t, tn, type Language } from '../i18n';
 
@@ -27,6 +28,26 @@ const BITRATES = [
   { value: 3_000_000, label: t('3 Mbps (mobile data)') },
 ];
 
+
+/** What this device is called when someone picks where to play something (Play on TV). */
+function ScreenNameField() {
+  const [name, setName] = useState(savedScreenName);
+  return (
+    <label className="field">
+      <span>{t("This device's name")}</span>
+      <input
+        className="input"
+        value={name}
+        maxLength={40}
+        placeholder={defaultScreenName()}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={() => setScreenName(name)}
+        onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()}
+      />
+      <small className="muted">{t('Shown when you or someone at home picks where to play something, like "Living room TV".')}</small>
+    </label>
+  );
+}
 
 function OfflineStorage() {
   const list = useOffline();
@@ -193,6 +214,7 @@ export default function Settings() {
 
       <section className="panel">
         <h2>{t('Playback on this device')}</h2>
+        <ScreenNameField />
         <label className="field">
           <span>{t('Streaming quality')}</span>
           <select className="select" value={prefs.maxBitrate} onChange={(e) => setPrefs({ maxBitrate: Number(e.target.value) })}>

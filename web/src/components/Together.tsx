@@ -139,6 +139,7 @@ export function TogetherPill() {
         <span className="live-dot" aria-hidden="true" />
         <Faces people={everyone} max={2} />
         <span className="together-pill__label">{t('Watch together')}</span>
+        {rooms.length > 1 && <span className="together-pill__count">{rooms.length}</span>}
       </button>
       {open && (
         <div className="menu together-menu" role="menu">
