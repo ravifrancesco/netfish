@@ -29,6 +29,17 @@ const art = {
     page(1024, 1024, `<div style="width:824px;height:824px;border-radius:185px;${bg}display:grid;place-items:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)">${mark(560)}</div>`, { transparent: true }),
   // iOS masks the corners itself: a full square, no transparency.
   ios: () => page(1024, 1024, `<div style="width:1024px;height:1024px;${bg}display:grid;place-items:center">${mark(620)}</div>`),
+  // TV icon (Fire TV): a full square, logo above the name. Fire TV ignores the banner of apps
+  // installed outside its store and squeezes the icon into a square, so this is what it shows.
+  tv: () =>
+    page(
+      1024,
+      1024,
+      `<div style="width:1024px;height:1024px;${bg}display:flex;flex-direction:column;align-items:center;justify-content:center;gap:34px">
+        ${mark(400)}
+        <span style="font-size:212px;letter-spacing:-0.035em;line-height:1;color:#eef3f6;margin-top:-6px"><span style="font-weight:300;color:#b5c0ca">net</span><span style="font-weight:800;margin-left:0.04em">fish</span></span>
+      </div>`,
+    ),
   // Fire TV / Android TV home-screen banner (16:9).
   banner: () =>
     page(
@@ -68,9 +79,9 @@ app.whenReady().then(async () => {
   for (const [density, width] of Object.entries({ xhdpi: 320, xxhdpi: 480, xxxhdpi: 640 })) {
     write(path.join(res, `drawable-${density}/banner.png`), banner.resize({ width, height: (width * 9) / 16, quality: 'best' }));
   }
-  // On TVs the app's icon is the wide banner too: Fire TV ignores the banner of apps installed
-  // outside its store and stretches the icon over the tile, which left grey bars beside a square one.
-  write(path.join(res, 'mipmap-television-xhdpi/ic_launcher.png'), banner.resize({ width: 640, height: 360, quality: 'best' }));
+  // On TVs the icon is the full square with the name (see art.tv).
+  const tv = await render(win, art.tv(), 1024, 1024);
+  write(path.join(res, 'mipmap-television-xhdpi/ic_launcher.png'), tv.resize({ width: 512, height: 512, quality: 'best' }));
 
   const ios = await render(win, art.ios(), 1024, 1024);
   write(path.join(root, 'apps/ios/Netfish/Assets.xcassets/AppIcon.appiconset/icon-1024.png'), ios.resize({ width: 1024, height: 1024, quality: 'best' }));

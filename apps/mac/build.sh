@@ -45,6 +45,23 @@ if otool -L "$APP/Contents/MacOS/Netfish" "$APP"/Contents/Frameworks/*.dylib | g
   exit 1
 fi
 
+# dylibbundler can add its search path to a library that already has it (it did to libmpv).
+# macOS 15 refuses to load a library listing the same LC_RPATH twice, so the app wouldn't open there.
+rpaths() { otool -l "$1" | awk '/cmd LC_RPATH/ { getline; getline; print $2 }'; }
+for bin in "$APP/Contents/MacOS/Netfish" "$APP"/Contents/Frameworks/*.dylib; do
+  for path in $(rpaths "$bin" | sort | uniq -d); do
+    for _ in 1 2 3 4; do
+      rpaths "$bin" | grep -qxF "$path" || break
+      install_name_tool -delete_rpath "$path" "$bin" 2>/dev/null || true
+    done
+    install_name_tool -add_rpath "$path" "$bin" 2>/dev/null
+  done
+  if [ -n "$(rpaths "$bin" | sort | uniq -d)" ]; then
+    echo "$(basename "$bin") still lists a search path twice (macOS 15 won't load it)" >&2
+    exit 1
+  fi
+done
+
 # iCloud and Finder tag files with metadata that code signing refuses.
 xattr -cr "$APP"
 for lib in "$APP"/Contents/Frameworks/*.dylib; do codesign --force --sign - "$lib"; done

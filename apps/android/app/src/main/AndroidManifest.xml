@@ -8,8 +8,8 @@
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
-    <!-- Icons: square on phones; on TVs (mipmap-television) the wide banner with "netfish", because Fire TV
-         shows the icon, not the banner, for apps installed outside its store, stretched over the tile. -->
+    <!-- Icons: the rounded tile on phones; on TVs (mipmap-television) a full square with the logo and "netfish",
+         because Fire TV shows the icon, squeezed into a square, not the banner, for apps installed outside its store. -->
     <application
         android:label="Netfish"
         android:icon="@mipmap/ic_launcher"
