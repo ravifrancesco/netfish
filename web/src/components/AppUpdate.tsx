@@ -41,7 +41,9 @@ export function AppUpdate() {
   const install = async () => {
     if (!update) return;
     setError(undefined);
-    setProgress(0);
+    // Already downloaded by itself: it only needs a restart.
+    if (status?.ready === status?.latest) setRestarting(true);
+    else setProgress(0);
     const stop = update.onProgress((p) => setProgress(p.total ? p.received / p.total : undefined));
     try {
       await update.install();
@@ -49,8 +51,20 @@ export function AppUpdate() {
     } catch (err) {
       setError((err as Error).message);
       setProgress(undefined);
+      setRestarting(false);
     } finally {
       stop();
+    }
+  };
+
+  const setAuto = async (on: boolean) => {
+    if (!update?.setAuto || !status) return;
+    setStatus({ ...status, auto: on, ready: on ? status.ready : undefined, autoProblem: undefined });
+    write(CHECKED, 'null'); // Home's note checks again
+    try {
+      await update.setAuto(on);
+    } catch (err) {
+      setError((err as Error).message);
     }
   };
 
@@ -62,9 +76,11 @@ export function AppUpdate() {
       ? t('Downloading the update… {percent}', { percent: percent(progress) })
       : checking
         ? t('Checking for updates…')
-        : status?.available
-          ? t('Netfish {version} is available', { version: status.latest })
-          : status
+        : status?.available && status.ready === status.latest
+          ? t('Netfish {version} is ready and installs when you quit Netfish.', { version: status.latest })
+          : status?.available
+            ? t('Netfish {version} is available', { version: status.latest })
+            : status
             ? t('Netfish is up to date')
             : '';
 
@@ -86,7 +102,8 @@ export function AppUpdate() {
         <span className="spacer" />
         {status?.available && status.canInstall ? (
           <button className="btn btn--accent btn--sm" disabled={busy} onClick={() => void install()}>
-            {busy ? <Spinner size={14} /> : <Download size={15} />} {t('Update')}
+            {busy ? <Spinner size={14} /> : status.ready === status.latest ? <RefreshCw size={15} /> : <Download size={15} />}{' '}
+            {status.ready === status.latest ? t('Restart now') : t('Update')}
           </button>
         ) : status?.available && status.page ? (
           <a className="btn btn--ghost btn--sm" href={status.page} target="_blank" rel="noreferrer">
@@ -100,6 +117,16 @@ export function AppUpdate() {
       </div>
       {progress !== undefined && <Progress value={progress} />}
       {error && <p className="conn__result is-bad">{error}</p>}
+      {update.setAuto && status && (
+        <label className="check">
+          <input type="checkbox" checked={Boolean(status.auto)} onChange={(e) => void setAuto(e.target.checked)} />
+          <span>
+            {t('Update Netfish by itself')}
+            <span className="muted small"> · {t('New versions download in the background and install when you quit Netfish.')}</span>
+          </span>
+        </label>
+      )}
+      {status?.auto && status.autoProblem && <p className="muted small">{t("Couldn't update by itself: {problem}", { problem: status.autoProblem })}</p>}
     </div>
   );
 }
@@ -133,8 +160,10 @@ export function UpdateNudge() {
     app.update
       .check()
       .then((s) => {
-        write(CHECKED, JSON.stringify({ at: Date.now(), latest: s.available ? s.latest : undefined }));
-        setLatest(s.available ? s.latest : undefined);
+        // Updating by itself: nothing to ask.
+        const latest = s.available && !s.auto ? s.latest : undefined;
+        write(CHECKED, JSON.stringify({ at: Date.now(), latest }));
+        setLatest(latest);
       })
       .catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

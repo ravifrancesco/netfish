@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         main = MainWindow()
         main.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
+        AutoUpdate.shared.start()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -28,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         main.player.shutdown()
+        AutoUpdate.shared.quitting()
     }
 
     // ---------- Menus ----------

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { TriangleAlert, CalendarClock, Clock, Layers, Play, Plus, Star, Clapperboard } from 'lucide-react';
+import { TriangleAlert, CalendarClock, Check, CircleCheck, Clock, Layers, Play, Plus, Star, Clapperboard, Undo2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { DownloadItem, MediaType, SeasonSummary, TitleDetail } from '@netfish/shared';
 import { api, type TitleRef } from '../api';
 import { Row } from '../components/Cards';
 import { DownloadButton } from '../components/DownloadButton';
+import { WatchTogetherButton } from '../components/Together';
 import { NameLinks, PeopleRow } from '../components/People';
 import { isNotAvailable, notOutText } from '../components/NotOut';
 import { DeleteFromDisk, DownloadAgain, RemovedNote, StopDownload } from '../components/Manage';
@@ -21,6 +23,46 @@ import { useConfig, useMe, useRefreshTitle } from '../lib/hooks';
 type Sheet =
   | { kind: 'versions'; language?: string; seasonNumber?: number; episodeNumber?: number }
   | { kind: 'subtitles'; seasonNumber?: number };
+
+/** Watched / not watched in Jellyfin; for a show, every episode. */
+function useSetWatched() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  return useMutation({
+    mutationFn: ({ itemId, watched }: { itemId: string; watched: boolean }) => api.setWatched(itemId, watched),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['title'] });
+      void qc.invalidateQueries({ queryKey: ['season'] });
+      void qc.invalidateQueries({ queryKey: ['home'] });
+    },
+    onError: (err) => toast('error', (err as Error).message),
+  });
+}
+
+function WatchedButton({ d }: { d: TitleDetail }) {
+  const set = useSetWatched();
+  if (!d.jellyfinId || d.watched === undefined) return null;
+  return (
+    <button className="btn btn--ghost btn--lg" disabled={set.isPending} onClick={() => set.mutate({ itemId: d.jellyfinId!, watched: !d.watched })}>
+      {d.watched ? <Undo2 size={20} /> : <CircleCheck size={20} />} {d.watched ? t('Mark as unwatched') : t('Mark as watched')}
+    </button>
+  );
+}
+
+function EpisodeWatched({ itemId, played }: { itemId: string; played?: boolean }) {
+  const set = useSetWatched();
+  return (
+    <button
+      type="button"
+      className={`link-btn episode__watched${played ? ' is-on' : ''}`}
+      disabled={set.isPending}
+      onClick={() => set.mutate({ itemId, watched: !played })}
+      title={played ? t('Mark as unwatched') : undefined}
+    >
+      {played ? <Check size={14} /> : <CircleCheck size={14} />} {played ? t('Watched') : t('Mark as watched')}
+    </button>
+  );
+}
 
 function DownloadLine({ d, canStop }: { d: DownloadItem; canStop: boolean }) {
   const bits = [
@@ -217,8 +259,8 @@ function Episodes({ d, titleRef, onSheet, initialSeason }: { d: TitleDetail; tit
                       <span className="muted small">{t('Airs {date}', { date: new Date(e.airDate!).toLocaleDateString(locale) })}</span>
                     ) : !e.available ? (
                       <span className="muted small">{t('Not in your library')}</span>
-                    ) : e.played ? (
-                      <span className="muted small">{t('Watched')}</span>
+                    ) : e.jellyfinId ? (
+                      <EpisodeWatched itemId={e.jellyfinId} played={e.played} />
                     ) : null}
                   </div>
                 </div>
@@ -335,6 +377,7 @@ export default function Title() {
                 <Play size={22} fill="currentColor" /> {d.play.label}
               </Link>
             )}
+            {d.play && <WatchTogetherButton itemId={d.play.itemId} />}
             {d.play && d.mediaType === 'movie' && <DownloadButton itemId={d.play.itemId} />}
             {d.removed && !d.removed.seasons && d.canManage ? (
               <DownloadAgain d={d} className="btn btn--accent btn--lg" />
@@ -351,6 +394,7 @@ export default function Title() {
                 <Clapperboard size={20} /> {t('Trailer')}
               </button>
             )}
+            <WatchedButton d={d} />
             <DeleteFromDisk d={d} />
           </div>
           {d.play?.progress !== undefined && <Progress value={d.play.progress} tone="watch" className="tp__progress" />}

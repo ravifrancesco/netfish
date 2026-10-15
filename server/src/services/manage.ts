@@ -17,6 +17,7 @@ import { allDownloads, forgetDownloads } from './downloads';
 import { invalidateLibrary } from './library';
 import { grabbedKeys, seriesFor } from './releases';
 import { myRequestKeys } from './requests';
+import { forgetCleanup } from './cleanup';
 
 /**
  * Managing what's on disk, through Radarr and Sonarr: stopping a download, deleting a
@@ -59,6 +60,7 @@ function forget(mediaType: MediaType, tmdbId: number, tvdbId?: number) {
   invalidateLibrary();
   forgetDownloads();
   storageCache.clear();
+  forgetCleanup();
 }
 
 // ---------- Stopping a download ----------

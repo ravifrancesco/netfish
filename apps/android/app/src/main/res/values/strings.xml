@@ -21,4 +21,5 @@
 
     <!-- Player -->
     <string name="error_cant_play">The TV couldn\'t play this (%1$s)</string>
+    <string name="notice_channel">Ready to watch</string>
 </resources>

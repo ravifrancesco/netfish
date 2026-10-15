@@ -168,6 +168,7 @@ export async function movieDetail(user: SessionUser, tmdbId: number): Promise<Ti
     crew: crewFromTmdb(movie.credits),
     trailerYoutubeKey: trailerOf(movie.relatedVideos),
     play: playOf(item),
+    watched: item ? Boolean(item.UserData?.Played) : undefined,
     ...tracksFrom(streamsOf(item)),
     requests: requestsOf(movie.mediaInfo, mySeerrId),
     downloads: downloadsFor(downloads, 'movie', tmdbId),
@@ -201,13 +202,14 @@ export async function tvDetail(user: SessionUser, tmdbId: number): Promise<Title
   const tv = await catalog.tv(tmdbId);
   const tvdbId = tv.externalIds?.tvdbId;
   const entry = findInLibrary(index, 'tv', tmdbId, tvdbId);
-  const [downloads, mySeerrId, jfSeasons, playItem, recs, managed] = await Promise.all([
+  const [downloads, mySeerrId, jfSeasons, playItem, recs, managed, series] = await Promise.all([
     settle(allDownloads(), []),
     maybeSeerrUserId(user),
     entry ? settle(jellyfin.seasons(user.token, user.id, entry.id), EMPTY) : Promise.resolve(EMPTY),
     entry ? nextEpisode(user, entry.id) : Promise.resolve(undefined),
     settle(catalog.recommendations('tv', tmdbId), EMPTY_PAGE),
     settle(sonarrSeries(tvdbId), null),
+    entry ? settle(jellyfin.item(user.token, user.id, entry.id), undefined) : Promise.resolve(undefined),
   ]);
 
   const jfByNumber = new Map(jfSeasons.Items.map((s) => [s.IndexNumber ?? -1, s]));
@@ -252,6 +254,7 @@ export async function tvDetail(user: SessionUser, tmdbId: number): Promise<Title
     crew: (tv.createdBy ?? []).map((c) => ({ id: c.id ? String(c.id) : undefined, name: c.name, role: 'Creator' })),
     trailerYoutubeKey: trailerOf(tv.relatedVideos),
     play: playOf(playItem),
+    watched: series ? Boolean(series.UserData?.Played) : undefined,
     ...tracksFrom(streamsOf(playItem)),
     requests: requestsOf(tv.mediaInfo, mySeerrId),
     downloads: downloadsFor(downloads, 'tv', tmdbId, tvdbId),

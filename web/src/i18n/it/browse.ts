@@ -164,6 +164,10 @@ export default {
     'Cerca nella tua libreria e in tutto ciò che puoi aggiungere, oppure un regista o un attore per vedere i suoi lavori.',
   People: 'Persone',
   'Shortest first': 'Prima i più brevi',
+  'Mark as watched': 'Segna come visto',
+  'Mark as unwatched': 'Segna come non visto',
+  'Remove {title} from Continue Watching': 'Togli {title} da Continua a guardare',
+  'Remove from Continue Watching': 'Togli da Continua a guardare',
   'Longest first': 'Prima i più lunghi',
   'Movies & shows': 'Film e serie TV',
 

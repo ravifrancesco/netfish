@@ -49,6 +49,50 @@ export default {
   '{n} title is not on disk.': '{n} titolo non è sul disco.',
   '{n} titles are not on disk.': '{n} titoli non sono sul disco.',
 
+  // Clean-up suggestions
+  'Everyone finished it · last watched a month ago': 'Finito da tutti · visto l’ultima volta un mese fa',
+  'Everyone finished it · last watched {n} months ago': 'Finito da tutti · visto l’ultima volta {n} mesi fa',
+  'Nobody has watched it · arrived a month ago': 'Nessuno l’ha guardato · arrivato un mese fa',
+  'Nobody has watched it · arrived {n} months ago': 'Nessuno l’ha guardato · arrivato {n} mesi fa',
+  'Could go to free space': 'Si potrebbe eliminare per fare spazio',
+  Delete: 'Elimina',
+  "Don't suggest it again": 'Non suggerirlo più',
+  Keep: 'Tieni',
+  'Delete {n} title from disk?': 'Eliminare {n} titolo dal disco?',
+  'Delete {n} titles from disk?': 'Eliminare {n} titoli dal disco?',
+  'They stay in your library as Not on disk, and you can download any of them again.':
+    'Restano nella tua libreria come Non sul disco e puoi riscaricarli quando vuoi.',
+
+  // Who's watching? (profiles on a device)
+  'PIN saved.': 'PIN salvato.',
+  'PIN removed.': 'PIN rimosso.',
+  you: 'tu',
+  'Locked with a PIN': 'Bloccato con un PIN',
+  'Sign {name} out on this device?': 'Disconnettere {name} da questo dispositivo?',
+  Remove: 'Rimuovi',
+  'New PIN (4 digits)': 'Nuovo PIN (4 cifre)',
+  'Save PIN': 'Salva PIN',
+  'Your profile is locked with a PIN on this device.': 'Il tuo profilo è bloccato con un PIN su questo dispositivo.',
+  'Lock your profile with a PIN, so nobody else here can switch to it.': 'Blocca il tuo profilo con un PIN, così nessun altro qui può passarci.',
+  'Change PIN': 'Cambia PIN',
+  'Set a PIN': 'Imposta un PIN',
+  'Remove PIN': 'Rimuovi PIN',
+  "Ask who's watching when Netfish opens (with two or more profiles)": 'Chiedi chi guarda quando si apre Netfish (con due o più profili)',
+  'Switch profile': 'Cambia profilo',
+  "Enter {name}'s PIN": 'Inserisci il PIN di {name}',
+  '{n} of 4 digits': '{n} di 4 cifre',
+  'Delete a digit': 'Cancella una cifra',
+  "Who's watching?": 'Chi guarda?',
+  'Add profile': 'Aggiungi profilo',
+  'Add a profile: sign in with another Jellyfin account.': 'Aggiungi un profilo: accedi con un altro account Jellyfin.',
+  "Back to who's watching": 'Torna a chi guarda',
+  'Profiles on this device': 'Profili su questo dispositivo',
+
+  // Ready to watch
+  'Ready to watch': 'Pronti da guardare',
+  '{title} is ready to watch.': '{title} è pronto da guardare.',
+  'Notify me when something I asked for is ready to watch': 'Avvisami quando qualcosa che ho richiesto è pronto da guardare',
+
   // Updating the Mac and Windows apps
   'Restarting Netfish…': 'Riavvio Netfish…',
   'Downloading the update… {percent}': 'Scarico l’aggiornamento… {percent}',
@@ -60,4 +104,10 @@ export default {
   'Download page': 'Pagina di download',
   'Check again': 'Controlla di nuovo',
   'Netfish {version} is available for this computer.': 'È disponibile Netfish {version} per questo computer.',
+  'Netfish {version} is ready and installs when you quit Netfish.': 'Netfish {version} è pronto e si installa quando chiudi Netfish.',
+  'Restart now': 'Riavvia ora',
+  'Update Netfish by itself': 'Aggiorna Netfish da solo',
+  'New versions download in the background and install when you quit Netfish.':
+    'Le nuove versioni si scaricano in background e si installano quando chiudi Netfish.',
+  "Couldn't update by itself: {problem}": 'Aggiornamento automatico non riuscito: {problem}',
 } as Record<string, string>;

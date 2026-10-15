@@ -6,9 +6,11 @@ import { Spinner } from '../components/ui';
 import { useConfig } from '../lib/hooks';
 import { deviceId, deviceName } from '../lib/prefs';
 import Setup from './Setup';
+import { markPicked } from '../components/ProfilePicker';
 import { t } from '../i18n';
 
-export default function Login() {
+/** `adding`: another person signing in on this device ("Add profile"); `onCancel` goes back to the picker. */
+export default function Login({ adding, onCancel, onDone }: { adding?: boolean; onCancel?: () => void; onDone?: () => void } = {}) {
   const qc = useQueryClient();
   const { data: config } = useConfig();
   const [username, setUsername] = useState('');
@@ -17,8 +19,11 @@ export default function Login() {
   const login = useMutation({
     mutationFn: () => api.login({ username, password, deviceId: deviceId(), deviceName: deviceName() }),
     onSuccess: ({ user }) => {
+      // A different person: nothing cached for the previous one carries over.
+      qc.clear();
       qc.setQueryData(['me'], user);
-      void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'me' });
+      markPicked();
+      onDone?.();
     },
   });
 
@@ -43,7 +48,7 @@ export default function Login() {
           <Mark size={44} />
           <Wordmark className="wordmark--lg" />
         </div>
-        <p className="muted">{t('Sign in with your Jellyfin account.')}</p>
+        <p className="muted">{adding ? t('Add a profile: sign in with another Jellyfin account.') : t('Sign in with your Jellyfin account.')}</p>
         {config && !config.jellyfinConfigured && (
           <p className="login__error">{t("This server isn't connected to Jellyfin yet. Set {variable} in the stack.", { variable: 'JELLYFIN_URL' })}</p>
         )}
@@ -64,6 +69,11 @@ export default function Login() {
         <button className="btn btn--accent btn--lg btn--block" disabled={login.isPending || !username}>
           {login.isPending ? <Spinner size={20} /> : t('Sign in')}
         </button>
+        {onCancel && (
+          <button type="button" className="btn btn--ghost btn--block" onClick={onCancel}>
+            {t("Back to who's watching")}
+          </button>
+        )}
       </form>
     </div>
   );

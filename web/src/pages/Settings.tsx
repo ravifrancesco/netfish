@@ -7,6 +7,8 @@ import { api } from '../api';
 import { Connections } from '../components/Connections';
 import { Storage } from '../components/Storage';
 import { AppUpdate } from '../components/AppUpdate';
+import { notifySupport } from '../lib/notify';
+import { DeviceProfiles } from '../components/DeviceProfiles';
 import { LanguageSelect } from '../components/LanguageSelect';
 import { Mark } from '../components/Logo';
 import { Spinner, StorageWarning, useToast } from '../components/ui';
@@ -170,6 +172,11 @@ export default function Settings() {
         </div>
       </section>
 
+      <section className="panel" id="profiles">
+        <h2>{t('Profiles on this device')}</h2>
+        <DeviceProfiles />
+      </section>
+
       <section className="panel">
         <h2>{t('Language')}</h2>
         <label className="field">
@@ -213,6 +220,39 @@ export default function Settings() {
           <input type="checkbox" checked={prefs.autoplayNext} onChange={(e) => setPrefs({ autoplayNext: e.target.checked })} />
           <span>{t('Play the next episode automatically')}</span>
         </label>
+        {notifySupport() && (
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={prefs.notifyReady && (notifySupport() === 'app' || Notification.permission === 'granted')}
+              onChange={async (e) => {
+                const on = e.target.checked;
+                // A browser asks once whether Netfish may notify.
+                if (on && notifySupport() === 'browser' && Notification.permission !== 'granted') {
+                  if ((await Notification.requestPermission()) !== 'granted') return;
+                }
+                setPrefs({ notifyReady: on });
+              }}
+            />
+            <span>{t('Notify me when something I asked for is ready to watch')}</span>
+          </label>
+        )}
+        {notifySupport() && (
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={prefs.notifyTogether && (notifySupport() === 'app' || Notification.permission === 'granted')}
+              onChange={async (e) => {
+                const on = e.target.checked;
+                if (on && notifySupport() === 'browser' && Notification.permission !== 'granted') {
+                  if ((await Notification.requestPermission()) !== 'granted') return;
+                }
+                setPrefs({ notifyTogether: on });
+              }}
+            />
+            <span>{t('Notify me when someone wants to watch together')}</span>
+          </label>
+        )}
       </section>
 
       {desktop() && (

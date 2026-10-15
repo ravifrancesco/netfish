@@ -10,6 +10,8 @@ import { allDownloads, progressByTitle } from './downloads';
 import { libraryIndex, type LibraryIndex } from './library';
 import { listRequests } from './requests';
 import { traktPicks } from './trakt';
+import { isHidden } from './watched';
+import { readyToWatch } from './ready';
 import { householdFavourites, noteWatched, syncHousehold } from './household';
 import { peopleRows, rankPicks, tasteOf, type PeopleRows, type Seed, type Taste } from './taste';
 import { t } from '../lib/i18n';
@@ -38,12 +40,12 @@ function seedsFrom(items: JfItem[], index: LibraryIndex): { seeds: Seed[]; watch
   return { seeds, watched, watchedIds };
 }
 
-function continueWatching(resume: JfItem[], nextUp: JfItem[], index: LibraryIndex): Card[] {
+function continueWatching(userId: string, resume: JfItem[], nextUp: JfItem[], index: LibraryIndex): Card[] {
   const seen = new Set<string>();
   const cards: Card[] = [];
   for (const item of [...resume, ...nextUp]) {
     const group = item.Type === 'Episode' ? (item.SeriesId ?? item.Id) : item.Id;
-    if (seen.has(group)) continue;
+    if (seen.has(group) || isHidden(userId, group, item)) continue;
     seen.add(group);
     cards.push(jfPlayableCard(item, index));
   }
@@ -158,9 +160,10 @@ export async function buildHome(user: SessionUser): Promise<HomeResponse> {
       }));
   }
 
-  const popularHere = await householdCards;
+  const [popularHere, ready] = await Promise.all([householdCards, settle(readyToWatch(user), [])]);
   const candidates: Row[] = [
-    { id: 'continue', title: t('Continue Watching'), style: 'wide', items: continueWatching(resume.Items, nextUp.Items, index) },
+    { id: 'ready', title: t('Ready to watch'), style: 'poster', items: ready },
+    { id: 'continue', title: t('Continue Watching'), style: 'wide', items: continueWatching(userId, resume.Items, nextUp.Items, index) },
     { id: 'requested', title: t('Your requests'), style: 'poster', items: requested, href: '/activity' },
     { id: 'picks', title: t('Top picks for {name}', { name: user.name }), style: 'poster', items: picks },
     { id: 'popular-here', title: t('Popular on this server'), style: 'poster', items: popularHere.length >= 3 ? popularHere : [] },

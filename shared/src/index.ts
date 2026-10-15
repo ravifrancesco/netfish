@@ -117,6 +117,8 @@ export interface Card {
   thumb?: string;
   /** Length in minutes: the movie's, or a typical episode's for a show. */
   runtimeMinutes?: number;
+  /** "Ready to watch": when it arrived in the library. */
+  readyAt?: string;
   /** Present while Radarr/Sonarr are downloading it. 0..1 */
   downloadProgress?: number;
 }
@@ -238,6 +240,8 @@ export interface TitleDetail {
   cast: Person[];
   crew: Person[];
   trailerYoutubeKey?: string;
+  /** In the library and watched all the way (a show: every episode). */
+  watched?: boolean;
   /** What the big Play button does. Absent when nothing is playable yet. */
   play?: { itemId: string; label: string; progress?: number };
   /** Languages present in the library copy (for TV: from the next-up episode). */
@@ -365,6 +369,103 @@ export interface StorageInfo {
   biggest: Array<{ key: string; mediaType: MediaType; tmdbId?: number; title: string; year?: number; poster?: string; size: number }>;
   /** Titles deleted from disk and kept in the library. */
   removed: number;
+}
+
+/** Settings → Storage: something that could go to free space, and why. */
+export interface CleanupSuggestion {
+  key: string;
+  mediaType: MediaType;
+  tmdbId?: number;
+  title: string;
+  year?: number;
+  poster?: string;
+  size: number;
+  /** finished: everyone who watched it finished long ago · unwatched: nobody started it since it arrived. */
+  reason: 'finished' | 'unwatched';
+  /** Last watched, or when it arrived. */
+  since: string;
+}
+
+/** A person signed in on this device, for "Who's watching?". */
+export interface DeviceProfile {
+  userId: string;
+  name: string;
+  avatar?: string;
+  /** Needs a PIN to switch to. */
+  locked: boolean;
+  /** The profile this device is using now. */
+  current: boolean;
+}
+
+export interface ProfilesResponse {
+  profiles: DeviceProfile[];
+  /** Ask who's watching when Netfish opens. */
+  ask: boolean;
+}
+
+// ---------- Watch together ----------
+
+export type TogetherAction = 'start' | 'play' | 'pause' | 'seek' | 'next';
+
+/** Where a room's film is: playing or paused at a point, as of a moment on the server's clock. */
+export interface TogetherPlayback {
+  itemId: string;
+  playing: boolean;
+  /** Seconds into the film at `at`. */
+  position: number;
+  /** Server time (ms) of the last change. */
+  at: number;
+  /** The last change, and who made it. */
+  action: TogetherAction;
+  by: string;
+  /** The player that made it (so it doesn't tell itself). */
+  byClient?: string;
+  /** Goes up with every change. */
+  rev: number;
+}
+
+export interface TogetherMember {
+  /** One per open player (the same person can join from two devices). */
+  clientId: string;
+  userId: string;
+  name: string;
+  avatar?: string;
+  /** Has the room open right now. */
+  here: boolean;
+  /** Loading or buffering. */
+  waiting: boolean;
+}
+
+export interface TogetherRoom {
+  /** Six letters and digits: the invite code. */
+  id: string;
+  hostId: string;
+  hostName: string;
+  /** "Dune", or the show's name for an episode. */
+  title: string;
+  /** For an episode: "S1:E3 · Its name". */
+  subtitle?: string;
+  image?: string;
+  playback: TogetherPlayback;
+  members: TogetherMember[];
+  createdAt: string;
+}
+
+/** One message on a room's live stream: the room as it is now, or that it ended. */
+export interface TogetherEvent {
+  room?: TogetherRoom;
+  ended?: boolean;
+  /** The server's clock (ms), so players agree on where the film is. */
+  now: number;
+}
+
+export interface TogetherControl {
+  clientId: string;
+  action: Exclude<TogetherAction, 'start'>;
+  /** Where this player is (seconds). */
+  position?: number;
+  /** For "next": the episode everyone moves on to. */
+  itemId?: string;
 }
 
 export interface DownloadsResponse {

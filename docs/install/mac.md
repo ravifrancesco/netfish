@@ -14,7 +14,7 @@ The app is in Italian when your Mac's language is Italian.
 
 **Downloads** for offline viewing: the **Download** button on any movie or episode. Find them in the profile menu → **Downloads on this computer** (⇧⌘D). They're stored in `~/Library/Application Support/app.netfish.mac`.
 
-**Updating:** from version 0.3, Netfish tells you on Home when a new version is out: **Settings → Desktop app → Update** downloads it, swaps it in and reopens Netfish. Your sign-in and downloads are kept. (Netfish must be in your Applications folder for this.) Older versions: download the new DMG and replace the app.
+**Updating:** from version 0.3, Netfish tells you on Home when a new version is out: **Settings → Desktop app → Update** downloads it, swaps it in and reopens Netfish. Your sign-in and downloads are kept. (Netfish must be in your Applications folder for this.) Older versions: download the new DMG and replace the app. From 0.4 you can also switch on **Update Netfish by itself** there: new versions download in the background and go in when you quit Netfish, so nothing you're watching is interrupted.
 
 **Problems:**
 

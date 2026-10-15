@@ -49,6 +49,12 @@ export interface UpdateStatus {
   canInstall: boolean;
   /** The release's page (what's new, manual download). */
   page?: string;
+  /** "Update Netfish by itself" is on (apps from 0.4 on). */
+  auto?: boolean;
+  /** A newer version is downloaded and waiting: it goes in when Netfish quits. */
+  ready?: string;
+  /** Why updating by itself last failed. */
+  autoProblem?: string;
 }
 
 export interface DesktopBridge {
@@ -78,10 +84,14 @@ export interface DesktopBridge {
   clearOffline?: () => Promise<OfflineItem[]>;
   /** Open the downloads page, optionally straight into one movie (play) or one show. */
   openOffline?: (target?: { play?: string; show?: string }) => void;
+  /** A system notification; clicking it opens `path` in Netfish. */
+  notify?: (n: { title: string; body: string; path: string }) => void;
   update?: {
     check: () => Promise<UpdateStatus>;
     /** Downloads and installs the new version; the app restarts when it's done. */
     install: () => Promise<void>;
+    /** Turns "Update Netfish by itself" on or off (apps from 0.4 on). */
+    setAuto?: (on: boolean) => Promise<void>;
     onProgress: (callback: (p: { received: number; total: number }) => void) => () => void;
   };
 }
@@ -105,6 +115,7 @@ interface AndroidNative {
   offlineUsage?(): number;
   openOffline?(target: string): void;
   openServer?(): void;
+  notify?(notification: string): void;
 }
 
 declare global {
@@ -163,6 +174,7 @@ function androidBridge(): DesktopBridge | undefined {
           clearOffline: async () => answer(native.clearOffline!()),
           offlineUsage: async () => Number(native.offlineUsage!()),
           openOffline: (target?: { play?: string; show?: string }) => native.openOffline!(JSON.stringify(target ?? {})),
+          notify: native.notify ? (n: { title: string; body: string; path: string }) => native.notify!(JSON.stringify(n)) : undefined,
         }
       : {}),
     // ExoPlayer draws the film underneath the page; the page's player drives it.

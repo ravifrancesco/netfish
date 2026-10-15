@@ -5,6 +5,9 @@ import AppKit
 /// once Netfish has quit; the old copy stays until the new one is in place, then Netfish
 /// opens again. Files an app downloads itself aren't quarantined, so macOS doesn't ask
 /// about the new version. The self-test build only ever does a dry run.
+///
+/// With "Update Netfish by itself" on, AutoUpdate gets the new version ready in the
+/// background and swaps it in when Netfish quits, so nothing is ever interrupted.
 enum Updater {
     static let repository = "ravifrancesco/netfish"
     static let current = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
@@ -56,9 +59,15 @@ enum Updater {
         return false
     }
 
-    /// Downloads, checks and installs the release, then quits so it can be swapped in.
-    @MainActor
-    static func install(_ release: Release, progress: @escaping (Int64, Int64) -> Void) async throws {
+    /// A newer version, downloaded and checked, waiting to be swapped in.
+    struct Staged {
+        let version: String
+        let app: URL
+        let work: URL
+    }
+
+    /// Downloads and checks a release without touching the installed app.
+    static func prepare(_ release: Release, progress: @escaping (Int64, Int64) -> Void) async throws -> Staged {
         guard let download = release.download else { throw Problem(L("This version can only be downloaded from its page.")) }
         let app = Bundle.main.bundleURL
         guard app.pathExtension == "app" else { throw Problem(L("Netfish can't update itself here.")) }
@@ -72,23 +81,33 @@ enum Updater {
 
         let work = FileManager.default.temporaryDirectory.appendingPathComponent("netfish-update-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
-        let zip = work.appendingPathComponent("Netfish-mac.zip")
-        try await Downloader.fetch(download, to: zip, progress: progress)
-        try await run("/usr/bin/ditto", ["-x", "-k", zip.path, work.path])
-        let fresh = work.appendingPathComponent("Netfish.app")
-        guard let info = Bundle(url: fresh)?.infoDictionary,
-              info["CFBundleIdentifier"] as? String == "app.netfish.mac",
-              info["CFBundleShortVersionString"] as? String == release.version else {
-            throw Problem(L("The download doesn't look like Netfish {version}.", ["version": release.version]))
+        do {
+            let zip = work.appendingPathComponent("Netfish-mac.zip")
+            try await Downloader.fetch(download, to: zip, progress: progress)
+            try await run("/usr/bin/ditto", ["-x", "-k", zip.path, work.path])
+            try? FileManager.default.removeItem(at: zip)
+            let fresh = work.appendingPathComponent("Netfish.app")
+            guard let info = Bundle(url: fresh)?.infoDictionary,
+                  info["CFBundleIdentifier"] as? String == "app.netfish.mac",
+                  info["CFBundleShortVersionString"] as? String == release.version else {
+                throw Problem(L("The download doesn't look like Netfish {version}.", ["version": release.version]))
+            }
+            try await run("/usr/bin/codesign", ["--verify", "--deep", "--strict", fresh.path])
+            return Staged(version: release.version, app: fresh, work: work)
+        } catch {
+            try? FileManager.default.removeItem(at: work)
+            throw error
         }
-        try await run("/usr/bin/codesign", ["--verify", "--deep", "--strict", fresh.path])
+    }
 
+    /// Puts the staged version in place once Netfish has quit, and opens it again if asked.
+    static func apply(_ staged: Staged, reopen: Bool) throws {
+        let app = Bundle.main.bundleURL
         if selfTest {
-            print("update dry run: \(fresh.path) is ready to replace \(app.path)")
+            print("update dry run: \(staged.app.path) is ready to replace \(app.path)\(reopen ? "" : " after quitting")")
             fflush(stdout)
             return
         }
-
         // A running app can't be replaced safely: a small script waits for Netfish to quit,
         // swaps the copies (putting the old one back if anything fails), and opens it again.
         let script = """
@@ -97,14 +116,23 @@ enum Updater {
         mv "$2" "$old" || exit 1
         if /usr/bin/ditto "$3" "$2"; then rm -rf "$old"; else rm -rf "$2"; mv "$old" "$2"; fi
         /usr/bin/xattr -dr com.apple.quarantine "$2" 2>/dev/null
-        /usr/bin/open "$2"
+        [ "$5" = 1 ] && /usr/bin/open "$2"
         rm -rf "$4"
         """
         let swap = Process()
         swap.executableURL = URL(fileURLWithPath: "/bin/sh")
-        swap.arguments = ["-c", script, "netfish-update", String(ProcessInfo.processInfo.processIdentifier), app.path, fresh.path, work.path]
+        swap.arguments = ["-c", script, "netfish-update", String(ProcessInfo.processInfo.processIdentifier), app.path, staged.app.path, staged.work.path, reopen ? "1" : "0"]
         try swap.run()
-        NSApp.terminate(nil)
+    }
+
+    /// Updates now: downloads and checks the release (unless it's already waiting), then
+    /// quits so it can be swapped in, and Netfish opens again.
+    @MainActor
+    static func install(_ release: Release, progress: @escaping (Int64, Int64) -> Void) async throws {
+        var staged = AutoUpdate.shared.take(release.version)
+        if staged == nil { staged = try await prepare(release, progress: progress) }
+        try apply(staged!, reopen: true)
+        if !selfTest { NSApp.terminate(nil) }
     }
 
     private static func run(_ tool: String, _ arguments: [String]) async throws {
@@ -118,6 +146,85 @@ enum Updater {
             process.waitUntilExit()
             guard process.terminationStatus == 0 else { throw Problem(L("The update couldn't be checked or unpacked.")) }
         }.value
+    }
+}
+
+/// "Update Netfish by itself": a check soon after opening and every six hours; a newer
+/// version is downloaded and checked in the background, and put in place when Netfish
+/// quits (it's there the next time Netfish opens).
+@MainActor
+final class AutoUpdate {
+    static let shared = AutoUpdate()
+    private let key = "autoUpdate"
+    private var timer: Timer?
+    private var busy = false
+    /// The version waiting for Netfish to quit.
+    private(set) var staged: Updater.Staged?
+    /// Why the last try didn't work (shown in Settings).
+    private(set) var problem: String?
+
+    var on: Bool {
+        get { UserDefaults.standard.bool(forKey: key) }
+        set {
+            UserDefaults.standard.set(newValue, forKey: key)
+            if newValue { start(after: 1) } else { stop() }
+        }
+    }
+
+    func start(after delay: TimeInterval = 20) {
+        guard on, timer == nil else { return }
+        timer = Timer.scheduledTimer(withTimeInterval: 6 * 3600, repeats: true) { _ in
+            Task { @MainActor in await AutoUpdate.shared.run() }
+        }
+        Task {
+            try? await Task.sleep(for: .seconds(delay))
+            await run()
+        }
+    }
+
+    private func stop() {
+        timer?.invalidate()
+        timer = nil
+        problem = nil
+        if let staged { try? FileManager.default.removeItem(at: staged.work) }
+        staged = nil
+    }
+
+    func run() async {
+        guard on, !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            guard let release = try await Updater.check(), release.download != nil, release.version != staged?.version else { return }
+            let fresh = try await Updater.prepare(release) { _, _ in }
+            // Turned off while it downloaded: don't keep it.
+            guard on else {
+                try? FileManager.default.removeItem(at: fresh.work)
+                return
+            }
+            if let old = staged { try? FileManager.default.removeItem(at: old.work) }
+            staged = fresh
+            problem = nil
+        } catch {
+            problem = error.localizedDescription
+        }
+    }
+
+    /// Updating now instead: hands over the waiting copy when it's that version (an older
+    /// one is thrown away), so quitting doesn't swap anything else in.
+    func take(_ version: String) -> Updater.Staged? {
+        guard let waiting = staged else { return nil }
+        staged = nil
+        if waiting.version == version { return waiting }
+        try? FileManager.default.removeItem(at: waiting.work)
+        return nil
+    }
+
+    /// Netfish is quitting: the new version goes in place now, and opens next time.
+    func quitting() {
+        guard on, let staged else { return }
+        self.staged = nil
+        try? Updater.apply(staged, reopen: false)
     }
 }
 

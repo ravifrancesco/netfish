@@ -64,6 +64,7 @@ const IT: Record<string, string> = {
 
   // Home rows
   'Continue Watching': 'Continua a guardare',
+  'Ready to watch': 'Pronti da guardare',
   'Your requests': 'Le tue richieste',
   'Top picks for {name}': 'I migliori per {name}',
   'Because you watched {name}': 'Perché hai guardato {name}',
@@ -196,6 +197,23 @@ const IT: Record<string, string> = {
   'not out yet': 'non ancora uscito',
   "{service} won't download it yet: it isn't out. It downloads by itself once it is.":
     '{service} non lo scarica ancora perché non è ancora uscito. Si scaricherà da solo quando uscirà.',
+  'Unknown item': 'Elemento sconosciuto',
+
+  // Profiles on a device
+  "That profile isn't on this device any more": 'Quel profilo non è più su questo dispositivo',
+  'Too many wrong PINs. Try again in a minute.': 'Troppi PIN sbagliati. Riprova tra un minuto.',
+  'Wrong PIN': 'PIN sbagliato',
+  // Watch together
+  'Only films and episodes can be watched together': 'Si possono guardare insieme solo film ed episodi',
+  'That room has ended': 'Quella stanza è stata chiusa',
+  'Join the room first': 'Prima entra nella stanza',
+  'Too many rooms are open. Try again later.': 'Ci sono troppe stanze aperte. Riprova più tardi.',
+  'This room is full': 'Questa stanza è piena',
+  'Only {name} can end this room': 'Solo {name} può chiudere questa stanza',
+  'Sign in to {name} again': 'Accedi di nuovo come {name}',
+  'A PIN is four digits': 'Il PIN è di quattro cifre',
+  'Only that person can remove a profile with a PIN': 'Solo quella persona può rimuovere un profilo con il PIN',
+
   // Managing what's on disk
   'That download has already finished or been stopped': 'Quel download è già finito o è stato fermato',
   'Only an admin, or whoever asked for it, can stop this download': 'Solo un amministratore, o chi l’ha richiesto, può fermare questo download',

@@ -9,6 +9,10 @@ export interface Prefs {
   audioLanguage: string;
   autoplayNext: boolean;
   volume: number;
+  /** Notify when something you asked for is ready to watch (apps, or a browser that allows it). */
+  notifyReady: boolean;
+  /** Notify when someone else opens a Watch together room. */
+  notifyTogether: boolean;
 }
 
 const KEY = 'netfish.prefs';
@@ -19,6 +23,8 @@ const DEFAULTS: Prefs = {
   audioLanguage: '',
   autoplayNext: true,
   volume: 1,
+  notifyReady: true,
+  notifyTogether: true,
 };
 
 function read(): Prefs {

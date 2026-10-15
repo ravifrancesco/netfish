@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiError, setUnauthorizedHandler } from './api';
 import { Nav } from './components/Nav';
@@ -17,6 +17,9 @@ import Settings from './pages/Settings';
 import Setup from './pages/Setup';
 import Title from './pages/Title';
 import { t } from './i18n';
+import { useReadyNotifications, useTogetherNotifications } from './lib/notify';
+import { JoinRoom } from './components/Together';
+import { ProfilePicker, useProfiles, wasPicked } from './components/ProfilePicker';
 
 // The player pulls in hls.js; only load it when someone presses play.
 const Watch = lazy(() => import('./pages/Watch'));
@@ -37,9 +40,23 @@ function TvFocus() {
   return null;
 }
 
+/** "Switch profile" from the menu. */
+function SwitchProfile() {
+  const navigate = useNavigate();
+  return <ProfilePicker onAdd={() => navigate('/profiles/add')} onPicked={() => navigate('/', { replace: true })} />;
+}
+
+function AddProfile() {
+  const navigate = useNavigate();
+  return <Login adding onCancel={() => navigate('/profiles', { replace: true })} onDone={() => navigate('/', { replace: true })} />;
+}
+
 function Shell({ user }: { user: NonNullable<ReturnType<typeof useMe>['data']> }) {
   const { pathname } = useLocation();
-  const watching = pathname.startsWith('/watch/');
+  useReadyNotifications(user.id);
+  useTogetherNotifications(user.id);
+  // The player and the profile picker fill the screen without the menu bar.
+  const watching = pathname.startsWith('/watch/') || pathname.startsWith('/profiles');
   return (
     <>
       <ScrollToTop />
@@ -57,6 +74,9 @@ function Shell({ user }: { user: NonNullable<ReturnType<typeof useMe>['data']> }
             <Route path="/activity" element={<ActivityPage />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/watch/:itemId" element={<Watch />} />
+            <Route path="/together/:id" element={<JoinRoom />} />
+            <Route path="/profiles" element={<SwitchProfile />} />
+            <Route path="/profiles/add" element={<AddProfile />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
@@ -76,7 +96,18 @@ export function App() {
   }, [qc]);
 
   const signedOut = me.data === null || (me.error instanceof ApiError && me.error.status === 401);
-  const ready = !config.isLoading && (me.isSuccess || me.isError);
+  const profiles = useProfiles();
+  const [adding, setAdding] = useState(false);
+  const [picked, setPicked] = useState(wasPicked);
+  const ready = !config.isLoading && (me.isSuccess || me.isError) && (profiles.isSuccess || profiles.isError);
+  const known = profiles.data?.profiles ?? [];
+  // A device several people use asks who's watching when Netfish opens.
+  const ask = !picked && known.length > 1 && profiles.data?.ask;
+  // Whoever just signed in is who's watching.
+  const signedIn = () => {
+    setAdding(false);
+    setPicked(true);
+  };
 
   return (
     <ToastProvider>
@@ -84,8 +115,14 @@ export function App() {
       {ready &&
         (config.data?.setupRequired ? (
           <Setup />
+        ) : signedOut && known.length && !adding ? (
+          <ProfilePicker onAdd={() => setAdding(true)} onPicked={() => setPicked(true)} />
         ) : signedOut ? (
-          <Login />
+          <Login adding={adding} onCancel={known.length ? () => setAdding(false) : undefined} onDone={signedIn} />
+        ) : me.data && ask ? (
+          <ProfilePicker onAdd={() => setAdding(true)} onPicked={() => setPicked(true)} />
+        ) : me.data && adding ? (
+          <Login adding onCancel={() => setAdding(false)} onDone={signedIn} />
         ) : me.data ? (
           <Shell user={me.data} />
         ) : (

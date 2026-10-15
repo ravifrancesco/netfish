@@ -1236,9 +1236,217 @@ p {
 .statusbox__note svg {
   flex: none;
 }
+/* ---------- Who's watching? ---------- */
+
+.profiles {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 28px;
+  padding: 40px 16px;
+  text-align: center;
+}
+.profiles h1 {
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-weight: 800;
+}
+.profiles__grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(16px, 3vw, 32px);
+}
+.profile-tile {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 6px;
+  background: none;
+  border: 0;
+  color: var(--text-2);
+  cursor: pointer;
+  border-radius: var(--radius);
+  outline: none;
+}
+.profile-tile__avatar {
+  width: clamp(96px, 12vw, 150px);
+  height: clamp(96px, 12vw, 150px);
+  border-radius: 14px;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  font-size: 3rem;
+  font-weight: 800;
+  border: 3px solid transparent;
+  transition:
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+/* The first letter fills the avatar's box, which drops the usual fallback padding
+   (no :has() here: older TV browsers don't know it). */
+.img-fallback.profile-tile__avatar,
+.img-fallback.pinpad__avatar,
+.img-fallback.device-profiles__avatar,
+.img-fallback.together-panel__avatar {
+  padding: 0;
+  overflow: hidden;
+}
+.avatar-initial {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+.profile-tile--add .profile-tile__avatar {
+  background: var(--surface);
+  color: var(--text-3);
+  border-color: var(--line-2);
+}
+.profile-tile__name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 1.05rem;
+}
+.profile-tile:hover .profile-tile__avatar,
+.profile-tile:focus-visible .profile-tile__avatar,
+html.is-tv .profile-tile:focus .profile-tile__avatar {
+  border-color: var(--text);
+  transform: scale(1.04);
+}
+.profile-tile:hover,
+.profile-tile:focus-visible,
+html.is-tv .profile-tile:focus {
+  color: var(--text);
+  outline: none;
+}
+.pinpad {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+}
+.pinpad__avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 14px;
+  object-fit: cover;
+  font-size: 2.4rem;
+  font-weight: 800;
+}
+.pinpad__dots {
+  display: flex;
+  gap: 14px;
+}
+.pinpad__dots span {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--text-2);
+}
+.pinpad__dots span.is-on {
+  background: var(--text);
+  border-color: var(--text);
+}
+.pinpad__dots.is-wrong span {
+  border-color: var(--danger);
+}
+.pinpad__error {
+  min-height: 1.4em;
+  color: var(--danger);
+  margin: 0;
+}
+.pinpad__keys {
+  display: grid;
+  grid-template-columns: repeat(3, 72px);
+  gap: 12px;
+}
+.pinpad__key {
+  height: 60px;
+  border-radius: 12px;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.4rem;
+  font-weight: 650;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.pinpad__key--text {
+  font-size: 0.85rem;
+}
+.pinpad__key:hover,
+.pinpad__key:focus-visible,
+html.is-tv .pinpad__key:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+.device-profiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.device-profiles li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.device-profiles__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  object-fit: cover;
+  font-weight: 700;
+}
+.pin-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pin-form .input {
+  width: 110px;
+  letter-spacing: 0.4em;
+  text-align: center;
+}
+.cleanup {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.cleanup__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cleanup__head svg {
+  color: var(--accent);
+}
+.big__why {
+  display: block;
+}
+.big input[type='checkbox'] {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
 .app-update {
   display: grid;
   gap: 10px;
+}
+.episode__watched {
+  font-size: 0.82rem;
+  color: var(--text-3);
+}
+.episode__watched.is-on {
+  color: var(--accent);
 }
 .card__length {
   position: absolute;
@@ -3102,5 +3310,183 @@ html.is-tv ::-webkit-scrollbar {
   }
   .item__poster {
     height: 96px;
+  }
+}
+
+/* ---------- Watch together ---------- */
+.together-rooms {
+  display: grid;
+  gap: 10px;
+  margin: 0 var(--gutter);
+}
+.together-room {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px 10px 10px;
+  border-radius: var(--radius);
+  background: rgba(18, 23, 30, 0.92);
+  border: 1px solid var(--accent-soft);
+  backdrop-filter: blur(10px);
+}
+.together-room__art {
+  width: 112px;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex: none;
+}
+.together-room__text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.together-room__text strong {
+  font-size: 1.05rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.together-room__text svg {
+  vertical-align: -2px;
+  color: var(--accent);
+}
+.together-wrap {
+  position: relative;
+}
+.together-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-soft);
+  background: rgba(14, 18, 24, 0.7);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 650;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.together-chip svg {
+  color: var(--accent);
+}
+.together-chip:hover,
+.together-chip.is-active,
+html.is-tv .together-chip:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+.together-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(360px, calc(100vw - 32px));
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px 16px;
+  border-radius: var(--radius);
+  background: rgba(14, 18, 24, 0.97);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  z-index: 5;
+}
+.together-panel p {
+  margin: 0;
+}
+.together-panel__head {
+  display: flex;
+  align-items: center;
+}
+.together-panel__link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.together-panel__link input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 0.82rem;
+}
+.together-panel__members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.together-panel__members li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.together-panel__members li.is-away {
+  opacity: 0.55;
+}
+.together-panel__avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  object-fit: cover;
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex: none;
+}
+.together-note {
+  position: absolute;
+  top: max(84px, calc(var(--safe-top) + 72px));
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  width: fit-content;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: rgba(14, 18, 24, 0.9);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow);
+  font-size: 0.92rem;
+  white-space: nowrap;
+  max-width: calc(100% - 32px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: pop-in 0.25s var(--ease);
+  pointer-events: none;
+}
+.together-note svg {
+  color: var(--accent);
+  flex: none;
+}
+.together-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 140px;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  background: rgba(14, 18, 24, 0.88);
+  border: 1px solid var(--accent-soft);
+  color: var(--text-2);
+  text-align: center;
+  max-width: calc(100% - 32px);
+}
+@media (max-width: 600px) {
+  .together-room__art {
+    width: 72px;
+  }
+  .together-chip {
+    padding: 6px 10px;
   }
 }

@@ -37,9 +37,11 @@ final class MacBridge: NSObject, WKScriptMessageHandlerWithReply {
         openOffline: (target) => { call('openOffline', target || {}); },
         openServer: () => { call('openServer'); },
         toggleFullscreen: () => { call('fullscreen'); },
+        notify: (n) => { call('notify', n); },
         update: {
           check: () => call('updateCheck'),
           install: () => call('updateInstall'),
+          setAuto: (on) => call('updateAuto', on),
           onProgress: (cb) => { updates.add(cb); return () => updates.delete(cb); },
         },
         videoOverlay: {
@@ -124,16 +126,29 @@ final class MacBridge: NSObject, WKScriptMessageHandlerWithReply {
             window.showServer()
             return nil
 
+        // Notifications
+        case "notify":
+            let n = args as? [String: Any] ?? [:]
+            Notifier.shared.show(title: n["title"] as? String ?? "Netfish", body: n["body"] as? String ?? "", path: n["path"] as? String ?? "/")
+            return nil
+
         // Updates from GitHub Releases
         case "updateCheck":
             release = try await Updater.check()
+            let auto = AutoUpdate.shared
             return [
                 "current": MacBridge.version,
                 "latest": release?.version ?? NSNull(),
                 "available": release != nil,
                 "canInstall": release?.download != nil,
                 "page": release?.page?.absoluteString ?? NSNull(),
+                "auto": auto.on,
+                "ready": auto.staged?.version ?? NSNull(),
+                "autoProblem": auto.problem ?? NSNull(),
             ] as [String: Any]
+        case "updateAuto":
+            AutoUpdate.shared.on = args as? Bool ?? false
+            return nil
         case "updateInstall":
             if release == nil { release = try await Updater.check() }
             guard let found = release else { throw Problem(L("Netfish is up to date")) }

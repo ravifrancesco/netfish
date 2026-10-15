@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Activity, Clapperboard, Film, HardDriveDownload, House, LogOut, Search, Settings, Tv, X } from 'lucide-react';
+import { Activity, Clapperboard, Film, HardDriveDownload, House, LogOut, Search, Settings, Tv, Users, X } from 'lucide-react';
 import type { User } from '@netfish/shared';
 import { api } from '../api';
 import { appKind, desktop } from '../lib/desktop';
@@ -115,6 +115,9 @@ function ProfileMenu({ user }: { user: User }) {
               <HardDriveDownload size={16} /> {t('Downloads on {device}', { device: appKind().device })}
             </button>
           )}
+          <Link to="/profiles" className="menu__item" onClick={() => setOpen(false)} role="menuitem">
+            <Users size={16} /> {t('Switch profile')}
+          </Link>
           <Link to="/settings" className="menu__item" onClick={() => setOpen(false)} role="menuitem">
             <Settings size={16} /> {t('Settings')}
           </Link>

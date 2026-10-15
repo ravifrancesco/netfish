@@ -1,6 +1,8 @@
 import type {
   AppConfig,
   Card,
+  CleanupSuggestion,
+  ProfilesResponse,
   ConnectionTest,
   CreateRequest,
   DownloadsResponse,
@@ -25,6 +27,8 @@ import type {
   ServerSettings,
   StopMode,
   StorageInfo,
+  TogetherControl,
+  TogetherRoom,
   ServiceConnection,
   ServiceConnectionUpdate,
   ServiceStatus,
@@ -80,8 +84,13 @@ export const api = {
   me: () => call<User>('/auth/me'),
   login: (body: LoginRequest) => call<{ user: User }>('/auth/login', { body }),
   logout: () => call<{ ok: true }>('/auth/logout', { method: 'POST' }),
+  profiles: () => call<ProfilesResponse>('/profiles'),
+  switchProfile: (userId: string, pin?: string) => call<User>('/profiles/switch', { body: { userId, pin } }),
+  removeProfile: (userId: string) => call<{ ok: true }>(`/profiles/${enc(userId)}`, { method: 'DELETE' }),
+  updateMyProfile: (patch: { pin?: string | null; ask?: boolean }) => call<ProfilesResponse>('/profiles/me', { method: 'PUT', body: patch }),
 
   home: () => call<HomeResponse>('/home'),
+  ready: () => call<{ items: Card[] }>('/ready'),
   search: (q: string) => call<SearchResponse>(`/search?q=${enc(q)}`),
   person: (id: string) => call<PersonDetail>(`/person/${enc(id)}`),
   library: (type: MediaType, sort: string, start: number, limit = 60) =>
@@ -122,6 +131,18 @@ export const api = {
   playSession: (itemId: string, body: PlaybackRequest) => call<PlaybackSession>(`/play/${enc(itemId)}/session`, { body }),
   progress: (report: ProgressReport, keepalive = false) => call<void>('/play/progress', { body: report, keepalive }),
 
+  setWatched: (itemId: string, watched: boolean) => call<{ ok: true }>(`/items/${enc(itemId)}/watched`, { body: { watched } }),
+  hideFromContinue: (itemId: string) => call<{ ok: true }>(`/items/${enc(itemId)}/hide`, { method: 'POST' }),
+
+  // Watch together
+  rooms: () => call<{ rooms: TogetherRoom[] }>('/together'),
+  room: (id: string) => call<TogetherRoom>(`/together/${enc(id)}`),
+  /** Without a position, the room starts where the host left off. */
+  createRoom: (itemId: string, position?: number) => call<TogetherRoom>('/together', { body: { itemId, position } }),
+  roomControl: (id: string, body: TogetherControl) => call<TogetherRoom>(`/together/${enc(id)}/control`, { body }),
+  roomWaiting: (id: string, clientId: string, waiting: boolean) => call<{ ok: true }>(`/together/${enc(id)}/waiting`, { body: { clientId, waiting } }),
+  leaveRoom: (id: string, clientId: string) => call<{ ok: true }>(`/together/${enc(id)}/leave`, { body: { clientId } }),
+  endRoom: (id: string) => call<{ ok: true }>(`/together/${enc(id)}`, { method: 'DELETE' }),
   stopDownload: (id: string, mode: StopMode) => call<{ ok: true }>(`/downloads/${enc(id)}/stop`, { body: { mode } }),
   deleteFromDisk: (type: MediaType, tmdbId: number, seasons?: number[]) =>
     call<{ freed: number }>(`/title/${type}/${tmdbId}/delete`, { body: { seasons } }),
@@ -129,4 +150,6 @@ export const api = {
     call<{ ok: true }>(`/title/${type}/${tmdbId}/redownload`, { body: { seasons } }),
   removed: (type: MediaType) => call<{ items: Card[] }>(`/library/removed?type=${type}`),
   storage: () => call<StorageInfo>('/admin/storage'),
+  cleanup: () => call<{ items: CleanupSuggestion[] }>('/admin/cleanup'),
+  keepForGood: (key: string) => call<{ ok: true }>('/admin/cleanup/keep', { body: { key } }),
 };

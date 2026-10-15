@@ -10,6 +10,7 @@ import { decimal, titleHref } from '../lib/format';
 import { t } from '../i18n';
 import { useConfig, useMe } from '../lib/hooks';
 import { UpdateNudge } from '../components/AppUpdate';
+import { TogetherBanner } from '../components/Together';
 
 /** Admins: a nudge to finish connecting services until they're all there. */
 function SetupNudge() {
@@ -118,6 +119,7 @@ export default function Home() {
       <div className="rows">
         <SetupNudge />
         <UpdateNudge />
+        <TogetherBanner />
         {rows.map((row) => (
           <Row key={row.id} row={row} />
         ))}

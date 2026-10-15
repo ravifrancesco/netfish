@@ -21,4 +21,5 @@
 
     <!-- Player -->
     <string name="error_cant_play">La TV non è riuscita a riprodurre questo video (%1$s)</string>
+    <string name="notice_channel">Pronti da guardare</string>
 </resources>

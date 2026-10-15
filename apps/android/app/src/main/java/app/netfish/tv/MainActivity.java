@@ -1,6 +1,11 @@
 package app.netfish.tv;
 
 import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Intent;
 import android.app.UiModeManager;
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -152,9 +157,52 @@ public class MainActivity extends Activity {
         });
 
         String server = server();
+        // Opened from a notification: straight to that page.
+        String path = getIntent() != null ? getIntent().getStringExtra("path") : null;
         if (server == null) showSetup(null);
-        else web.loadUrl(server);
+        else web.loadUrl(path != null && path.startsWith("/") ? server.replaceAll("/+$", "") + path : server);
         web.requestFocus();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        String path = intent.getStringExtra("path");
+        if (path != null && path.startsWith("/")) web.evaluateJavascript("window.__netfishOpen && window.__netfishOpen(" + JSONObject.quote(path) + ")", null);
+    }
+
+    // ---------- Notifications ("ready to watch"), phones and tablets ----------
+
+    private static final String NOTICES = "ready";
+
+    private void showNotice(String json) {
+        JSONObject notice;
+        try {
+            notice = new JSONObject(json);
+        } catch (JSONException e) {
+            return;
+        }
+        // Android 13 and later ask once; this notice is skipped, the next ones show.
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[] {"android.permission.POST_NOTIFICATIONS"}, 7);
+            return;
+        }
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager == null) return;
+        if (Build.VERSION.SDK_INT >= 26) {
+            manager.createNotificationChannel(new NotificationChannel(NOTICES, getString(R.string.notice_channel), NotificationManager.IMPORTANCE_DEFAULT));
+        }
+        String path = notice.optString("path", "/");
+        Intent open = new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP).putExtra("path", path);
+        PendingIntent tap = PendingIntent.getActivity(this, path.hashCode(), open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Notification.Builder builder = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(this, NOTICES) : new Notification.Builder(this);
+        builder.setSmallIcon(R.drawable.ic_notice)
+            .setContentTitle(notice.optString("title", "Netfish"))
+            .setContentText(notice.optString("body", ""))
+            .setContentIntent(tap)
+            .setAutoCancel(true);
+        manager.notify(path.hashCode(), builder.build());
     }
 
     private String server() {
@@ -326,6 +374,13 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public String version() {
             return BuildConfig.NETFISH_VERSION;
+        }
+
+        /** A system notification (phones and tablets); tapping it opens that page. */
+        @JavascriptInterface
+        public void notify(String notice) {
+            if (!fromServer() || tv) return;
+            runOnUiThread(() -> showNotice(notice));
         }
 
         /** firetv (TVs: remote control, no downloads) or android (phones and tablets). */

@@ -83,6 +83,7 @@ sealed class MainWindow : Form
             Player = new MpvPlayer(video.Handle);
             Player.State += OnPlayerState;
             await CreateWebView();
+            AutoUpdate.Start(TimeSpan.FromSeconds(20));
         }
         catch (Exception error)
         {
@@ -388,8 +389,39 @@ sealed class MainWindow : Form
         controller?.MoveFocus(CoreWebView2MoveFocusReason.Programmatic);
     }
 
+    // ---------- Notifications ("ready to watch") ----------
+
+    NotifyIcon? notices;
+    string? noticePath;
+
+    /// <summary>A Windows notification; clicking it brings Netfish forward on that page.</summary>
+    public void Notify(string title, string body, string path)
+    {
+        if (notices == null)
+        {
+            notices = new NotifyIcon { Icon = Icon, Text = "Netfish" };
+            notices.BalloonTipClicked += (_, _) => OpenNotice();
+            notices.Click += (_, _) => OpenNotice();
+            // The tray icon is only there while a notification is.
+            notices.BalloonTipClosed += (_, _) => notices.Visible = false;
+        }
+        noticePath = path;
+        notices.Visible = true;
+        notices.ShowBalloonTip(10_000, title, body, ToolTipIcon.None);
+    }
+
+    void OpenNotice()
+    {
+        if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+        Activate();
+        if (noticePath is { } path)
+            _ = Web?.ExecuteScriptAsync($"window.__netfishOpen && window.__netfishOpen({System.Text.Json.JsonSerializer.Serialize(path)})");
+        if (notices != null) notices.Visible = false;
+    }
+
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
+        notices?.Dispose();
         AppData.SaveConfig(c =>
         {
             c["bounds"] = new JsonObject { ["x"] = normalBounds.X, ["y"] = normalBounds.Y, ["width"] = normalBounds.Width, ["height"] = normalBounds.Height };
@@ -401,6 +433,7 @@ sealed class MainWindow : Form
         Player?.Dispose();
         try { controller?.Close(); } catch { }
         controller = null;
+        AutoUpdate.Closing(); // a waiting update installs now
         base.OnFormClosing(e);
     }
 

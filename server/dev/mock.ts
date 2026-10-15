@@ -247,6 +247,17 @@ void app.register(
     jf.get('/Users', async (req, reply) =>
       jfUser(req)?.admin ? USERS.map((u) => ({ Id: u.id, Name: u.name, Policy: { IsAdministrator: u.admin } })) : reply.code(403).send(),
     );
+    // Watched / not watched; a show or season marks all its episodes.
+    const setPlayed = (req: FastifyRequest<{ Params: { id: string }; Querystring: Q }>, played: boolean) => {
+      const user = jfUser(req)!;
+      const item = itemsById.get(req.params.id);
+      if (!item) return false;
+      const targets = item.kind === 'series' ? libraryEpisodes(item.title) : item.kind === 'season' ? libraryEpisodes(item.title, item.s) : [item];
+      for (const target of targets) setUd(user.id, target.id, { played, pos: 0, lastPlayed: played ? Date.now() : ud(user.id, target.id).lastPlayed });
+      return true;
+    };
+    jf.post<{ Params: { id: string }; Querystring: Q }>('/UserPlayedItems/:id', async (req, reply) => (setPlayed(req, true) ? {} : reply.code(404).send()));
+    jf.delete<{ Params: { id: string }; Querystring: Q }>('/UserPlayedItems/:id', async (req, reply) => (setPlayed(req, false) ? {} : reply.code(404).send()));
     jf.post('/Library/Refresh', async (req, reply) => (jfUser(req)?.admin ? reply.code(204).send() : reply.code(403).send()));
     jf.post('/Sessions/Logout', async (req, reply) => {
       sessions.delete(jfToken(req) ?? '');

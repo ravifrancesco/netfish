@@ -183,6 +183,17 @@ export const jellyfin = {
     const path = { start: '/Sessions/Playing', progress: '/Sessions/Playing/Progress', stop: '/Sessions/Playing/Stopped' }[event];
     return jfRequest<void>(token, path, { method: 'POST', body });
   },
+  /** Watched / not watched. A show or season marks every episode in it. */
+  setPlayed: async (token: string, userId: string, itemId: string, played: boolean) => {
+    const method = played ? 'POST' : 'DELETE';
+    try {
+      await jfRequest<unknown>(token, `/UserPlayedItems/${itemId}`, { method, query: { userId } });
+    } catch (err) {
+      // Jellyfin before 10.9 only has the older address.
+      if ((err as { status?: number }).status !== 404) throw err;
+      await jfRequest<unknown>(token, `/Users/${userId}/PlayedItems/${itemId}`, { method });
+    }
+  },
   /** Scan the libraries for changes (e.g. files deleted through Radarr/Sonarr). Needs admin rights. */
   refreshLibrary: (token: string) => jfRequest<void>(token, '/Library/Refresh', { method: 'POST' }),
   /** Re-scan one item so newly downloaded subtitle files show up. Needs admin rights. */

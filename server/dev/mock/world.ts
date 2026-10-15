@@ -300,6 +300,11 @@ export function seed() {
   [[admin, [1, 5, 10, 12]], [sam, [5, 12, 14, 3]]].forEach(([user, films]) =>
     (films as number[]).forEach((n, i) => setUd((user as MockUser).id, ids.movie(byN(n)), { played: true, lastPlayed: ago((i + 1) * 2 * DAY) })),
   );
+  // Long ago, for clean-up suggestions: finished months back, and arrived over a year ago unwatched.
+  setUd(sam.id, ids.movie(byN(14)), { played: true, lastPlayed: ago(250 * DAY) });
+  setUd(sam.id, ids.movie(byN(3)), { played: true, lastPlayed: ago(300 * DAY) });
+  for (const n of [22, 24, 26]) addToLibrary(`movie-${byN(n).tmdbId}`, ago((380 + n) * DAY));
+  addToLibrary(`tv-${byN(109).tmdbId}-1`, ago(420 * DAY));
   for (let e = 1; e <= 6; e++) setUd(admin.id, ids.episode(byN(104), 1, e), { played: true, lastPlayed: ago(4 * DAY - e * 3600_000) });
   for (let e = 1; e <= 5; e++) setUd(sam.id, ids.episode(byN(102), 1, e), { played: true, lastPlayed: ago(DAY - e * 3600_000) });
   setUd(sam.id, ids.movie(byN(10)), { pos: 0.3 * RUNTIME_TICKS, lastPlayed: ago(3600_000) });

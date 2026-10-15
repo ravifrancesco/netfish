@@ -74,9 +74,11 @@ sealed class Bridge(MainWindow window, OfflineStore store)
             openServer: () => send('openServer'),
             toggleFullscreen: () => send('fullscreen'),
             keepAwake: (on) => send('keepAwake', Boolean(on)),
+            notify: (n) => send('notify', n),
             update: {
               check: () => call('updateCheck'),
               install: () => call('updateInstall'),
+              setAuto: (on) => call('updateAuto', on),
               onProgress: (cb) => { updates.add(cb); return () => updates.delete(cb); },
             },
             videoOverlay: {
@@ -177,6 +179,14 @@ sealed class Bridge(MainWindow window, OfflineStore store)
                 window.ShowServer();
                 return null;
 
+            // Notifications
+            case "notify":
+            {
+                var n = args as JsonObject ?? new JsonObject();
+                window.Notify(Str(n["title"]) ?? "Netfish", Str(n["body"]) ?? "", Str(n["path"]) ?? "/");
+                return null;
+            }
+
             // Updates from GitHub Releases
             case "updateCheck":
                 release = await Updater.Check();
@@ -187,7 +197,13 @@ sealed class Bridge(MainWindow window, OfflineStore store)
                     ["available"] = release != null,
                     ["canInstall"] = release?.Download != null,
                     ["page"] = release?.Page,
+                    ["auto"] = AutoUpdate.On,
+                    ["ready"] = AutoUpdate.Staged?.Version,
+                    ["autoProblem"] = AutoUpdate.Problem,
                 };
+            case "updateAuto":
+                AutoUpdate.On = args is JsonValue on && on.TryGetValue<bool>(out var yes) && yes;
+                return null;
             case "updateInstall":
             {
                 release ??= await Updater.Check();

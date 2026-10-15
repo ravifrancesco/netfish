@@ -27,6 +27,8 @@ import { buildDeviceProfile } from '../player/profile';
 import { OverlayVideo, trackPositions } from '../player/overlay';
 import { parseVtt, type Cue } from '../player/vtt';
 import { explainReasons } from '../player/reasons';
+import { useTogether } from '../lib/together';
+import { TogetherChip, TogetherNotes, TogetherPanel } from '../components/Together';
 import { t } from '../i18n';
 
 const REPORT_EVERY = 10;
@@ -133,6 +135,26 @@ export default function Watch() {
   const subtitleRef = useRef<StreamTrack | undefined>(undefined);
   subtitleRef.current = subtitle;
 
+  // Watch together: this player follows the room, and tells it when you play, pause or skip.
+  const roomId = params.get('room') ?? undefined;
+  const together = useTogether(roomId);
+  const togetherRef = useRef(together);
+  togetherRef.current = together;
+  const inRoom = () => Boolean(roomId && togetherRef.current.room && !togetherRef.current.ended);
+  const itemRef = useRef(itemId);
+  itemRef.current = itemId;
+  /** Loaded far enough to be moved around. */
+  const canSync = useRef(false);
+  /** Lined up with the room once since the last load. */
+  const synced = useRef(false);
+  /** Changes made to follow the room (not by you) until then: they aren't passed on. */
+  const followingUntil = useRef(0);
+  const lastCorrection = useRef(0);
+  /** Don't start on its own (the room is paused). */
+  const startPaused = useRef(false);
+  const [needsTap, setNeedsTap] = useState(false);
+  const [roomPanel, setRoomPanel] = useState(false);
+
   // ---------- reporting ----------
 
   const report = useCallback((event: ProgressReport['event'], s = sessionRef.current, keepalive = false) => {
@@ -222,13 +244,21 @@ export default function Watch() {
       v.src = s.url;
       if (start > 0) v.addEventListener('loadedmetadata', () => (v.currentTime = start), { once: true });
     }
-    v.play().catch(() => setPlaying(false));
+    if (startPaused.current) return;
+    v.play().catch((err: Error) => {
+      setPlaying(false);
+      // The browser wants a tap before it plays sound (joined from a link, nothing clicked yet).
+      if (inRoom() && err.name === 'NotAllowedError') setNeedsTap(true);
+    });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = useCallback(
     async (opts: LoadOptions) => {
       setWaiting(true);
       setError(undefined);
+      canSync.current = false;
+      synced.current = false;
+      togetherRef.current.setWaiting(true);
       if (sessionRef.current) report('stop');
       try {
         if (overlayActive.current && overlay) overlayProfile.current ??= await overlay.profile();
@@ -252,15 +282,19 @@ export default function Watch() {
     [itemId, attach, report],
   );
 
-  // First load (and whenever the item changes, e.g. next episode).
+  // First load (and whenever the item changes, e.g. next episode). In a room, from where the room is.
+  const roomKnown = !roomId || Boolean(together.room) || together.ended;
   useEffect(() => {
-    if (!info.data) return;
+    if (!info.data || !roomKnown) return;
     fallbackTried.current = false;
     const d = info.data;
+    const room = inRoom() ? togetherRef.current.room : undefined;
+    if (room && room.playback.itemId !== itemId) return; // moving to the room's episode first
     const fromUrl = params.get('t');
     const resume = d.resumeSeconds && d.durationSeconds && d.resumeSeconds < d.durationSeconds - 60 ? d.resumeSeconds : 0;
-    void load({ start: fromUrl !== null ? Number(fromUrl) : resume });
-  }, [info.data]); // eslint-disable-line react-hooks/exhaustive-deps
+    startPaused.current = Boolean(room && !room.playback.playing);
+    void load({ start: room ? (togetherRef.current.expected() ?? 0) : fromUrl !== null ? Number(fromUrl) : resume });
+  }, [info.data, roomKnown]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pick an initial subtitle once tracks are known.
   useEffect(() => {
@@ -332,9 +366,21 @@ export default function Watch() {
   const onPause = () => {
     setPlaying(false);
     report('progress');
+    // Paused some other way (headphones out, the system's controls…): pause the room too.
+    const v = video.current;
+    const room = togetherRef.current.room;
+    if (inRoom() && room?.playback.playing && canSync.current && Date.now() > followingUntil.current && v && !(v.duration - v.currentTime < 1)) {
+      togetherRef.current.send('pause', v.currentTime);
+    }
   };
-  const onWaiting = () => setWaiting(true);
-  const onCanPlay = () => setWaiting(false);
+  const onWaiting = () => {
+    setWaiting(true);
+    togetherRef.current.setWaiting(true);
+  };
+  const onCanPlay = () => {
+    setWaiting(false);
+    readyToSync();
+  };
   const onDurationChange = () => setLength(video.current?.duration ?? 0);
   const onVolumeChange = () => setMuted(video.current?.muted ?? false);
   const onLoaded = () => {
@@ -345,6 +391,8 @@ export default function Watch() {
   const onPlaying = () => {
     setPlaying(true);
     setWaiting(false);
+    setNeedsTap(false);
+    readyToSync();
     if (!started.current) {
       started.current = true;
       report('start');
@@ -356,8 +404,10 @@ export default function Watch() {
   const next = info.data?.nextItemId;
 
   const goNext = useCallback(() => {
-    if (next) navigate(`/watch/${next}`, { replace: true });
-  }, [next, navigate]);
+    if (!next) return;
+    togetherRef.current.send('next', undefined, next);
+    navigate(`/watch/${next}${roomId ? `?room=${roomId}` : ''}`, { replace: true });
+  }, [next, navigate, roomId]);
 
   const onEnded = () => {
     report('stop');
@@ -389,14 +439,81 @@ export default function Watch() {
   const toggle = useCallback(() => {
     const v = video.current;
     if (!v) return;
-    if (v.paused) void v.play();
-    else v.pause();
+    if (v.paused) {
+      setNeedsTap(false);
+      void v.play();
+      togetherRef.current.send('play', v.currentTime);
+    } else {
+      v.pause();
+      togetherRef.current.send('pause', v.currentTime);
+    }
   }, []);
   const seekTo = useCallback((t: number) => {
     const v = video.current;
     if (!v) return;
     v.currentTime = Math.max(0, Math.min(t, (v.duration || Infinity) - 0.5));
+    togetherRef.current.send('seek', v.currentTime);
   }, []);
+
+  // ---------- following the room ----------
+
+  /** Lines this player up with the room: play or pause like it, and jump if it's drifted too far. */
+  const follow = useCallback((changed: boolean) => {
+    const v = video.current;
+    const room = togetherRef.current.room;
+    if (!inRoom() || !room || !v || !canSync.current || room.playback.itemId !== itemRef.current) return;
+    // At the very end, this player is about to move on by itself (or leave).
+    if (v.duration && v.currentTime > v.duration - 1) return;
+    const p = room.playback;
+    const want = togetherRef.current.expected() ?? 0;
+    const now = Date.now();
+    // Re-encoded streams take a while to seek: let them drift a little more before jumping.
+    // Paused, everyone should be on the same picture.
+    const slack = changed ? (p.playing ? 0.75 : 0.25) : sessionRef.current?.method === 'Transcode' ? 4 : 2;
+    if (Math.abs(v.currentTime - want) > slack && (changed || now - lastCorrection.current > 6000)) {
+      followingUntil.current = now + 1500;
+      lastCorrection.current = now;
+      // A touch ahead while playing: the jump itself takes a moment.
+      v.currentTime = Math.max(0, Math.min(want + (p.playing ? 0.3 : 0), (v.duration || Infinity) - 0.5));
+    }
+    if (p.playing && v.paused) {
+      followingUntil.current = now + 1500;
+      void Promise.resolve(v.play()).catch((err: Error) => err.name === 'NotAllowedError' && setNeedsTap(true));
+    } else if (!p.playing && !v.paused) {
+      followingUntil.current = now + 1500;
+      v.pause();
+    }
+  }, []);
+
+  // Ready after loading or buffering: tell the room, and line up with it the first time.
+  function readyToSync() {
+    canSync.current = true;
+    togetherRef.current.setWaiting(false);
+    if (inRoom() && !synced.current) {
+      synced.current = true;
+      startPaused.current = false;
+      follow(true);
+    }
+  }
+
+  // Someone changed something: follow it. The room moved on to another episode: go there.
+  const rev = together.room?.playback.rev;
+  const roomItem = together.room?.playback.itemId;
+  useEffect(() => {
+    if (!roomId || !roomItem || together.ended) return;
+    if (roomItem !== itemId) {
+      navigate(`/watch/${roomItem}?room=${roomId}`, { replace: true });
+      return;
+    }
+    follow(true);
+  }, [rev, roomItem]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // And keep checking: players drift apart slowly (different devices, a stall).
+  useEffect(() => {
+    if (!roomId) return;
+    const timer = setInterval(() => follow(false), 2000);
+    return () => clearInterval(timer);
+  }, [roomId, follow]);
   const setVol = (val: number) => {
     const v = video.current!;
     v.volume = val;
@@ -455,7 +572,7 @@ export default function Watch() {
     hideTimer.current = setTimeout(() => setShowUi(false), 3000);
   }, []);
   useEffect(() => () => clearTimeout(hideTimer.current), []);
-  const uiVisible = showUi || !playing || menu || Boolean(error);
+  const uiVisible = showUi || !playing || menu || roomPanel || Boolean(error);
 
   // The app's player keeps its subtitles above the controls while they show (like the web player does).
   useEffect(() => {
@@ -562,6 +679,7 @@ export default function Watch() {
           break;
         case 'Escape':
           if (menu) setMenu(false);
+          else if (roomPanel) setRoomPanel(false);
           else if (fullscreen) toggleFullscreen();
           else navigate(-1);
           break;
@@ -614,6 +732,9 @@ export default function Watch() {
           ref={video}
           className="player__video"
           playsInline
+          preload="auto"
+          // In a paused room nothing starts it, so it's ready as soon as it knows the film.
+          onLoadedMetadata={() => startPaused.current && (setWaiting(false), readyToSync())}
           poster={d?.backdrop}
           // While the controls are hidden, a click/tap only brings them back (like Netflix).
           onClick={() => (uiVisible ? toggle() : poke())}
@@ -633,7 +754,16 @@ export default function Watch() {
       )}
       {useOverlay && !appDrawsSubtitles && subtitle?.vttUrl && <PageSubtitles url={subtitle.vttUrl} time={time} raised={uiVisible} />}
 
-      {(waiting || info.isLoading) && !error && (
+      {needsTap && !error && (
+        <div className="player__center">
+          <button className="btn btn--primary btn--lg" onClick={() => (setNeedsTap(false), follow(true))}>
+            <Play size={22} fill="currentColor" /> {t('Join in')}
+          </button>
+        </div>
+      )}
+      {roomId && <TogetherNotes together={together} />}
+
+      {(waiting || info.isLoading) && !error && !needsTap && (
         <div className="player__center">
           <Spinner size={48} />
         </div>
@@ -660,6 +790,23 @@ export default function Watch() {
           <span className="player__title">{heading}</span>
           {subheading && <span className="player__subtitle">{subheading}</span>}
         </div>
+        {roomId && (
+          <div className="together-wrap">
+            <TogetherChip together={together} open={roomPanel} onToggle={() => setRoomPanel((o) => !o)} />
+            {roomPanel && (
+              <TogetherPanel
+                together={together}
+                onClose={() => setRoomPanel(false)}
+                onLeave={() => {
+                  // Out of the room, still watching: the film carries on from here.
+                  void together.leave();
+                  setRoomPanel(false);
+                  navigate(`/watch/${itemId}`, { replace: true });
+                }}
+              />
+            )}
+          </div>
+        )}
         {session && session.method !== 'DirectPlay' && (
           <div className="player__why-wrap">
             <button
@@ -688,6 +835,10 @@ export default function Watch() {
           </div>
         )}
       </div>
+
+      {roomId && together.room?.playback.action === 'start' && !playing && !together.ended && (
+        <div className="together-hint">{t("Everyone's player starts together: press play when you're all here.")}</div>
+      )}
 
       {intro && (
         <button className="player__skip btn btn--ghost" onClick={() => seekTo(intro.end)}>

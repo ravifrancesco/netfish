@@ -56,6 +56,21 @@ FunctionEnd
 
 ; Netfish has to be closed before its files can be replaced.
 !macro CloseNetfish
+  ; Started by Netfish as it closes (an update): give it up to 10 seconds to finish closing.
+  ${If} ${Silent}
+    StrCpy $2 0
+    ${Do}
+      nsExec::ExecToStack 'cmd /c tasklist /FI "IMAGENAME eq Netfish.exe" /NH | find /I "Netfish.exe"'
+      Pop $0
+      Pop $1
+      ${If} $0 != 0
+      ${OrIf} $2 >= 20
+        ${ExitDo}
+      ${EndIf}
+      Sleep 500
+      IntOp $2 $2 + 1
+    ${Loop}
+  ${EndIf}
   nsExec::ExecToStack 'cmd /c tasklist /FI "IMAGENAME eq Netfish.exe" /NH | find /I "Netfish.exe"'
   Pop $0 ; 0: it's running
   Pop $1

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type {
   AppConfig,
   CreateRequest,
@@ -12,11 +12,13 @@ import type {
   ServerSettings,
   ServiceConnectionUpdate,
   SubtitleRequest,
+  TogetherControl,
   TraktStatus,
   User,
 } from '@netfish/shared';
 import {
   SESSION_COOKIE,
+  checkToken,
   forgetSession,
   rememberSession,
   requireAdmin,
@@ -30,6 +32,7 @@ import { config, has } from './config';
 import { getSettings, updateSettings } from './settings';
 import { storageFix, storageWritable } from './lib/storage';
 import { SETUP_CODE, listConnections, resetConnection, testConnection, updateConnection } from './connections';
+import { deviceOf, ensureDevice, hasProfile, listProfiles, rememberProfile, removeProfile, setAsk, setPin, switchProfile } from './profiles';
 import { jellyfin } from './clients/jellyfin';
 import { settle } from './lib/async';
 import { publicLanguages } from './lib/languages';
@@ -42,6 +45,10 @@ import { grabRelease, grabbedKeys, searchReleases } from './services/releases';
 import { jobsFor, requestSubtitles } from './services/subtitles';
 import { offlineInfo, playInfo, reportProgress, startPlayback } from './services/playback';
 import { personDetail } from './services/people';
+import { hideFromContinue, setWatched } from './services/watched';
+import { readyToWatch } from './services/ready';
+import { control, createRoom, endRoom, getRoom, leave, listRooms, openStream, setWaiting } from './services/together';
+import { cleanupSuggestions, keepForGood } from './services/cleanup';
 import { deleteFromDisk, downloadAgain, removedTitles, stopDownload, storage } from './services/manage';
 import { createRequest, listRequests, myRequestKeys } from './services/requests';
 import { scrobble, setScrobble, startImport, startLink, traktStatus, unlink } from './services/trakt';
@@ -123,6 +130,8 @@ export async function apiRoutes(app: FastifyInstance) {
     }
     const user = toSessionUser(result.User, result.AccessToken);
     rememberSession(user);
+    // One more profile on this device, for "Who's watching?".
+    rememberProfile(ensureDevice(req, reply), user);
     reply.setCookie(SESSION_COOKIE, result.AccessToken, {
       path: '/',
       httpOnly: true,
@@ -135,6 +144,9 @@ export async function apiRoutes(app: FastifyInstance) {
 
   app.post('/auth/logout', async (req, reply) => {
     const token = tokenFrom(req);
+    // Signing out also takes this person off the device's profiles.
+    const user = token ? await checkToken(token).catch(() => null) : null;
+    if (user) removeProfile(deviceOf(req), user.id);
     if (token) {
       await settle(jellyfin.logout(token), undefined);
       forgetSession(token);
@@ -143,12 +155,57 @@ export async function apiRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
+  // ---------- Profiles on this device ("Who's watching?"): work signed out too ----------
+  const setSession = (req: FastifyRequest, reply: FastifyReply, token: string) =>
+    reply.setCookie(SESSION_COOKIE, token, { path: '/', httpOnly: true, sameSite: 'lax', secure: req.protocol === 'https', maxAge: 60 * 60 * 24 * 400 });
+  app.get('/profiles', async (req) => listProfiles(deviceOf(req), tokenFrom(req)));
+  app.post<{ Body: { userId?: string; pin?: string } }>('/profiles/switch', async (req, reply) => {
+    const user = await switchProfile(deviceOf(req), clean(req.body?.userId, 64), typeof req.body?.pin === 'string' ? req.body.pin : undefined);
+    rememberSession(user);
+    setSession(req, reply, user.token);
+    return publicUser(user);
+  });
+  app.delete<{ Params: { userId: string } }>('/profiles/:userId', async (req, reply) => {
+    const device = deviceOf(req);
+    const userId = clean(req.params.userId, 64);
+    // A locked profile can only be taken off by that person (signed in as them).
+    const current = tokenFrom(req) ? await checkToken(tokenFrom(req)!).catch(() => null) : null;
+    if (listProfiles(device, undefined).profiles.find((p) => p.userId === userId)?.locked && current?.id !== userId) {
+      throw new HttpError(403, t('Only that person can remove a profile with a PIN'));
+    }
+    const token = removeProfile(device, userId);
+    if (token) {
+      await settle(jellyfin.logout(token), undefined);
+      forgetSession(token);
+      if (tokenFrom(req) === token) reply.clearCookie(SESSION_COOKIE, { path: '/' });
+    }
+    return { ok: true };
+  });
+  // Profile pictures for the picker, which shows signed out too (Jellyfin serves them without a sign-in).
+  app.get<{ Params: { userId: string } }>('/profiles/:userId/avatar', async (req, reply) => {
+    const userId = clean(req.params.userId, 64);
+    if (!/^[a-f0-9-]{32,36}$/i.test(userId) || !hasProfile(deviceOf(req), userId) || !config.jellyfin.url) throw new HttpError(404, 'Not found');
+    const res = await fetch(`${config.jellyfin.url}/Users/${userId}/Images/Primary?maxWidth=256&quality=90`, { signal: AbortSignal.timeout(8000) }).catch(() => undefined);
+    if (!res?.ok) throw new HttpError(404, 'Not found');
+    reply.header('content-type', res.headers.get('content-type') ?? 'image/jpeg').header('cache-control', 'private, max-age=3600');
+    return reply.send(Buffer.from(await res.arrayBuffer()));
+  });
+
   // ---------- Signed in ----------
   await app.register(async (api) => {
     api.addHook('preHandler', requireUser);
 
     api.get('/auth/me', async (req) => publicUser(userOf(req)));
+    // This person's PIN on this device, and whether the device asks who's watching.
+    api.put<{ Body: { pin?: string | null; ask?: boolean } }>('/profiles/me', async (req) => {
+      const device = deviceOf(req);
+      if (req.body && 'pin' in req.body) setPin(device, userOf(req).id, req.body.pin === null ? null : String(req.body.pin ?? ''));
+      if (typeof req.body?.ask === 'boolean') setAsk(device, req.body.ask);
+      return listProfiles(device, tokenFrom(req));
+    });
     api.get('/home', async (req) => buildHome(userOf(req)));
+    // What you asked for that has arrived (the apps poll this to notify).
+    api.get('/ready', async (req) => ({ items: await readyToWatch(userOf(req)) }));
     api.get('/languages', async () => publicLanguages());
 
     api.get<{ Querystring: { q?: string } }>('/search', async (req) => search(userOf(req), clean(req.query.q, 200)));
@@ -247,6 +304,38 @@ export async function apiRoutes(app: FastifyInstance) {
       items: await removedTitles(req.query.type === 'tv' ? 'tv' : 'movie'),
     }));
     api.get('/admin/storage', { preHandler: requireAdmin }, async () => storage());
+    api.get('/admin/cleanup', { preHandler: requireAdmin }, async (req) => ({ items: await cleanupSuggestions(userOf(req)) }));
+    api.post<{ Body: { key?: string } }>('/admin/cleanup/keep', { preHandler: requireAdmin }, async (req) => {
+      const key = clean(req.body?.key, 40);
+      if (!/^(movie|tv)-\d+$/.test(key)) throw new HttpError(400, 'Bad key');
+      return keepForGood(key);
+    });
+
+    // Watched / not watched, and taking things off Continue Watching.
+    api.post<{ Params: { itemId: string }; Body: { watched?: boolean } }>('/items/:itemId/watched', async (req) =>
+      setWatched(userOf(req), clean(req.params.itemId, 64), req.body?.watched !== false),
+    );
+    api.post<{ Params: { itemId: string } }>('/items/:itemId/hide', async (req) => hideFromContinue(userOf(req), clean(req.params.itemId, 64)));
+
+    // Watch together: rooms where play, pause and seeking stay in step for everyone.
+    type Room = { Params: { id: string } };
+    api.get('/together', async () => ({ rooms: listRooms() }));
+    api.post<{ Body: { itemId?: string; position?: number } }>('/together', async (req) =>
+      createRoom(userOf(req), clean(req.body?.itemId, 64), Number.isFinite(req.body?.position) ? Number(req.body?.position) : undefined),
+    );
+    api.get<Room>('/together/:id', async (req) => getRoom(clean(req.params.id, 12)));
+    api.get<Room & { Querystring: { client?: string } }>('/together/:id/events', async (req, reply) => {
+      openStream(userOf(req), clean(req.params.id, 12), req.query.client, reply);
+      return reply;
+    });
+    api.post<Room & { Body: TogetherControl }>('/together/:id/control', async (req) =>
+      control(userOf(req), clean(req.params.id, 12), req.body ?? ({} as TogetherControl)),
+    );
+    api.post<Room & { Body: { clientId?: string; waiting?: boolean } }>('/together/:id/waiting', async (req) =>
+      setWaiting(userOf(req), clean(req.params.id, 12), req.body?.clientId, Boolean(req.body?.waiting)),
+    );
+    api.post<Room & { Body: { clientId?: string } }>('/together/:id/leave', async (req) => leave(userOf(req), clean(req.params.id, 12), req.body?.clientId));
+    api.delete<Room>('/together/:id', async (req) => endRoom(userOf(req), clean(req.params.id, 12)));
 
     // Playback
     api.get<{ Params: { itemId: string } }>('/play/:itemId', async (req) => playInfo(userOf(req), clean(req.params.itemId, 64)));

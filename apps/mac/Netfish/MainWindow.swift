@@ -64,6 +64,11 @@ final class MainWindow: NSWindowController, NSWindowDelegate, WKNavigationDelega
         web.frame = root.bounds
 
         store.onChange = { [weak self] list in self?.push("__netfishOfflineChanged", list) }
+        Notifier.shared.start()
+        Notifier.shared.open = { [weak self] path in
+            guard let data = try? JSONSerialization.data(withJSONObject: path, options: .fragmentsAllowed), let json = String(data: data, encoding: .utf8) else { return }
+            self?.web.evaluateJavaScript("window.__netfishOpen && window.__netfishOpen(\(json))")
+        }
         player.onState = { [weak self] state in self?.pushState(state) }
         player.onEnd = { [weak self] finished, error in
             var state: [String: Any] = ["ended": true, "finished": finished]

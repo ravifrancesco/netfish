@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { ChevronLeft, ChevronRight, Info, Play } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Info, Play, X } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '../api';
 import type { Card, Row as RowData } from '@netfish/shared';
 import { duration, titleHref } from '../lib/format';
 import { Img, Progress, StatusChip } from './ui';
@@ -45,8 +47,30 @@ export function WideCard({ card }: { card: Card }) {
         <Link to={titleHref(card)} className="icon-btn icon-btn--sm" aria-label={t('More about {title}', { title: card.title })}>
           <Info size={18} />
         </Link>
+        {card.jellyfinId && <HideFromContinue id={card.jellyfinId} title={card.title} />}
       </div>
     </div>
+  );
+}
+
+/** Takes it off Continue Watching until it's played again. */
+function HideFromContinue({ id, title }: { id: string; title: string }) {
+  const qc = useQueryClient();
+  const hide = useMutation({
+    mutationFn: () => api.hideFromContinue(id),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['home'] }),
+  });
+  return (
+    <button
+      type="button"
+      className="icon-btn icon-btn--sm"
+      disabled={hide.isPending}
+      onClick={() => hide.mutate()}
+      aria-label={t('Remove {title} from Continue Watching', { title })}
+      title={t('Remove from Continue Watching')}
+    >
+      <X size={18} />
+    </button>
   );
 }
 

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { HardDrive, Trash2 } from 'lucide-react';
-import type { StorageInfo } from '@netfish/shared';
+import { HardDrive, Sparkles, Trash2 } from 'lucide-react';
+import type { CleanupSuggestion, StorageInfo } from '@netfish/shared';
 import { api } from '../api';
 import { bytes } from '../lib/format';
 import { Img, Modal, Progress, Spinner, useToast } from './ui';
@@ -54,6 +54,105 @@ function DeleteBig({ item, onDone }: { item: Big; onDone: () => void }) {
   );
 }
 
+const monthsSince = (iso: string) => Math.max(1, Math.round((Date.now() - Date.parse(iso)) / (30.4 * 86_400_000)));
+
+function why(s: CleanupSuggestion) {
+  const n = monthsSince(s.since);
+  return s.reason === 'finished'
+    ? tn(n, 'Everyone finished it · last watched a month ago', 'Everyone finished it · last watched {n} months ago')
+    : tn(n, 'Nobody has watched it · arrived a month ago', 'Nobody has watched it · arrived {n} months ago');
+}
+
+/** Things that could go: finished long ago, or never watched in a year. Tick and delete; or keep for good. */
+function Cleanup({ onDone }: { onDone: () => void }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const q = useQuery({ queryKey: ['cleanup'], queryFn: api.cleanup });
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [confirming, setConfirming] = useState(false);
+  const items = q.data?.items ?? [];
+  const selected = items.filter((s) => chosen.includes(s.key));
+  const total = selected.reduce((n, s) => n + s.size, 0);
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ['cleanup'] });
+    onDone();
+  };
+  const keep = useMutation({ mutationFn: (key: string) => api.keepForGood(key), onSuccess: refresh });
+  const remove = useMutation({
+    mutationFn: async () => {
+      let freed = 0;
+      for (const s of selected) if (s.tmdbId) freed += (await api.deleteFromDisk(s.mediaType, s.tmdbId)).freed;
+      return freed;
+    },
+    onSuccess: (freed) => {
+      setConfirming(false);
+      setChosen([]);
+      toast('ok', t('Deleted from disk: {size} freed.', { size: bytes(freed) }));
+      refresh();
+    },
+    onError: (err) => {
+      toast('error', (err as Error).message);
+      refresh();
+    },
+  });
+
+  if (!q.data || !items.length) return null;
+  return (
+    <div className="cleanup">
+      <div className="cleanup__head">
+        <Sparkles size={18} />
+        <strong>{t('Could go to free space')}</strong>
+        <span className="spacer" />
+        <button className="btn btn--danger btn--sm" disabled={!selected.length || remove.isPending} onClick={() => setConfirming(true)}>
+          <Trash2 size={15} /> {selected.length ? t('Delete {size}', { size: bytes(total) }) : t('Delete')}
+        </button>
+      </div>
+      <ul className="bigs">
+        {items.map((s) => (
+          <li key={s.key} className="big">
+            <input
+              type="checkbox"
+              checked={chosen.includes(s.key)}
+              onChange={(e) => setChosen((list) => (e.target.checked ? [...list, s.key] : list.filter((k) => k !== s.key)))}
+              aria-label={s.title}
+            />
+            <Img src={s.poster} className="big__poster" fallback={<span>{s.title[0]}</span>} />
+            <span className="big__title">
+              <Link to={`/title/${s.mediaType}/${s.tmdbId}`} className="name-link">
+                {s.title}
+              </Link>{' '}
+              {s.year && <span className="muted">({s.year})</span>}
+              <span className="big__why muted small">{why(s)}</span>
+            </span>
+            <span className="muted small">{bytes(s.size)}</span>
+            <button className="link-btn small" disabled={keep.isPending} onClick={() => keep.mutate(s.key)} title={t("Don't suggest it again")}>
+              {t('Keep')}
+            </button>
+          </li>
+        ))}
+      </ul>
+      {confirming && (
+        <Modal
+          title={tn(selected.length, 'Delete {n} title from disk?', 'Delete {n} titles from disk?')}
+          onClose={() => setConfirming(false)}
+          footer={
+            <>
+              <button className="btn btn--ghost" onClick={() => setConfirming(false)}>
+                {t('Cancel')}
+              </button>
+              <button className="btn btn--danger" disabled={remove.isPending} onClick={() => remove.mutate()}>
+                {remove.isPending ? <Spinner size={16} /> : <Trash2 size={16} />} {t('Delete {size}', { size: bytes(total) })}
+              </button>
+            </>
+          }
+        >
+          <p className="muted">{t('They stay in your library as Not on disk, and you can download any of them again.')}</p>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 /** Admin: how full the disks are, what takes the space, and a quick way to free some. */
 export function Storage() {
   const qc = useQueryClient();
@@ -87,6 +186,8 @@ export function Storage() {
         {s.movies && <span>{t('Movies: {count} · {size}', { count: s.movies.count, size: bytes(s.movies.size) })}</span>}
         {s.shows && <span>{t('Shows: {count} · {size}', { count: s.shows.count, size: bytes(s.shows.size) })}</span>}
       </div>
+
+      <Cleanup onDone={refresh} />
 
       {s.biggest.length > 0 && (
         <>
