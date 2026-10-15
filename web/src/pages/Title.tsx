@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { TriangleAlert, Clock, Layers, Play, Plus, Star, Clapperboard } from 'lucide-react';
+import { TriangleAlert, CalendarClock, Clock, Layers, Play, Plus, Star, Clapperboard } from 'lucide-react';
 import type { DownloadItem, MediaType, SeasonSummary, TitleDetail } from '@netfish/shared';
 import { api, type TitleRef } from '../api';
 import { Row } from '../components/Cards';
 import { DownloadButton } from '../components/DownloadButton';
 import { NameLinks, PeopleRow } from '../components/People';
+import { isNotAvailable, notOutText } from '../components/NotOut';
 import { RatingsStrip, TrailerPlayer } from '../components/Extras';
 import { RequestButton } from '../components/RequestButton';
 import { SubtitlesSheet } from '../components/SubtitlesSheet';
@@ -46,13 +47,25 @@ function DownloadLine({ d }: { d: DownloadItem }) {
 function StatusPanel({ d }: { d: TitleDetail }) {
   const inLibrary = d.status === 'available' || d.status === 'partial';
   const latest = inLibrary ? undefined : d.requests[0];
-  if (!d.downloads.length && !latest && d.status !== 'processing' && d.status !== 'pending') return null;
+  // A new episode only arrives by itself when Sonarr manages the show.
+  const notOut = d.notOut && (d.notOut.kind !== 'airing' || d.managed) && !d.downloads.length ? d.notOut : undefined;
+  const waitingForRelease = isNotAvailable(notOut);
+  if (!d.downloads.length && !latest && d.status !== 'processing' && d.status !== 'pending' && !notOut) return null;
   return (
     <div className="statusbox">
       {d.downloads.map((dl) => (
         <DownloadLine key={dl.id} d={dl} />
       ))}
-      {!d.downloads.length && d.status === 'processing' && (
+      {notOut && (
+        <p className="statusbox__note">
+          <CalendarClock size={16} />
+          <span>
+            {waitingForRelease && <strong>{t('Not available yet')} · </strong>}
+            {notOutText(notOut, d.mediaType, d.managed || d.status !== 'none')}
+          </span>
+        </p>
+      )}
+      {!d.downloads.length && d.status === 'processing' && !waitingForRelease && (
         <p className="statusbox__note">
           <Clock size={16} /> {t("Requested — looking for a good release. It'll start downloading as soon as one turns up.")}
         </p>
@@ -297,7 +310,11 @@ export default function Title() {
                 <Star size={14} fill="currentColor" /> {decimal(d.rating)}
               </span>
             )}
-            <span className={`avail avail--${d.status}`}>{AVAILABILITY_LABEL[d.status]}</span>
+            {d.status === 'processing' && isNotAvailable(d.notOut) ? (
+              <span className="avail avail--pending">{t('Not available')}</span>
+            ) : (
+              <span className={`avail avail--${d.status}`}>{AVAILABILITY_LABEL[d.status]}</span>
+            )}
           </div>
           {d.genres.length > 0 && <div className="tp__genres">{d.genres.join(' · ')}</div>}
           {d.tmdbId && <RatingsStrip mediaType={d.mediaType} tmdbId={d.tmdbId} />}

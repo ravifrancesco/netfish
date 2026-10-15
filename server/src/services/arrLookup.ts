@@ -25,3 +25,7 @@ export function sonarrSeries(tvdbId: number | undefined): Promise<SonarrSeries |
 export function forgetRadarrMovie(tmdbId: number) {
   movies.delete(String(tmdbId));
 }
+
+export function forgetSonarrSeries(tvdbId: number | undefined) {
+  if (tvdbId) series.delete(String(tvdbId));
+}

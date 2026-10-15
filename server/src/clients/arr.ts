@@ -76,6 +76,12 @@ export interface RadarrMovie {
   title: string;
   tmdbId: number;
   hasFile?: boolean;
+  /** Radarr only searches once this is true (its "minimum availability", e.g. released digitally). */
+  isAvailable?: boolean;
+  status?: 'tba' | 'announced' | 'inCinemas' | 'released' | 'deleted';
+  inCinemas?: string;
+  digitalRelease?: string;
+  physicalRelease?: string;
   images?: ArrImage[];
   movieFile?: ArrFile;
 }
@@ -85,6 +91,10 @@ export interface SonarrSeries {
   title: string;
   tvdbId: number;
   tmdbId?: number;
+  status?: 'continuing' | 'ended' | 'upcoming' | 'deleted';
+  firstAired?: string;
+  previousAiring?: string;
+  nextAiring?: string;
   images?: ArrImage[];
 }
 

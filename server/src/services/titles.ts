@@ -18,6 +18,7 @@ import { findLanguage, languageLabel } from '../lib/languages';
 import { HttpError } from '../lib/upstream';
 import { radarrMovie, sonarrSeries } from './arrLookup';
 import { canChooseVersion } from './releases';
+import { movieNotOut, showNotOut } from './notOut';
 import { availabilityFromSeerr, episodeLabel, resolveAvailability, seerrCards } from './cards';
 import { catalog } from './catalog';
 import { allDownloads, downloadsFor, progressByTitle } from './downloads';
@@ -169,6 +170,7 @@ export async function movieDetail(user: SessionUser, tmdbId: number): Promise<Ti
     downloads: downloadsFor(downloads, 'movie', tmdbId),
     recommendations: seerrCards(recs.results, index, progressByTitle(downloads)).slice(0, 18),
     managed: Boolean(managed),
+    notOut: status === 'available' ? undefined : movieNotOut(movie, managed),
     canChooseVersion: Boolean(managed) && canChooseVersion(user),
     canRequest: status === 'none',
   };
@@ -245,6 +247,7 @@ export async function tvDetail(user: SessionUser, tmdbId: number): Promise<Title
     seasons,
     recommendations: seerrCards(recs.results, index, progressByTitle(downloads)).slice(0, 18),
     managed: Boolean(managed),
+    notOut: showNotOut(tv, managed),
     canChooseVersion: Boolean(managed) && canChooseVersion(user),
     canRequest: seasons.some((s) => s.seasonNumber > 0 && s.status === 'none'),
   };

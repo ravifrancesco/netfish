@@ -193,6 +193,9 @@ const IT: Record<string, string> = {
   'The link was declined on trakt.tv.': 'Il collegamento è stato rifiutato su trakt.tv.',
   'Trakt ended the link. Link the account again.': 'Trakt ha chiuso il collegamento. Collega di nuovo l’account.',
 
+  'not out yet': 'non ancora uscito',
+  "{service} won't download it yet: it isn't out. It downloads by itself once it is.":
+    '{service} non lo scarica ancora perché non è ancora uscito. Si scaricherà da solo quando uscirà.',
   'Movie size limit': 'Il limite per i film',
   'Episode size limit': 'Il limite per gli episodi',
 };

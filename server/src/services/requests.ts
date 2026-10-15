@@ -9,6 +9,8 @@ import { catalog } from './catalog';
 import { allDownloads, downloadsFor } from './downloads';
 import { findInLibrary, libraryIndex } from './library';
 import { maybeSeerrUserId, seerrUserId } from './seerrUsers';
+import { forgetRadarrMovie, forgetSonarrSeries, radarrMovie, sonarrSeries } from './arrLookup';
+import { movieNotOut, showNotOut } from './notOut';
 
 const STATUS: Record<number, RequestStatus> = { 1: 'pending', 2: 'approved', 3: 'declined', 4: 'failed', 5: 'completed' };
 
@@ -58,6 +60,19 @@ export async function listRequests(user: SessionUser, scope: 'mine' | 'all'): Pr
     const tmdbId = r.media.tmdbId;
     const info = await settle(catalog.basics(r.type, tmdbId), undefined);
     const entry = index ? findInLibrary(index, r.type, tmdbId, r.media.tvdbId) : undefined;
+    const status = resolveAvailability(r.media, Boolean(entry));
+    const download = summarizeDownloads(downloadsFor(downloads, r.type, tmdbId, r.media.tvdbId));
+    // Approved but nothing downloading: say so when it's simply not out yet (Radarr/Sonarr lookups are cached).
+    const waiting = !download && status !== 'available' && (STATUS[r.status] === 'approved' || STATUS[r.status] === 'completed');
+    // Radarr/Sonarr know best; TMDB's dates cover the moment before Seerr has handed it over.
+    let notOut;
+    if (waiting && r.type === 'movie') {
+      const managed = await settle(radarrMovie(tmdbId), null);
+      notOut = movieNotOut(managed ? undefined : await settle(catalog.movie(tmdbId), undefined), managed);
+    } else if (waiting) {
+      const managed = await settle(sonarrSeries(r.media.tvdbId), null);
+      notOut = showNotOut(managed ? undefined : await settle(catalog.tv(tmdbId), undefined), managed);
+    }
     return {
       id: r.id,
       mediaType: r.type,
@@ -67,12 +82,13 @@ export async function listRequests(user: SessionUser, scope: 'mine' | 'all'): Pr
       poster: info?.poster,
       backdrop: info?.backdrop,
       requestStatus: STATUS[r.status] ?? 'pending',
-      status: resolveAvailability(r.media, Boolean(entry)),
+      status,
       seasons: r.seasons?.map((s) => s.seasonNumber),
       createdAt: r.createdAt,
       requestedBy: userName(r),
       mine: seerrId !== undefined && r.requestedBy?.id === seerrId,
-      download: summarizeDownloads(downloadsFor(downloads, r.type, tmdbId, r.media.tvdbId)),
+      download,
+      notOut: notOut?.kind === 'airing' && status === 'partial' ? undefined : notOut,
     };
   });
 }
@@ -94,6 +110,9 @@ export async function createRequest(user: SessionUser, body: CreateRequest): Pro
     body.mediaType === 'tv' ? (body.seasons?.length ? body.seasons.filter((n) => Number.isInteger(n)) : 'all') : undefined;
   const created = await seerr.createRequest({ mediaType: body.mediaType, mediaId: body.tmdbId, seasons }, seerrId);
   catalog.invalidate(body.mediaType, body.tmdbId);
+  // Seerr has just handed it to Radarr/Sonarr: look again instead of trusting "not managed".
+  if (body.mediaType === 'movie') forgetRadarrMovie(body.tmdbId);
+  else forgetSonarrSeries(created.media?.tvdbId ?? undefined);
   lists.clear();
   return toSummary(created, seerrId);
 }

@@ -11,7 +11,7 @@ A Netflix-style front door for a home media server. One app to browse, discover,
 - **Suggestions that learn, for free:** *Top picks* blends TMDB's "people who liked this also liked" with the genres, directors and actors each person watches most, and with what's popular on your server. Home also gets *Popular on this server*, *More from* a favourite director and *Because you like* a favourite actor. No account or subscription needed; it all runs on the Pi.
 - **Directors and actors:** search a name to see their films and shows, what's in your library first. Every name on a title page opens that person's page too.
 - **Request in one click:** movies, or pick seasons of a show. Filed in Seerr as *your* user, so approvals and quotas still apply.
-- **Live download progress:** from Radarr/Sonarr's queues, with speed and ETA from qBittorrent. Season packs show as one item, and stalls and import problems are explained.
+- **Live download progress:** from Radarr/Sonarr's queues, with speed and ETA from qBittorrent. Season packs show as one item, and stalls and import problems are explained. When Radarr says a film is *Not Available* (still only in cinemas, or not out yet) or a show hasn't started, Netfish says so, with the date it should arrive.
 - **Versions:** Radarr/Sonarr's Interactive Search, inside Netfish. See every release from every indexer, filter by audio language, quality or text, and download the one you want. Netfish warns when a release probably won't replace your current copy, and admins can cap how big a release people may pick.
 - **Another audio language:** the same panel with a language filter, highlighting multi-audio releases that keep the original language.
 - **Subtitles in any language:** fetched through Bazarr for a movie, a season or one episode; the library refreshes when they arrive.
@@ -104,7 +104,7 @@ The apps show the interface from your server, so most new features arrive by upd
 
 **1. Portainer → Stacks → Add stack**, name it `netfish`, paste [`docker-compose.yml`](docker-compose.yml), and **Deploy**. No variables are needed: Portainer pulls the ready-made image `ghcr.io/ravifrancesco/netfish:latest` (built by GitHub for Raspberry Pi and PCs).
 
-**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.2.0`.
+**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.2.1`.
 
 <details>
 <summary>Or build the image on the Pi yourself</summary>

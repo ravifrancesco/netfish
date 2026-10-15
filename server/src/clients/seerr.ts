@@ -116,7 +116,8 @@ export interface SeerrMovie {
   originalLanguage?: string;
   credits?: Credits;
   relatedVideos?: Video[];
-  releases?: { results?: Array<{ iso_3166_1: string; release_dates?: Array<{ certification?: string }> }> };
+  /** TMDB release dates per country; type 2/3 = cinemas, 4 = digital, 5 = disc. */
+  releases?: { results?: Array<{ iso_3166_1: string; release_dates?: Array<{ certification?: string; type?: number; release_date?: string }> }> };
   externalIds?: { imdbId?: string };
   mediaInfo?: SeerrMediaInfo;
 }
@@ -124,6 +125,7 @@ export interface SeerrMovie {
 export interface SeerrTv {
   id: number;
   name: string;
+  nextEpisodeToAir?: { airDate?: string | null } | null;
   originalName?: string;
   overview?: string;
   tagline?: string;

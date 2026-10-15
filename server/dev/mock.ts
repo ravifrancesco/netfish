@@ -585,10 +585,13 @@ void app.register(
         tagline: t.n % 3 === 0 ? 'The ocean keeps its secrets.' : '',
       };
       if (type === 'movie') {
-        return { ...common, title: t.title, originalTitle: t.title, releaseDate: `${t.year}-06-01`, runtime: 104 + (t.n % 30), releases: { results: [{ iso_3166_1: 'US', release_dates: [{ certification: 'PG-13' }] }] }, externalIds: { imdbId: `tt${9000000 + t.n}` } };
+        const out = releaseOf(t) as { inCinemas: string; digitalRelease: string };
+        const releases = { results: [{ iso_3166_1: 'US', release_dates: [{ certification: 'PG-13', type: 3, release_date: out.inCinemas }, { type: 4, release_date: out.digitalRelease }] }] };
+        return { ...common, title: t.title, originalTitle: t.title, releaseDate: out.inCinemas.slice(0, 10), runtime: 104 + (t.n % 30), releases, externalIds: { imdbId: `tt${9000000 + t.n}` } };
       }
       return {
-        ...common, name: t.title, originalName: t.title, firstAirDate: `${t.year}-01-15`, episodeRunTime: [48], numberOfSeasons: t.seasons,
+        ...common, name: t.title, originalName: t.title, firstAirDate: (releaseOf(t).firstAired ?? '').slice(0, 10), episodeRunTime: [48], numberOfSeasons: t.seasons,
+        nextEpisodeToAir: releaseOf(t).nextAiring ? { airDate: releaseOf(t).nextAiring!.slice(0, 10) } : null,
         createdBy: [{ id: personId(creatorOf(t)), name: creatorOf(t) }], networks: [{ name: 'Mock+' }],
         contentRatings: { results: [{ iso_3166_1: 'US', rating: 'TV-14' }] }, externalIds: { tvdbId: t.tvdbId, imdbId: `tt${9100000 + t.n}` },
         seasons: Array.from({ length: t.seasons }, (_, i) => ({ id: t.tmdbId * 10 + i, seasonNumber: i + 1, name: `Season ${i + 1}`, episodeCount: EPISODES_PER_SEASON, airDate: `${t.year + i}-01-15`, posterPath: `/poster-season-${t.tmdbId}-${i + 1}.jpg` })),
@@ -643,7 +646,10 @@ void app.register(
       if (t.type === 'movie' && mediaStatus(t) !== 1) return reply.code(409).send({ message: 'Request for this media already exists.' });
       const r: MockRequest = { id: newId(), type: t.type, tmdbId: t.tmdbId, seasons, status: 2, seerrUserId: user.seerrId, createdAt: new Date().toISOString() };
       requests.push(r);
-      if (t.type === 'movie') startDownload(t, { durationMs: 75_000 });
+      // Radarr/Sonarr only find something once it's out.
+      if (!isOut(t)) {
+        /* waits for its release */
+      } else if (t.type === 'movie') startDownload(t, { durationMs: 75_000 });
       else seasons.forEach((season, i) => startDownload(t, { season, durationMs: 90_000 + i * 30_000 }));
       return reply.code(201).send(requestDto(r));
     });
@@ -726,6 +732,20 @@ function fakeReleases(t: Title, season?: number, episode?: number) {
   });
 }
 
+/** When titles come out: 2026 films are in cinemas (out digitally soon), 2027 ones not out yet; 2026 shows haven't started. */
+const DAY_MS = 86_400_000;
+const fromNow = (days: number) => new Date(Date.now() + days * DAY_MS).toISOString();
+function releaseOf(t: Title) {
+  if (t.type === 'movie') {
+    if (t.year >= 2027) return { status: 'announced', isAvailable: false, inCinemas: fromNow(30 + t.n), digitalRelease: fromNow(120 + t.n) };
+    if (t.year === 2026) return { status: 'inCinemas', isAvailable: false, inCinemas: fromNow(-20), digitalRelease: fromNow(t.n - 10) };
+    return { status: 'released', isAvailable: true, inCinemas: `${t.year}-06-01T00:00:00Z`, digitalRelease: `${t.year}-09-01T00:00:00Z` };
+  }
+  if (t.year >= 2026) return { status: 'upcoming', firstAired: fromNow(40), nextAiring: fromNow(40) };
+  return { status: 'ended', firstAired: `${t.year}-01-15T00:00:00Z`, previousAiring: `${t.year + t.seasons - 1}-03-01T00:00:00Z` };
+}
+const isOut = (t: Title) => (t.type === 'movie' ? releaseOf(t).isAvailable !== false : releaseOf(t).status !== 'upcoming');
+
 const arrAuth = async (req: FastifyRequest, reply: import('fastify').FastifyReply) => {
   if (req.headers['x-api-key'] !== API_KEY) return reply.code(401).send({ message: 'Unauthorized' });
 };
@@ -743,13 +763,15 @@ void app.register(
     r.get<{ Querystring: Q }>('/movie', async (req) =>
       TITLES.filter((t) => t.type === 'movie' && managed(t) && (!req.query.tmdbId || t.tmdbId === Number(req.query.tmdbId))).map((t) => ({
         id: t.n, title: t.title, tmdbId: t.tmdbId, hasFile: inLibrary(t), images: [{ coverType: 'poster', remoteUrl: posterUrl(t) }],
-        movieFile: inLibrary(t) ? fileDto(t) : undefined,
+        movieFile: inLibrary(t) ? fileDto(t) : undefined, ...releaseOf(t),
       })),
     );
     r.get<{ Querystring: Q }>('/release', async (req) => {
       await sleep(1500);
       const t = TITLES.find((x) => x.type === 'movie' && x.n === Number(req.query.movieId));
-      return t ? fakeReleases(t) : [];
+      if (!t) return [];
+      // Like Radarr: before a movie is available, every release is turned down for it.
+      return isOut(t) ? fakeReleases(t) : fakeReleases(t).map((r) => ({ ...r, rejected: true, rejections: [...(r.rejections ?? []), `Movie ${t.title} is not available`] }));
     });
     r.post<{ Body: { guid: string } }>('/release', async (req, reply) => {
       const hit = releaseCache.get(req.body.guid);
@@ -768,7 +790,7 @@ void app.register(
     r.get('/queue', async () => ({ page: 1, totalRecords: 0, records: queueRecords('tv') }));
     r.get<{ Querystring: Q }>('/series', async (req) =>
       TITLES.filter((t) => t.type === 'tv' && managed(t) && (!req.query.tvdbId || t.tvdbId === Number(req.query.tvdbId))).map((t) => ({
-        id: t.n, title: t.title, tvdbId: t.tvdbId, tmdbId: t.tmdbId, images: [{ coverType: 'poster', remoteUrl: posterUrl(t) }],
+        id: t.n, title: t.title, tvdbId: t.tvdbId, tmdbId: t.tmdbId, images: [{ coverType: 'poster', remoteUrl: posterUrl(t) }], ...releaseOf(t),
       })),
     );
     r.get<{ Querystring: Q }>('/episodefile', async (req) => {

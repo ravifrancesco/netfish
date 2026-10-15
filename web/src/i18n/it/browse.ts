@@ -165,6 +165,30 @@ export default {
   People: 'Persone',
   'Movies & shows': 'Film e serie TV',
 
+  // Not out yet (Radarr waits for a digital release, Sonarr for episodes to air)
+  'Not available yet': 'Non ancora disponibile',
+  'Not available': 'Non disponibile',
+  'Only in cinemas for now.': 'Per ora solo al cinema.',
+  'Comes out {date}.': 'Esce il {date}.',
+  'In cinemas only for now': 'Per ora solo al cinema',
+  'In cinemas · out to stream or buy {date}': 'Al cinema · in streaming o da acquistare dal {date}',
+  'Comes out {date}': 'Esce il {date}',
+  'Starts {date}': 'Inizia il {date}',
+  'Starts {date}.': 'Inizia il {date}.',
+  'Next episode {date}.': 'Prossimo episodio il {date}.',
+  'Request it now and it downloads by itself once it can be streamed or bought.':
+    'Richiedilo ora: si scaricherà da solo appena sarà disponibile in streaming o da acquistare.',
+  'It downloads by itself once it can be streamed or bought, expected {date}.':
+    'Si scaricherà da solo appena sarà disponibile in streaming o da acquistare, previsto il {date}.',
+  'It downloads by itself once it can be streamed or bought.': 'Si scaricherà da solo appena sarà disponibile in streaming o da acquistare.',
+  'It downloads by itself after it airs.': 'Si scaricherà da solo dopo la messa in onda.',
+  'Episodes download by themselves as they air.': 'Gli episodi si scaricano da soli man mano che vanno in onda.',
+  'Request it now and episodes download by themselves as they air.': 'Richiedila ora: gli episodi si scaricheranno da soli man mano che vanno in onda.',
+  'Next episode {date}': 'Prossimo episodio il {date}',
+  "This movie can't be streamed or bought yet, so anything listed here was most likely filmed in a cinema (CAM, TS) and looks poor. Radarr waits for a proper release by itself.":
+    'Questo film non è ancora disponibile in streaming o da acquistare, quindi quello che vedi qui è quasi sempre registrato al cinema (CAM, TS) e di scarsa qualità. Radarr aspetta da solo una versione buona.',
+  "This show hasn't started yet, so there's nothing to find so far.": 'Questa serie non è ancora iniziata, quindi per ora non c’è niente da trovare.',
+
   // A person's page
   'Born {date}': 'Data di nascita: {date}',
   More: 'Altro',

@@ -5,11 +5,12 @@ import { radarr, sonarr, type ArrFile, type ArrRelease } from '../clients/arr';
 import { settle } from '../lib/async';
 import { MINUTE, TTLCache } from '../lib/cache';
 import { GB, getSettings } from '../settings';
-import { HttpError } from '../lib/upstream';
+import { HttpError, UpstreamError } from '../lib/upstream';
 import { LANGUAGES, findLanguage, releaseTokens, titleHasLanguage, titleIsMulti } from '../lib/languages';
 import { radarrMovie, sonarrSeries } from './arrLookup';
 import { catalog } from './catalog';
 import { findInLibrary, libraryIndex } from './library';
+import { NOT_OUT_REJECTION } from './notOut';
 import { t } from '../lib/i18n';
 
 /**
@@ -89,7 +90,8 @@ function toRelease(r: ArrRelease, current?: Current): Release {
     ageHours: r.ageHours ?? 0,
     protocol: r.protocol ?? 'unknown',
     rejected: Boolean(r.rejected),
-    rejections: r.rejections ?? [],
+    // Radarr/Sonarr's reasons are English sentences; the common "not out yet" one is said plainly.
+    rejections: [...new Set((r.rejections ?? []).map((reason) => (NOT_OUT_REJECTION.test(reason) ? t('not out yet') : reason)))],
     customFormatScore: r.customFormatScore ?? 0,
     likelyImports:
       !current ||
@@ -208,7 +210,14 @@ export async function grabRelease(user: SessionUser, mediaType: MediaType, tmdbI
           : t('That release is over the {size} GB limit set by your admin', { size: limit.bytes / GB }),
       );
   }
-  await (mediaType === 'movie' ? radarr : sonarr).grab(body.guid, body.indexerId);
+  try {
+    await (mediaType === 'movie' ? radarr : sonarr).grab(body.guid, body.indexerId);
+  } catch (err) {
+    if (err instanceof UpstreamError && NOT_OUT_REJECTION.test(err.message)) {
+      throw new HttpError(409, t("{service} won't download it yet: it isn't out. It downloads by itself once it is.", { service: err.service }));
+    }
+    throw err;
+  }
   const mine = grabs.get(user.id) ?? new Map<string, number>();
   mine.set(`${mediaType}-${tmdbId}`, Date.now());
   grabs.set(user.id, mine);

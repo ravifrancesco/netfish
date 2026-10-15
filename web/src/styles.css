@@ -1233,6 +1233,20 @@ p {
   gap: 8px;
   color: var(--text-2);
 }
+.statusbox__note svg {
+  flex: none;
+}
+.item__notout {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  color: var(--text-2);
+}
+.item__notout svg {
+  flex: none;
+  color: var(--accent);
+}
 .dlline {
   display: grid;
   gap: 6px;
@@ -1404,7 +1418,9 @@ p {
   display: flex;
   gap: 18px;
   overflow-x: auto;
-  padding-bottom: 8px;
+  /* Room for the focus ring and zoom: a scrolling row clips anything outside it. */
+  padding: 10px 8px 8px;
+  margin: -10px -8px 0;
   scrollbar-width: none;
 }
 .person {
@@ -1439,7 +1455,9 @@ p {
   outline: none;
 }
 .person--link .person__img {
-  transition: box-shadow 0.15s ease;
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
 }
 .person--link:hover .person__img,
 .person--link:focus-visible .person__img {
@@ -2733,6 +2751,17 @@ html.is-tv .wide__frame:focus {
   transform: scale(1.06);
   box-shadow: 0 0 0 3px var(--accent), var(--shadow);
   z-index: 2;
+}
+/* People: a ring around the photo, like a poster's, not a box around the whole column. */
+html.is-tv .person--link:focus {
+  outline: none;
+}
+html.is-tv .person--link:focus .person__img {
+  transform: scale(1.08);
+  box-shadow: 0 0 0 3px var(--accent);
+}
+html.is-tv .person--link:focus .person__name {
+  color: var(--accent);
 }
 html.is-tv .row__arrow,
 html.is-tv .wide__meta .icon-btn,

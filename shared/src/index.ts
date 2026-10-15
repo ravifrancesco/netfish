@@ -204,6 +204,17 @@ export interface SeasonSummary {
   jellyfinId?: string;
 }
 
+/** Not out yet (Radarr's "Not Available"), so Radarr/Sonarr have nothing to download until then. */
+export interface NotOut {
+  /**
+   * cinemas: in cinemas, not out to stream or buy yet · unreleased: not out anywhere yet ·
+   * premiere: the show hasn't started · airing: more episodes still to come.
+   */
+  kind: 'cinemas' | 'unreleased' | 'premiere' | 'airing';
+  /** When it should become downloadable: digital release, premiere, next episode, or the cinema release if that's all that's known. */
+  date?: string;
+}
+
 export interface TitleDetail {
   key: string;
   mediaType: MediaType;
@@ -236,6 +247,7 @@ export interface TitleDetail {
   recommendations: Card[];
   /** Radarr/Sonarr manage this title. */
   managed: boolean;
+  notOut?: NotOut;
   /** This user may pick a specific release for it (managed + allowed by the server). */
   canChooseVersion: boolean;
   canRequest: boolean;
@@ -336,6 +348,7 @@ export interface RequestItem {
   requestedBy: string;
   mine: boolean;
   download?: { progress: number; etaSeconds?: number; state: DownloadState; count: number };
+  notOut?: NotOut;
 }
 
 export interface RequestsResponse {

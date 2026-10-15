@@ -1,12 +1,13 @@
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { TriangleAlert } from 'lucide-react';
+import { CalendarClock, TriangleAlert } from 'lucide-react';
 import type { DownloadItem, RequestItem } from '@netfish/shared';
 import { api } from '../api';
 import { ErrorState, Img, Progress, Spinner, StatusChip } from '../components/ui';
 import { AVAILABILITY_LABEL, DOWNLOAD_LABEL, ago, bytes, duration, percent } from '../lib/format';
 import { useConfig, useMe } from '../lib/hooks';
 import { t, tn } from '../i18n';
+import { isNotAvailable, notOutShort } from '../components/NotOut';
 
 function DownloadRow({ d }: { d: DownloadItem }) {
   const href = d.tmdbId ? `/title/${d.mediaType}/${d.tmdbId}` : undefined;
@@ -94,6 +95,8 @@ function Requests({ scope }: { scope: 'mine' | 'all' }) {
                   <span className="state state--done">{AVAILABILITY_LABEL.available}</span>
                 ) : r.requestStatus === 'pending' || r.requestStatus === 'declined' ? (
                   <span className={`state state--${r.requestStatus}`}>{REQUEST_LABEL[r.requestStatus]}</span>
+                ) : !r.download && isNotAvailable(r.notOut) ? (
+                  <span className="state state--pending">{t('Not available')}</span>
                 ) : (
                   <StatusChip status={r.status} progress={r.download?.progress} />
                 )}
@@ -102,6 +105,11 @@ function Requests({ scope }: { scope: 'mine' | 'all' }) {
                 {r.mediaType === 'tv' && r.seasons?.length ? `${tn(r.seasons.length, 'Season {list}', 'Seasons {list}', { list: r.seasons.join(', ') })} · ` : ''}
                 {r.mine ? t('You') : r.requestedBy} · {ago(r.createdAt)}
               </div>
+              {r.notOut && !r.download && notOutShort(r.notOut) && (
+                <div className="item__notout small">
+                  <CalendarClock size={14} /> {notOutShort(r.notOut)}
+                </div>
+              )}
               {r.download && (
                 <>
                   <Progress value={r.download.progress} />

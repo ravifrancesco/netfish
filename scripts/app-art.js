@@ -65,7 +65,12 @@ app.whenReady().then(async () => {
     write(path.join(res, `mipmap-${density}/ic_launcher.png`), launcher.resize({ width: size, height: size, quality: 'best' }));
   }
   const banner = await render(win, art.banner(), 1280, 720);
-  write(path.join(res, 'drawable-xhdpi/banner.png'), banner.resize({ width: 320, height: 180, quality: 'best' }));
+  for (const [density, width] of Object.entries({ xhdpi: 320, xxhdpi: 480, xxxhdpi: 640 })) {
+    write(path.join(res, `drawable-${density}/banner.png`), banner.resize({ width, height: (width * 9) / 16, quality: 'best' }));
+  }
+  // On TVs the app's icon is the wide banner too: Fire TV ignores the banner of apps installed
+  // outside its store and stretches the icon over the tile, which left grey bars beside a square one.
+  write(path.join(res, 'mipmap-television-xhdpi/ic_launcher.png'), banner.resize({ width: 640, height: 360, quality: 'best' }));
 
   const ios = await render(win, art.ios(), 1024, 1024);
   write(path.join(root, 'apps/ios/Netfish/Assets.xcassets/AppIcon.appiconset/icon-1024.png'), ios.resize({ width: 1024, height: 1024, quality: 'best' }));

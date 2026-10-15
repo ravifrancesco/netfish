@@ -284,6 +284,13 @@ export function VersionsSheet({
             </label>
           )}
         </div>
+        {title.notOut && title.notOut.kind !== 'airing' && (
+          <p className="versions__limit">
+            {title.mediaType === 'movie'
+              ? t("This movie can't be streamed or bought yet, so anything listed here was most likely filmed in a cinema (CAM, TS) and looks poor. Radarr waits for a proper release by itself.")
+              : t("This show hasn't started yet, so there's nothing to find so far.")}
+          </p>
+        )}
         {data && data.hiddenOversized > 0 && data.limit && (
           <p className="versions__limit">
             {me?.isAdmin
