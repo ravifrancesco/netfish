@@ -100,6 +100,13 @@ export const SERVICES: Record<ServiceId, Meta> = {
     keyLabel: 'Client ID',
     secretLabel: 'Client secret',
   },
+  suggestarr: {
+    name: 'SuggestArr',
+    purpose: 'What it requested for each person, on their Home (optional)',
+    keyHelp: 'SuggestArr 2.11 or newer. In SuggestArr, signed in as an admin: Profile → API keys → create a key, and paste it here.',
+    defaultUrl: 'http://host.docker.internal:5000',
+    usesKey: true,
+  },
 };
 
 const IDS = Object.keys(SERVICES) as ServiceId[];
@@ -307,6 +314,16 @@ async function probe(id: ServiceId, c: Live): Promise<ConnectionTest> {
       if (!key) return { ok: false, error: t('Add the Client ID') };
       if (!c.password) return { ok: false, error: t('Add the Client secret') };
       return traktCheck(key, c.password);
+    }
+    case 'suggestarr': {
+      // Its public API (v1) answers without a key, then the key says whose it is.
+      const status = await request<{ data?: { service?: string } }>('SuggestArr', `${c.url}/api/v1`, '/status', { timeoutMs: 6000 }).catch(() => undefined);
+      if (status?.data?.service !== 'SuggestArr') return { ok: false, error: t('No SuggestArr 2.11 or newer at that address') };
+      if (!key) return { ok: false, error: t('Add the API key') };
+      const me = await request<{ data: { username: string; role: string } }>('SuggestArr', `${c.url}/api/v1`, '/me', { headers: { 'x-api-key': key }, timeoutMs: 6000 });
+      return me.data.role === 'admin'
+        ? { ok: true, detail: t("{name}'s key", { name: me.data.username }) }
+        : { ok: true, detail: t("{name}'s key: not a SuggestArr admin, so Netfish only sees {name}'s suggestions", { name: me.data.username }) };
     }
   }
 }

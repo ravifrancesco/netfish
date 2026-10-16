@@ -139,6 +139,8 @@ export default {
   'Open on Letterboxd': 'Apri su Letterboxd',
   '{title} trailer': 'Trailer di {title}',
   'Close trailer': 'Chiudi trailer',
+  'Trailer language': 'Lingua del trailer',
+  '{language} (original)': '{language} (originale)',
 
   // Request and download buttons
   'Requested {title}. Waiting for approval.': 'Hai richiesto {title}. In attesa di approvazione.',

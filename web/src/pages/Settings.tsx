@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LogOut, MonitorCog } from 'lucide-react';
 import { useLocation } from 'react-router';
-import type { ServerSettings } from '@netfish/shared';
+import type { DownloadDetail, ServerSettings } from '@netfish/shared';
 import { api } from '../api';
 import { Connections } from '../components/Connections';
 import { Storage } from '../components/Storage';
@@ -83,6 +83,16 @@ function OfflineStorage() {
 const asText = (v: number | null | undefined) => (v ? String(v) : '');
 const asLimit = (v: string) => (v.trim() === '' ? null : Number(v));
 
+/** What Activity can say about a download, from Radarr/Sonarr. */
+const DOWNLOAD_DETAILS: Array<[DownloadDetail, string]> = [
+  ['quality', t('Quality')],
+  ['languages', t('Languages')],
+  ['release', t('Release name')],
+  ['formats', t('Custom formats and score')],
+  ['indexer', t('Indexer')],
+  ['client', t('Download client')],
+];
+
 /** Server-wide download rules. Applies to versions people pick in Netfish. */
 function DownloadRules() {
   const qc = useQueryClient();
@@ -91,15 +101,17 @@ function DownloadRules() {
   const [movie, setMovie] = useState('');
   const [episode, setEpisode] = useState('');
   const [grabs, setGrabs] = useState<ServerSettings['manualGrabs']>('all');
+  const [details, setDetails] = useState<DownloadDetail[]>([]);
   useEffect(() => {
     if (!q.data) return;
     setMovie(asText(q.data.maxMovieSizeGb));
     setEpisode(asText(q.data.maxEpisodeSizeGb));
     setGrabs(q.data.manualGrabs);
+    setDetails(q.data.downloadDetails);
   }, [q.data]);
 
   const save = useMutation({
-    mutationFn: () => api.saveAdminSettings({ maxMovieSizeGb: asLimit(movie), maxEpisodeSizeGb: asLimit(episode), manualGrabs: grabs }),
+    mutationFn: () => api.saveAdminSettings({ maxMovieSizeGb: asLimit(movie), maxEpisodeSizeGb: asLimit(episode), manualGrabs: grabs, downloadDetails: details }),
     onSuccess: (data) => {
       qc.setQueryData(['admin-settings'], data);
       void qc.invalidateQueries({ queryKey: ['releases'] });
@@ -111,7 +123,10 @@ function DownloadRules() {
 
   if (!q.data) return <Spinner />;
   const dirty =
-    asText(q.data.maxMovieSizeGb) !== movie.trim() || asText(q.data.maxEpisodeSizeGb) !== episode.trim() || q.data.manualGrabs !== grabs;
+    asText(q.data.maxMovieSizeGb) !== movie.trim() ||
+    asText(q.data.maxEpisodeSizeGb) !== episode.trim() ||
+    q.data.manualGrabs !== grabs ||
+    DOWNLOAD_DETAILS.some(([key]) => q.data.downloadDetails.includes(key) !== details.includes(key));
 
   return (
     <form
@@ -149,6 +164,18 @@ function DownloadRules() {
           "Releases over these sizes are hidden in Versions and can't be downloaded from Netfish. Season packs count per episode (a 10-episode pack under a 2 GB limit can be up to 20 GB). Admins can still show and pick them. Automatic downloads from requests follow Radarr/Sonarr's own size settings.",
         )}
       </small>
+      <div className="field">
+        <span>{t('What everyone sees about a download')}</span>
+        <div className="checks">
+          {DOWNLOAD_DETAILS.map(([key, label]) => (
+            <label key={key} className="check">
+              <input type="checkbox" checked={details.includes(key)} onChange={(e) => setDetails((list) => (e.target.checked ? [...list, key] : list.filter((x) => x !== key)))} />
+              <span>{label}</span>
+            </label>
+          ))}
+        </div>
+        <small className="muted">{t('In Activity and on the title’s page. Admins always see all of it.')}</small>
+      </div>
       <div>
         <button className="btn btn--accent" disabled={!dirty || save.isPending}>
           {save.isPending ? <Spinner size={16} /> : null} {t('Save')}

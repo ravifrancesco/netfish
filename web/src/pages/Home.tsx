@@ -2,7 +2,7 @@ import { Link } from 'react-router';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Info, Play, Plug, Plus, Star, X } from 'lucide-react';
-import type { Card } from '@netfish/shared';
+import type { HomeResponse } from '@netfish/shared';
 import { api } from '../api';
 import { Row, RowSkeleton } from '../components/Cards';
 import { Empty, ErrorState, Img, StatusChip } from '../components/ui';
@@ -57,8 +57,8 @@ function SetupNudge() {
   );
 }
 
-function Hero({ card }: { card: Card }) {
-  const playable = card.mediaType === 'movie' && card.jellyfinId && card.status === 'available';
+function Hero({ card }: { card: NonNullable<HomeResponse['hero']> }) {
+  const play = card.play ?? (card.mediaType === 'movie' && card.jellyfinId && card.status === 'available' ? { itemId: card.jellyfinId, label: t('Play') } : undefined);
   return (
     <section className="hero">
       <div className="hero__media">
@@ -79,9 +79,9 @@ function Hero({ card }: { card: Card }) {
         </div>
         {card.overview && <p className="hero__overview">{card.overview}</p>}
         <div className="hero__actions">
-          {playable ? (
-            <Link to={`/watch/${card.jellyfinId}`} className="btn btn--primary btn--lg">
-              <Play size={22} fill="currentColor" /> {t('Play')}
+          {play ? (
+            <Link to={`/watch/${play.itemId}`} className="btn btn--primary btn--lg">
+              <Play size={22} fill="currentColor" /> {play.label}
             </Link>
           ) : card.status === 'none' ? (
             <Link to={titleHref(card)} className="btn btn--accent btn--lg">

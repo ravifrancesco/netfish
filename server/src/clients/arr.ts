@@ -41,6 +41,10 @@ export interface ArrQueueRecord {
   title?: string;
   quality?: ArrQuality;
   languages?: ArrLanguage[];
+  customFormats?: Array<{ id: number; name: string }>;
+  customFormatScore?: number;
+  indexer?: string;
+  downloadClient?: string;
 }
 
 export interface ArrRelease {
@@ -230,6 +234,7 @@ export const sonarr = {
     arrRequest<void>('sonarr', '/episodefile/bulk', { method: 'DELETE', body: { episodeFileIds } }),
   searchSeason: (seriesId: number, seasonNumber: number) =>
     arrRequest<unknown>('sonarr', '/command', { body: { name: 'SeasonSearch', seriesId, seasonNumber } }),
+  searchEpisodes: (episodeIds: number[]) => arrRequest<unknown>('sonarr', '/command', { body: { name: 'EpisodeSearch', episodeIds } }),
   rootFolders: () => arrRequest<ArrRootFolder[]>('sonarr', '/rootfolder'),
   diskSpace: () => arrRequest<ArrDisk[]>('sonarr', '/diskspace'),
   tags: () => arrRequest<ArrTag[]>('sonarr', '/tag'),

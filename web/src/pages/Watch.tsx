@@ -20,6 +20,7 @@ import { PlayOnButton, SendToScreen } from '../components/PlayOn';
 import { castTarget, screenKind } from '../lib/screens';
 import { useDownloaded } from '../lib/offline';
 import { t } from '../i18n';
+import { browserTV } from '../lib/tv';
 
 const REPORT_EVERY = 10;
 
@@ -641,7 +642,8 @@ function Player() {
         onEnded,
         onError: onVideoError,
         onVolumeChange,
-        children: subtitle?.vttUrl && <track key={subtitle.vttUrl} kind="subtitles" src={subtitle.vttUrl} srcLang={subtitle.code} label={subtitle.label} default />,
+        // TV browsers (Samsung's, LG's) don't draw a video's subtitle tracks: the page does (below).
+        children: subtitle?.vttUrl && !browserTV() && <track key={subtitle.vttUrl} kind="subtitles" src={subtitle.vttUrl} srcLang={subtitle.code} label={subtitle.label} default />,
       }}
       backdrop={d?.backdrop}
       pictureShown={pictureShown}
@@ -697,7 +699,7 @@ function Player() {
           </Link>
         )
       }
-      pageSubtitles={useOverlay && !appDrawsSubtitles ? subtitle?.vttUrl : undefined}
+      pageSubtitles={(useOverlay && !appDrawsSubtitles) || browserTV() ? subtitle?.vttUrl : undefined}
       onControls={onControls}
       actions={
         <>

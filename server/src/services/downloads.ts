@@ -6,6 +6,7 @@ import { onConnectionChange } from '../connections';
 import { SECOND, TTLCache } from '../lib/cache';
 import { languageLabel } from '../lib/languages';
 import { lang, t } from '../lib/i18n';
+import { getSettings } from '../settings';
 import { freshHidden } from './fresh';
 
 /**
@@ -61,6 +62,30 @@ function base(r: ArrQueueRecord, torrents: Map<string, Torrent>) {
     quality: r.quality?.quality?.name,
     languages: (r.languages ?? []).map((l) => languageLabel(l.name) ?? l.name).filter((l) => l !== 'Unknown'),
     releaseTitle: r.title,
+    customFormats: r.customFormats?.map((f) => f.name),
+    customFormatScore: r.customFormatScore,
+    indexer: r.indexer || undefined,
+    downloadClient: r.downloadClient || undefined,
+    protocol: r.protocol,
+  };
+}
+
+/** A download as someone sees it: all of it for admins, the details an admin picked for everyone else. */
+export function detailsFor(isAdmin: boolean, d: DownloadItem): DownloadItem {
+  if (isAdmin) return d;
+  const shown = new Set(getSettings().downloadDetails);
+  const formats = shown.has('formats');
+  const client = shown.has('client');
+  return {
+    ...d,
+    quality: shown.has('quality') ? d.quality : undefined,
+    languages: shown.has('languages') ? d.languages : [],
+    releaseTitle: shown.has('release') ? d.releaseTitle : undefined,
+    customFormats: formats ? d.customFormats : undefined,
+    customFormatScore: formats ? d.customFormatScore : undefined,
+    indexer: shown.has('indexer') ? d.indexer : undefined,
+    downloadClient: client ? d.downloadClient : undefined,
+    protocol: client ? d.protocol : undefined,
   };
 }
 

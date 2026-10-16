@@ -14,6 +14,8 @@ import { isHidden } from './watched';
 import { readyToWatch } from './ready';
 import { householdFavourites, noteWatched, syncHousehold } from './household';
 import { peopleRows, rankPicks, tasteOf, type PeopleRows, type Seed, type Taste } from './taste';
+import { playTarget } from './titles';
+import { suggestedFor } from './suggestarr';
 import { t } from '../lib/i18n';
 
 const EMPTY: JfItemsResult = { Items: [], TotalRecordCount: 0 };
@@ -111,12 +113,13 @@ export async function buildHome(user: SessionUser): Promise<HomeResponse> {
   let requested: Card[] = [];
   let traktMovies: Card[] = [];
   let traktShows: Card[] = [];
+  let suggested: Card[] = [];
   let people: PeopleRows['rows'] = {};
 
   if (has.seerr()) {
     const exclude = new Set([...watched, ...topSeeds.map((s) => s.key)]);
     const tasteAndPeople = tasteOf(seeds).then(async (taste: Taste) => ({ taste, people: await peopleRows(taste, exclude, index, progress) }));
-    const [recPages, trendingP, moviesP, tvP, upcomingP, myRequests, traktM, traktS, mine] = await Promise.all([
+    const [recPages, trendingP, moviesP, tvP, upcomingP, myRequests, traktM, traktS, mine, sarr] = await Promise.all([
       Promise.all(topSeeds.map((s) => settle(catalog.recommendations(s.mediaType, s.tmdbId), undefined))),
       settle(catalog.discover('trending'), EMPTY_PAGE),
       settle(catalog.discover('movies'), EMPTY_PAGE),
@@ -126,9 +129,22 @@ export async function buildHome(user: SessionUser): Promise<HomeResponse> {
       settle(traktPicks('movie'), []),
       settle(traktPicks('tv'), []),
       settle(tasteAndPeople, undefined),
+      settle(suggestedFor(user, index), []),
     ]);
     traktMovies = seerrCards(traktM, index, progress);
     traktShows = seerrCards(traktS, index, progress);
+    // SuggestArr's, from this person's viewing (what they've since watched drops off), each with what it came from.
+    const cameFrom = new Map(sarr.map((s) => [`${s.result.mediaType}-${s.result.id}`, s.because]));
+    suggested = seerrCards(
+      sarr.map((s) => s.result),
+      index,
+      progress,
+    )
+      .filter((c) => !watched.has(c.key))
+      .map((c) => {
+        const name = cameFrom.get(c.key);
+        return { ...c, subtitle: name ? t('Because you watched {name}', { name }) : undefined };
+      });
 
     picks = mine
       ? rankPicks({ seeds: topSeeds, recPages, taste: mine.taste, people: mine.people.candidates, household: householdKeys, exclude, index, progress })
@@ -169,6 +185,7 @@ export async function buildHome(user: SessionUser): Promise<HomeResponse> {
     { id: 'continue', title: t('Continue Watching'), style: 'wide', items: continueWatching(userId, resume.Items, nextUp.Items, index, fresh) },
     { id: 'requested', title: t('Your requests'), style: 'poster', items: requested, href: '/activity' },
     { id: 'picks', title: t('Top picks for {name}', { name: user.name }), style: 'poster', items: picks },
+    { id: 'suggestarr', title: t('SuggestArr picked for you'), style: 'poster', items: suggested },
     { id: 'popular-here', title: t('Popular on this server'), style: 'poster', items: popularHere.length >= 3 ? popularHere : [] },
     { id: 'latest-movies', title: t('Recently added movies'), style: 'poster', items: latestMovies.Items.map((i) => jfToCard(i, index)), href: '/movies' },
     { id: 'latest-shows', title: t('New episodes'), style: 'poster', items: latestShows.Items.map((i) => jfToCard(i, index)), href: '/shows' },
@@ -186,10 +203,14 @@ export async function buildHome(user: SessionUser): Promise<HomeResponse> {
   ];
   const rows = candidates.filter((row) => row.items.length > 0);
 
-  const heroPool = [...picks.filter((c) => c.status === 'available'), ...picks, ...rows.find((r) => r.id === 'latest-movies')?.items ?? [], ...trending]
-    .filter((c) => c.backdrop && c.overview)
+  // The big picture up top is always something to play now: from the library, never one to request.
+  const have = (c: Card) => c.status === 'available' || c.status === 'partial';
+  const rowItems = (id: string) => rows.find((r) => r.id === id)?.items ?? [];
+  const heroPool = [...picks, ...rowItems('unwatched'), ...rowItems('latest-movies'), ...rowItems('popular-here'), ...trending]
+    .filter((c, i, all) => have(c) && c.backdrop && c.overview && all.findIndex((x) => x.key === c.key) === i)
     .slice(0, 6);
   const hero = heroPool.length ? heroPool[Math.floor(Math.random() * heroPool.length)] : undefined;
+  const play = hero?.jellyfinId ? await settle(playTarget(user, hero.mediaType, hero.jellyfinId), undefined) : undefined;
 
-  return { hero, rows };
+  return { hero: hero && { ...hero, play }, rows };
 }

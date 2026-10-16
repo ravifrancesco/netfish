@@ -18,6 +18,7 @@ import { OverlayVideo, trackPositions } from '../player/overlay';
 import { PageSubtitles, TrackMenu, useVolume } from '../player/PlayerView';
 import { pickSubtitle } from '../player/tracks';
 import { t, tn } from '../i18n';
+import { browserTV } from '../lib/tv';
 
 /**
  * A channel: the programme that's on, from the minute it's at, for everyone. No pausing or
@@ -511,7 +512,9 @@ export default function ChannelPlayer() {
 
   // Phones: a swipe up or down changes channel.
   const touchStart = useRef<{ y: number; x: number } | null>(null);
-  const onTouchStart = (e: ReactTouchEvent) => (touchStart.current = { y: e.touches[0].clientY, x: e.touches[0].clientX });
+  // (Not when it starts on the controls or a list: that's a tap there, or scrolling it.)
+  const onTouchStart = (e: ReactTouchEvent) =>
+    (touchStart.current = (e.target as HTMLElement).closest?.('.channel__controls, .player__menu') ? null : { y: e.touches[0].clientY, x: e.touches[0].clientX });
   const onTouchEnd = (e: ReactTouchEvent) => {
     const start = touchStart.current;
     touchStart.current = null;
@@ -576,10 +579,11 @@ export default function ChannelPlayer() {
         <video ref={video} className="player__video" playsInline preload="auto" onClick={onStage} onDoubleClick={toggleFullscreen}
           onPlaying={() => handlers.current.onPlaying()} onLoadedMetadata={() => handlers.current.onLoaded()} onEnded={() => handlers.current.onEnded()}
           onError={() => handlers.current.onError()} onVolumeChange={() => handlers.current.onVolumeChange()}>
-          {subtitle?.vttUrl && <track key={subtitle.vttUrl} kind="subtitles" src={subtitle.vttUrl} srcLang={subtitle.code} label={subtitle.label} default />}
+          {subtitle?.vttUrl && !browserTV() && <track key={subtitle.vttUrl} kind="subtitles" src={subtitle.vttUrl} srcLang={subtitle.code} label={subtitle.label} default />}
         </video>
       )}
-      {useOverlay && !appDrawsSubtitles && subtitle?.vttUrl && program && <PageSubtitles url={subtitle.vttUrl} time={position()} raised={uiVisible} />}
+      {/* Drawn by the page: for the app's players that can't, and TV browsers (they don't draw a video's tracks). */}
+      {((useOverlay && !appDrawsSubtitles) || browserTV()) && subtitle?.vttUrl && program && <PageSubtitles url={subtitle.vttUrl} time={position()} raised={uiVisible} />}
 
       {showSea && (
         <ChannelBreak
@@ -704,7 +708,7 @@ export default function ChannelPlayer() {
                 <span className="channel__current-name">{channel.name}</span>
               </button>
               {list && (
-                <div className="player__menu channel__list">
+                <div className="player__menu channel__list" ref={(el) => el?.querySelector('.is-on')?.scrollIntoView({ block: 'nearest' })}>
                   {channels.map((c) => {
                     const on = onNow(c, now);
                     const shown = on.program ?? on.next;

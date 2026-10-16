@@ -174,6 +174,8 @@ export interface MockDownload {
   stalledAt?: number;
   /** Stopped in qBittorrent (progress held at stalledAt); a speed limit (bytes/s, 0 none). */
   stopped?: boolean;
+  /** Picked by hand (Interactive Search): like Radarr/Sonarr, not searched for again when blocklisted. */
+  interactive?: boolean;
   limit?: number;
   size: number;
   release: string;
@@ -197,7 +199,7 @@ const ISO3: Record<string, string> = {
   Tamil: 'tam', Telugu: 'tel', Japanese: 'jpn',
 };
 
-export function startDownload(title: Title, opts: { season?: number; ageMs?: number; durationMs?: number; release?: string; quality?: string; languages?: string[]; stalledAt?: number } = {}) {
+export function startDownload(title: Title, opts: { season?: number; ageMs?: number; durationMs?: number; release?: string; quality?: string; languages?: string[]; stalledAt?: number; interactive?: boolean } = {}) {
   statusOverride.delete(`${title.type}-${title.tmdbId}`);
   const base = title.title.replace(/[^A-Za-z0-9]+/g, '.');
   downloads.push({
@@ -208,6 +210,7 @@ export function startDownload(title: Title, opts: { season?: number; ageMs?: num
     startedAt: Date.now() - (opts.ageMs ?? 0),
     durationMs: opts.durationMs ?? (title.type === 'movie' ? 90_000 : 120_000),
     stalledAt: opts.stalledAt,
+    interactive: opts.interactive,
     size: (title.type === 'movie' ? 8.4 : 14.2) * 1024 ** 3,
     release: opts.release ?? (title.type === 'movie' ? `${base}.${title.year}.1080p.BluRay.x264-FISHY` : `${base}.S${String(opts.season).padStart(2, '0')}.1080p.WEB-DL.x264-REEF`),
     quality: opts.quality ?? (title.type === 'movie' ? 'Bluray-1080p' : 'WEBDL-1080p'),

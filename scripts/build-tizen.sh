@@ -10,8 +10,10 @@ rm -rf "$WORK"
 mkdir -p "$WORK" release
 sed "s/__VERSION__/$VERSION/" apps/tizen/config.xml > "$WORK/config.xml"
 sed "s/__VERSION__/$VERSION/" apps/tizen/index.html > "$WORK/index.html"
+sed "s/__VERSION__/$VERSION/" apps/tizen/app.js > "$WORK/app.js"
+cp apps/tizen/style.css "$WORK/style.css"
 # The launcher icon, from the shared artwork.
 sips -z 512 512 apps/common/icon.png --out "$WORK/icon.png" >/dev/null 2>&1 || cp apps/common/icon.png "$WORK/icon.png"
 rm -f "release/Netfish-$VERSION-samsung.wgt"
-(cd "$WORK" && zip -q -X -r "$OLDPWD/release/Netfish-$VERSION-samsung.wgt" config.xml index.html icon.png)
+(cd "$WORK" && zip -q -X -r "$OLDPWD/release/Netfish-$VERSION-samsung.wgt" config.xml index.html style.css app.js icon.png)
 echo "Built release/Netfish-$VERSION-samsung.wgt"

@@ -249,7 +249,9 @@ void app.register(
     jf.get('/System/Info', async () => ({ ServerName: 'Mock Jellyfin', Version: '12.0.0-mock', Id: 'mock' }));
     jf.get('/Users/Me', async (req) => {
       const u = jfUser(req)!;
-      return { Id: u.id, Name: u.name, PrimaryImageTag: 'a1', Policy: { IsAdministrator: u.admin } };
+      // Their own audio language in Jellyfin: sam's is Italian, demo's French, admin's any.
+      const audio = { sam: 'ita', demo: 'fre' }[u.name] ?? '';
+      return { Id: u.id, Name: u.name, PrimaryImageTag: 'a1', Policy: { IsAdministrator: u.admin }, Configuration: { AudioLanguagePreference: audio, SubtitleLanguagePreference: '' } };
     });
     jf.get('/Users', async (req, reply) =>
       jfUser(req)?.admin ? USERS.map((u) => ({ Id: u.id, Name: u.name, Policy: { IsAdministrator: u.admin } })) : reply.code(403).send(),
@@ -615,7 +617,16 @@ void app.register(
     s.get('/discover/movies/upcoming', async () => page(TITLES.filter((t) => t.type === 'movie' && t.year >= 2026 && !inLibrary(t))));
     s.get('/discover/tv/upcoming', async () => page(TITLES.filter((t) => t.type === 'tv' && t.year >= 2026)));
 
-    const detail = (type: 'movie' | 'tv') => async (req: FastifyRequest<{ Params: { id: string } }>, reply: import('fastify').FastifyReply) => {
+    // Trailers by language, like Seerr: Blender's open-licensed films stand in. Big Buck Bunny is English
+    // (and what Seerr fills in when a language has none), Sintel Italian (every other title), Tears of
+    // Steel a title in its own language.
+    const trailerIn = (t: Title, language: string) =>
+      language === t.lang && t.lang !== 'en'
+        ? { key: 'R6MlUcmOul8', name: 'Bande-annonce' }
+        : language === 'it' && t.n % 2 === 0
+          ? { key: 'eRsGyueVLvQ', name: 'Trailer ufficiale' }
+          : { key: 'aqz-KE-bpKQ', name: 'Official Trailer' };
+    const detail = (type: 'movie' | 'tv') => async (req: FastifyRequest<{ Params: { id: string }; Querystring: { language?: string } }>, reply: import('fastify').FastifyReply) => {
       const t = titleByTmdb.get(`${type}-${req.params.id}`);
       if (!t) return reply.code(404).send({ message: 'Unable to retrieve' });
       const director = directorOf(t);
@@ -626,8 +637,7 @@ void app.register(
       const common = {
         id: t.tmdbId, overview: t.overview, posterPath: img('poster', t), backdropPath: img('backdrop', t), voteAverage: t.rating,
         genres: t.genres.map((name) => ({ id: GENRE_IDS[name] ?? 0, name })), originalLanguage: t.lang, credits, mediaInfo: mediaInfo(t),
-        // Blender's open-licensed Big Buck Bunny stands in for every trailer.
-        relatedVideos: [{ site: 'YouTube', key: 'aqz-KE-bpKQ', type: 'Trailer', name: 'Official Trailer' }],
+        relatedVideos: [{ site: 'YouTube', type: 'Trailer', ...trailerIn(t, req.query.language ?? 'en') }],
         tagline: t.n % 3 === 0 ? 'The ocean keeps its secrets.' : '',
       };
       if (type === 'movie') {
@@ -737,6 +747,13 @@ const langList = (names: string[]) => names.map((name) => ({ id: LANG_IDS[name] 
 const releaseCache = new Map<string, { title: Title; season?: number; release: string; quality: string; languages: string[] }>();
 const posterUrl = (t: Title) => `http://127.0.0.1:${PORT}/img/w342${img('poster', t)}`;
 
+/** Custom formats a release's name would match, with made-up scores (like a TRaSH-style profile). */
+function formatsOf(release: string) {
+  const all: Array<[RegExp, string, number]> = [[/BluRay/i, 'BluRay Tier 01', 1800], [/WEB-?DL/i, 'WEB Tier 02', 1650], [/HDR/i, 'HDR', 500], [/DDP|DD\+/i, 'DD+', 300], [/H\.?265|x265/i, 'x265 (HD)', -100], [/MULTi|DUAL|iTA-ENG/i, 'Multi-Audio', 50], [/720p/i, '720p', -500]];
+  const hits = all.filter(([re]) => re.test(release));
+  return { customFormats: hits.map(([, name], i) => ({ id: i + 1, name })), customFormatScore: hits.reduce((n, [, , score]) => n + score, 0) };
+}
+
 function queueRecords(type: 'movie' | 'tv') {
   return downloads
     .filter((d) => d.title.type === type)
@@ -751,6 +768,7 @@ function queueRecords(type: 'movie' | 'tv') {
         trackedDownloadState: importing ? 'importing' : 'downloading',
         statusMessages: d.stalledAt !== undefined && !d.stopped ? [{ title: d.release, messages: ['The download is stalled with no connections'] }] : [],
         downloadId: d.downloadId, protocol: 'torrent', title: d.release, quality: { quality: { name: d.quality } }, languages: langList(d.languages),
+        ...formatsOf(d.release), indexer: ['FishTracker', 'ReefNZB', 'TidalTorrents'][d.id % 3], downloadClient: 'qBittorrent',
       };
       const t = d.title;
       if (type === 'movie') return [{ ...base, id: d.id, movieId: t.n, movie: { id: t.n, title: t.title, tmdbId: t.tmdbId, year: t.year, images: [{ coverType: 'poster', remoteUrl: posterUrl(t) }] } }];
@@ -892,7 +910,7 @@ void app.register(
         const d = downloads.find((x) => x.id === id && x.title.type === 'movie');
         if (!d) continue;
         downloads.splice(downloads.indexOf(d), 1);
-        if (req.query.blocklist === 'true' && req.query.skipRedownload === 'false') startDownload(d.title, { durationMs: 70_000, release: `${d.release}.REPACK` });
+        if (req.query.blocklist === 'true' && req.query.skipRedownload === 'false' && !d.interactive) startDownload(d.title, { durationMs: 70_000, release: `${d.release}.REPACK` });
       }
       return {};
     });
@@ -935,7 +953,7 @@ void app.register(
     r.post<{ Body: { guid: string } }>('/release', async (req, reply) => {
       const hit = releaseCache.get(req.body.guid);
       if (!hit) return reply.code(404).send({ message: "Couldn't find requested release in cache, cache timeout probably expired." });
-      startDownload(hit.title, { release: hit.release, quality: hit.quality, languages: hit.languages, durationMs: 60_000 });
+      startDownload(hit.title, { release: hit.release, quality: hit.quality, languages: hit.languages, durationMs: 60_000, interactive: true });
       return {};
     });
   },
@@ -995,7 +1013,7 @@ void app.register(
       const ids = new Set(req.body.ids.map((id) => Math.floor(id / 100)));
       for (const d of downloads.filter((x) => ids.has(x.id) && x.title.type === 'tv')) {
         downloads.splice(downloads.indexOf(d), 1);
-        if (req.query.blocklist === 'true' && req.query.skipRedownload === 'false') startDownload(d.title, { season: d.season, durationMs: 80_000, release: `${d.release}.REPACK` });
+        if (req.query.blocklist === 'true' && req.query.skipRedownload === 'false' && !d.interactive) startDownload(d.title, { season: d.season, durationMs: 80_000, release: `${d.release}.REPACK` });
       }
       return {};
     });
@@ -1039,9 +1057,11 @@ void app.register(
       }
       return {};
     });
-    r.post<{ Body: { name: string; seriesId?: number; seasonNumber?: number } }>('/command', async (req, reply) => {
-      const t = TITLES.find((x) => x.type === 'tv' && x.n === req.body.seriesId);
-      const season = req.body.seasonNumber;
+    r.post<{ Body: { name: string; seriesId?: number; seasonNumber?: number; episodeIds?: number[] } }>('/command', async (req, reply) => {
+      // EpisodeSearch: the episodes' season (ids are series·10000 + season·100 + episode).
+      const first = req.body.episodeIds?.[0];
+      const t = TITLES.find((x) => x.type === 'tv' && x.n === (first ? Math.floor(first / 10000) : req.body.seriesId));
+      const season = first ? Math.floor((first % 10000) / 100) : req.body.seasonNumber;
       if (t && season && !library.has(`tv-${t.tmdbId}-${season}`) && !downloads.some((d) => d.title === t && d.season === season)) startDownload(t, { season, durationMs: 70_000 });
       return reply.code(201).send({ id: newId(), name: req.body.name, status: 'queued' });
     });
@@ -1065,7 +1085,7 @@ void app.register(
     r.post<{ Body: { guid: string } }>('/release', async (req, reply) => {
       const hit = releaseCache.get(req.body.guid);
       if (!hit) return reply.code(404).send({ message: "Couldn't find requested release in cache" });
-      startDownload(hit.title, { season: hit.season, release: hit.release, quality: hit.quality, languages: hit.languages, durationMs: 60_000 });
+      startDownload(hit.title, { season: hit.season, release: hit.release, quality: hit.quality, languages: hit.languages, durationMs: 60_000, interactive: true });
       return {};
     });
   },
@@ -1337,6 +1357,112 @@ void app.register(
 app.get('/trakt-state', async () => ({ ...traktState, codes: undefined, access: undefined, refresh: undefined, movies: [...traktState.movies], episodes: [...traktState.episodes] }));
 
 // ======================================================================
+// SuggestArr (its public API, v1): what it requested for whom, its jobs and their runs
+// ======================================================================
+
+interface SarrMockRequest {
+  tmdb_id: string;
+  media_type: 'movie' | 'tv';
+  title: string;
+  source_media_id: string | null;
+  source_origin: string | null;
+  requested_at: string;
+  requested_by: 'SuggestArr';
+  media_user: { id: string } | null;
+  metadata: { poster_path: string | null; rating: number | null };
+}
+interface SarrMockRun {
+  id: number;
+  job_id: number;
+  job_name: string;
+  status: 'running' | 'completed';
+  trigger_source: string | null;
+  results_count: number;
+  requested_count: number;
+  error_message: null;
+  started_at: string;
+  finished_at: string | null;
+  endsAt: number;
+}
+const sarrJobs = [
+  { id: 1, name: 'Recommendations', job_type: 'recommendation', enabled: true, media_type: 'both', schedule_type: 'preset', schedule_value: 'daily', user_ids: [] },
+  { id: 2, name: 'Weekend discover', job_type: 'discover', enabled: false, media_type: 'movie', schedule_type: 'cron', schedule_value: '0 4 * * 6', user_ids: [] },
+];
+const sarr = { requests: [] as SarrMockRequest[], runs: [] as SarrMockRun[], nextRun: 1 };
+const titleN = (n: number) => TITLES.find((t) => t.n === n)!;
+/** Like SuggestArr's database (UTC, no zone) and its run log (its server's clock, no zone). */
+const sqlTime = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
+const localTime = (ms: number) => new Date(ms - new Date(ms).getTimezoneOffset() * 60_000).toISOString().slice(0, 19);
+/**
+ * SuggestArr asks Seerr as the person themselves (its "user" identity mode). `seerr: false` when Seerr
+ * has the request already. The seeded ones are titles the library has or someone asked for already,
+ * so they don't change what Netfish's own new titles for channels can pick.
+ */
+function sarrRequest(n: number, because: number | string, user: MockUser | null, agoMs: number, opts: { seerr?: boolean } = {}) {
+  const t = titleN(n);
+  const source = typeof because === 'number' ? String(titleN(because).tmdbId) : because;
+  sarr.requests.unshift({
+    tmdb_id: String(t.tmdbId), media_type: t.type, title: t.title, source_media_id: source, source_origin: null, requested_at: sqlTime(Date.now() - agoMs),
+    requested_by: 'SuggestArr', media_user: user && { id: user.id }, metadata: { poster_path: `/poster-${t.type}-${t.tmdbId}.jpg`, rating: 7.2 },
+  });
+  if (opts.seerr === false) return;
+  requests.push({ id: newId(), type: t.type, tmdbId: t.tmdbId, seasons: t.type === 'tv' ? [1] : [], status: inLibrary(t) ? 5 : 2, seerrUserId: (user ?? USERS[0]).seerrId, createdAt: new Date(Date.now() - agoMs).toISOString() });
+}
+function seedSuggestarr() {
+  const [admin, , sam] = USERS;
+  sarrRequest(16, 'discover', null, 6 * DAY_MS, { seerr: false }); // Tidal Lock (demo asked for it too)
+  sarrRequest(109, 104, admin, 5 * DAY_MS); // Salt Marsh, here now, because admin watched Port Authority
+  sarrRequest(19, 5, admin, 4 * DAY_MS); // Reef Break, here now, because The Last Lighthouse
+  sarrRequest(20, 10, admin, DAY_MS, { seerr: false }); // Bioluminescent (admin's request, downloading), because Paper Boats
+  sarrRequest(15, 3, sam, 3 * DAY_MS); // Shoal, here now, because sam watched Night Tide
+  sarrRequest(106, 102, sam, 2 * DAY_MS); // Harbor Lights, here now, because Fishmongers
+  sarr.runs.unshift({ id: sarr.nextRun++, job_id: 1, job_name: 'Recommendations', status: 'completed', trigger_source: null, results_count: 18, requested_count: 2, error_message: null, started_at: localTime(Date.now() - 9 * 3600_000), finished_at: localTime(Date.now() - 9 * 3600_000 + 95_000), endsAt: 0 });
+}
+/** A run takes a few seconds; the first one asked for here finds Sunken Cities for admin. */
+function settleRuns() {
+  for (const run of sarr.runs.filter((r) => r.status === 'running' && Date.now() >= r.endsAt)) {
+    const found = !sarr.requests.some((r) => r.tmdb_id === String(titleN(107).tmdbId));
+    if (found) sarrRequest(107, 104, USERS[0], 0);
+    Object.assign(run, { status: 'completed', results_count: 14, requested_count: found ? 1 : 0, finished_at: localTime(Date.now()) });
+  }
+}
+void app.register(
+  async (sa) => {
+    sa.addHook('preHandler', async (req, reply) => {
+      if (req.url.endsWith('/status')) return;
+      if (req.headers['x-api-key'] !== API_KEY) return reply.code(401).send({ error: 'Invalid or missing API key' });
+    });
+    sa.get('/status', async () => ({ data: { service: 'SuggestArr', api_version: 'v1', status: 'ok' } }));
+    sa.get('/me', async () => ({
+      data: { id: 1, username: 'admin', role: 'admin', permissions: { can_manage_ai: true }, authentication: { method: 'api_key', api_key_id: 'mock', api_key_name: 'Netfish' } },
+    }));
+    sa.get('/jobs', async () => ({ data: sarrJobs, meta: { page: 1, per_page: 50, total: sarrJobs.length, pages: 1 } }));
+    sa.get<{ Querystring: { job_id?: string; status?: string; per_page?: string } }>('/runs', async (req) => {
+      settleRuns();
+      const list = sarr.runs.filter((r) => (!req.query.job_id || r.job_id === Number(req.query.job_id)) && (!req.query.status || r.status === req.query.status));
+      const per = Number(req.query.per_page ?? 20);
+      return { data: list.slice(0, per).map(({ endsAt: _, ...r }) => r), meta: { page: 1, per_page: per, total: list.length, pages: Math.max(1, Math.ceil(list.length / per)) } };
+    });
+    sa.post<{ Params: { id: string } }>('/jobs/:id/runs', async (req, reply) => {
+      const job = sarrJobs.find((j) => j.id === Number(req.params.id));
+      if (!job) return reply.code(404).send({ error: { code: 'not_found', message: 'Job not found' } });
+      const run: SarrMockRun = { id: sarr.nextRun++, job_id: job.id, job_name: job.name, status: 'running', trigger_source: 'api', results_count: 0, requested_count: 0, error_message: null, started_at: localTime(Date.now()), finished_at: null, endsAt: Date.now() + 6000 };
+      sarr.runs.unshift(run);
+      const { endsAt: _, ...data } = run;
+      return reply.code(202).header('location', `/api/v1/runs/${run.id}`).send({ data });
+    });
+    sa.get<{ Querystring: { page?: string; per_page?: string; user_id?: string } }>('/requests', async (req) => {
+      settleRuns();
+      const per = Math.min(100, Number(req.query.per_page ?? 20));
+      const page = Number(req.query.page ?? 1);
+      const list = sarr.requests.filter((r) => !req.query.user_id || r.media_user?.id === req.query.user_id).map((r) => ({ id: r.tmdb_id, ...r }));
+      return { data: list.slice((page - 1) * per, page * per), meta: { page, per_page: per, total: list.length, pages: Math.max(1, Math.ceil(list.length / per)) } };
+    });
+  },
+  { prefix: '/suggestarr/api/v1' },
+);
+
+// ======================================================================
 // TMDB-style images
 // ======================================================================
 
@@ -1358,6 +1484,7 @@ app.get<{ Params: { file: string } }>('/img/:size/:file', async (req, reply) => 
 // ======================================================================
 
 seed();
+seedSuggestarr();
 const mediaReady = ensureMedia();
 try {
   SAMPLE_SIZE = fs.statSync(`${MEDIA_DIR}/sample.mp4`).size;
@@ -1366,6 +1493,6 @@ try {
 }
 void app.register(fastifyStatic, { root: MEDIA_DIR, serve: false });
 app.listen({ port: PORT, host: '127.0.0.1' }).then(() => {
-  console.log(`[mock] Jellyfin, Seerr, Radarr, Sonarr, Bazarr, qBittorrent, Trakt on http://127.0.0.1:${PORT}`);
+  console.log(`[mock] Jellyfin, Seerr, Radarr, Sonarr, Bazarr, qBittorrent, Trakt, SuggestArr on http://127.0.0.1:${PORT}`);
   console.log(`[mock] users: demo/demo, sam/sam, admin/admin · sample video: ${mediaReady ? `${DURATION_SECONDS}s` : 'unavailable'}`);
 });

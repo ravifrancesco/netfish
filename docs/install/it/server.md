@@ -18,7 +18,7 @@ L'interfaccia di Portainer è in inglese, quindi i nomi dei menu qui sotto resta
 4. Apri `http://<your-pi>:7777` in un browser.
 5. Netfish ti chiede l'**indirizzo di Jellyfin**: `http://host.docker.internal:8096` se Jellyfin gira sullo stesso Pi, altrimenti il suo indirizzo normale.
 6. Accedi con un account Jellyfin **amministratore**.
-7. Apri **Impostazioni → Connessioni** e compila Seerr, Radarr, Sonarr, Bazarr, qBittorrent e (se vuoi) MDBList e Trakt. Ognuno ha un pulsante **Prova**; le modifiche valgono subito.
+7. Apri **Impostazioni → Connessioni** e compila Seerr, Radarr, Sonarr, Bazarr, qBittorrent e (se vuoi) MDBList, Trakt e SuggestArr. Ognuno ha un pulsante **Prova**; le modifiche valgono subito.
 
 Tutti gli altri accedono con il proprio account Jellyfin.
 
@@ -44,7 +44,7 @@ Le tue impostazioni e i tuoi accessi sono salvati in `/docker-data-volumes/netfi
 
 Portainer → **Stacks** → **netfish** → **Editor** → **Update the stack**, con **Re-pull image and redeploy** attivo. (Oppure **Containers → netfish → Recreate** con **Pull latest image**.)
 
-Per restare su una versione precisa invece di avere sempre l'ultima, usa un tag di versione: `ghcr.io/ravifrancesco/netfish:0.7.1`. Le versioni sono elencate nella [pagina Releases](https://github.com/ravifrancesco/netfish/releases).
+Per restare su una versione precisa invece di avere sempre l'ultima, usa un tag di versione: `ghcr.io/ravifrancesco/netfish:0.7.2`. Le versioni sono elencate nella [pagina Releases](https://github.com/ravifrancesco/netfish/releases).
 
 ## Creare l'immagine direttamente sul Pi
 

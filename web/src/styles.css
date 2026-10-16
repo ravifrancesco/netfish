@@ -378,6 +378,12 @@ p {
   height: 18px;
   accent-color: var(--accent);
 }
+.checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
+  gap: 10px 16px;
+  padding: 4px 0;
+}
 .input-unit {
   position: relative;
   display: flex;
@@ -1100,6 +1106,11 @@ p {
 .card__hover-year {
   color: var(--text-2);
   font-size: 0.76rem;
+}
+.card__hover-note {
+  color: var(--accent);
+  font-size: 0.72rem;
+  line-height: 1.25;
 }
 .card:hover .card__frame,
 .card:focus-visible .card__frame {
@@ -2136,7 +2147,7 @@ a.big__title:hover {
 }
 .trailer__frame {
   position: relative;
-  width: min(1280px, 100%, calc((100vh - 120px) * 16 / 9));
+  width: 100%;
   aspect-ratio: 16 / 9;
   border-radius: var(--radius);
   overflow: hidden;
@@ -2148,6 +2159,17 @@ a.big__title:hover {
   width: 100%;
   height: 100%;
   border: 0;
+}
+.trailer__stage {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  /* The picture as big as fits, with room under it for the languages. */
+  width: min(1280px, 100%, calc((100vh - 170px) * 16 / 9));
+}
+.trailer__langs {
+  max-width: 100%;
 }
 .trailer__close {
   position: absolute;
@@ -2414,6 +2436,12 @@ a.item__link:hover {
 .item__sub {
   font-size: 0.85rem;
 }
+.item__facts {
+  overflow-wrap: anywhere;
+}
+.item__suggested {
+  color: var(--accent);
+}
 .item__release {
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   font-size: 0.74rem;
@@ -2653,6 +2681,17 @@ html.is-tv .switch:focus {
   margin: 0 14px 14px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
+}
+.sarr__jobs {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sarr__jobs li {
+  display: grid;
+  gap: 2px;
 }
 .trakt p {
   margin: 0;
@@ -4811,12 +4850,44 @@ html.is-desktop.is-mac .channel__top {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* The list of channels: by the controls on a computer, a sheet from the bottom on a phone held
+   upright, a panel down the right on one held sideways. Always on screen, scrolling if it's long. */
 .channel__list {
+  position: fixed;
+  right: max(24px, env(safe-area-inset-right, 0px));
+  bottom: 104px;
   grid-template-columns: 1fr;
+  align-content: start;
   gap: 2px;
-  width: min(340px, 92vw);
-  right: -46px;
+  width: min(340px, calc(100vw - 32px));
+  max-height: calc(100vh - 140px);
+  max-height: calc(100dvh - 140px);
   padding: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  /* Solid: over a bright picture and the programme's title, see-through reads as a smudge. */
+  background: rgb(14, 18, 24);
+}
+@media (max-width: 700px) {
+  .channel__list {
+    left: 8px;
+    right: 8px;
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    width: auto;
+    max-height: 55vh;
+    max-height: 55dvh;
+  }
+}
+@media (max-height: 520px) {
+  .channel__list {
+    top: max(8px, env(safe-area-inset-top, 0px));
+    bottom: max(8px, env(safe-area-inset-bottom, 0px));
+    left: auto;
+    right: max(8px, env(safe-area-inset-right, 0px));
+    width: min(340px, 46vw);
+    max-height: none;
+  }
 }
 .channel__opt {
   gap: 12px;

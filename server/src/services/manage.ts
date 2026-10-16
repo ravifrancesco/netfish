@@ -96,6 +96,9 @@ export async function stopDownload(user: SessionUser, id: string, mode: StopMode
     const record = (await radarr.queue()).records.find((r) => r.id === queueId);
     if (!record) throw new HttpError(404, t('That download has already finished or been stopped'));
     await radarr.removeFromQueue([queueId], removal);
+    // Another release: Radarr only looks again by itself when it's set to (and not for one picked
+    // by hand, as Versions does), so it's asked to search now.
+    if (mode === 'replace' && record.movieId) await settle(radarr.search([record.movieId]), undefined);
     if (mode === 'stop' && record.movieId) {
       if (item.tmdbId) forgetRadarrMovie(item.tmdbId);
       const movie = item.tmdbId ? await settle(radarrMovie(item.tmdbId), undefined) : undefined;
@@ -116,6 +119,8 @@ export async function stopDownload(user: SessionUser, id: string, mode: StopMode
       removal,
     );
     const episodes = records.map((r) => r.episodeId).filter((n): n is number => n !== undefined);
+    // Another release: searched for now, as for films.
+    if (mode === 'replace' && episodes.length) await settle(sonarr.searchEpisodes(episodes), undefined);
     if (mode === 'stop' && episodes.length) await sonarr.setEpisodesMonitored(episodes, false);
     // The show's only download, and nothing of it on disk: take the request back.
     const seriesId = records[0]?.seriesId;

@@ -111,6 +111,10 @@ public class MainActivity extends Activity {
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
+        // Pages fit the screen as they are: no pinch zoom (Netfish's pages size themselves).
+        settings.setSupportZoom(false);
+        settings.setBuiltInZoomControls(false);
+        settings.setDisplayZoomControls(false);
         // TVs: "NetfishTV" switches the interface to TV mode (remote-control navigation).
         settings.setUserAgentString(settings.getUserAgentString() + (tv ? " NetfishTV/" : " NetfishAndroid/") + BuildConfig.NETFISH_VERSION);
 

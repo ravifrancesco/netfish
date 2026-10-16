@@ -11,7 +11,7 @@ import { t } from '../i18n';
 export function PosterCard({ card, showLength }: { card: Card; showLength?: boolean }) {
   const downloading = card.downloadProgress !== undefined && card.status !== 'available';
   return (
-    <Link to={titleHref(card)} className="card" aria-label={`${card.title}${card.year ? ` (${card.year})` : ''}`}>
+    <Link to={titleHref(card)} className="card" aria-label={`${card.title}${card.year ? ` (${card.year})` : ''}${card.subtitle ? `. ${card.subtitle}` : ''}`}>
       <div className="card__frame">
         <Img src={card.poster} className="card__img" fallback={<span className="card__fallback">{card.title}</span>} />
         <div className="card__chip">
@@ -22,6 +22,7 @@ export function PosterCard({ card, showLength }: { card: Card; showLength?: bool
         <div className="card__hover">
           <span className="card__hover-title">{card.title}</span>
           {card.year && <span className="card__hover-year">{card.year}</span>}
+          {card.subtitle && <span className="card__hover-note">{card.subtitle}</span>}
         </div>
       </div>
     </Link>

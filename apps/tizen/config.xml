@@ -9,6 +9,9 @@
     <!-- The interface comes from your Netfish server, wherever it is. -->
     <access origin="*" subdomains="true"/>
     <tizen:allow-navigation>*</tizen:allow-navigation>
+    <!-- Without one, a TV app gets Tizen's default (no inline style or script): the start page
+         keeps its own in style.css and app.js, and Netfish's pages come from your server. -->
+    <tizen:content-security-policy>default-src * data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline'; img-src * data: blob:; media-src * data: blob:; connect-src *; font-src * data:</tizen:content-security-policy>
     <tizen:privilege name="http://tizen.org/privilege/internet"/>
     <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
     <tizen:profile name="tv-samsung"/>

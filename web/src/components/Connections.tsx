@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, CircleCheck, CircleDashed, CircleX, ExternalLink, Eye, EyeOff } from 'lucide-react';
-import type { ConnectionTest, ServiceConnection, ServiceConnectionUpdate, ServiceStatus, TraktStatus } from '@netfish/shared';
+import type { ConnectionTest, ServiceConnection, ServiceConnectionUpdate, ServiceStatus, SuggestArrStatus, TraktStatus } from '@netfish/shared';
 import { api } from '../api';
 import { Spinner, useToast } from './ui';
 import { ago } from '../lib/format';
-import { t } from '../i18n';
+import { t, tn } from '../i18n';
 
 const v = (version?: string) => (version ? `v${version.replace(/^v/i, '')}` : undefined);
 
@@ -168,6 +168,7 @@ function ConnectionCard({ c, status }: { c: ServiceConnection; status?: ServiceS
         </div>
       </form>
       {c.id === 'trakt' && c.hasKey && c.hasPassword && <TraktAccount />}
+      {c.id === 'suggestarr' && c.hasKey && c.url && <SuggestArrJobs />}
     </details>
   );
 }
@@ -281,6 +282,84 @@ function TraktAccount() {
         <button type="button" className="link-btn" disabled={unlink.isPending} onClick={() => confirm(t('Unlink {name}? Trakt keeps its history.', { name: s.username ?? 'Trakt' })) && unlink.mutate()}>
           {t('Unlink')}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function lastRunText(run?: SuggestArrStatus['jobs'][number]['lastRun']): string {
+  if (!run) return t('Not run yet');
+  const when = run.at ? ago(run.at) : '';
+  if (run.status === 'failed') return t('Last run {when} failed: {problem}', { when, problem: run.error ?? '' });
+  if (run.status === 'skipped') return t('Last run {when} was skipped', { when });
+  return tn(run.requested ?? 0, 'Last run {when}: asked for {n} title', 'Last run {when}: asked for {n} titles', { when });
+}
+
+/** SuggestArr's jobs: when they run, how the last run went, and a way to run them now. */
+function SuggestArrJobs() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const q = useQuery({
+    queryKey: ['suggestarr'],
+    queryFn: api.suggestarr,
+    refetchInterval: (query) => (query.state.data?.jobs.some((j) => j.running) ? 3000 : 60_000),
+  });
+  const run = useMutation({
+    mutationFn: api.suggestarrRun,
+    onSuccess: (data) => qc.setQueryData(['suggestarr'], data),
+    onError: (err) => toast('error', (err as Error).message),
+  });
+  // When a run ends it may have asked for something new: Home and Activity catch up.
+  const running = Boolean(q.data?.jobs.some((j) => j.running));
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (wasRunning.current && !running) {
+      void qc.invalidateQueries({ queryKey: ['home'] });
+      void qc.invalidateQueries({ queryKey: ['requests'] });
+    }
+    wasRunning.current = running;
+  }, [running, qc]);
+
+  const s = q.data;
+  if (!s) return <div className="trakt">{q.isError ? <p className="conn__result is-bad">{(q.error as Error).message}</p> : <Spinner />}</div>;
+  if (s.error) {
+    return (
+      <div className="trakt">
+        <p className="conn__result is-bad">{s.error}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="trakt">
+      {s.user && !s.user.admin && (
+        <p className="muted small">{t("This is {name}'s key, not an admin's: Netfish only sees what SuggestArr asked for from {name}'s viewing.", { name: s.user.name })}</p>
+      )}
+      {s.jobs.length ? (
+        <ul className="sarr__jobs">
+          {s.jobs.map((j) => (
+            <li key={j.id}>
+              <strong className="small">{j.name}</strong>
+              <span className="muted small">{j.schedule}</span>
+              <span className={`small ${j.lastRun?.status === 'failed' && !j.running ? 'conn__result is-bad' : 'muted'}`}>
+                {j.running ? (
+                  <>
+                    <Spinner size={12} /> {t('Running…')}
+                  </>
+                ) : (
+                  lastRunText(j.lastRun)
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted small">{t('No jobs are turned on in SuggestArr.')}</p>
+      )}
+      <div className="conn__actions">
+        <button type="button" className="btn btn--ghost btn--sm" disabled={running || run.isPending || !s.jobs.length} onClick={() => run.mutate()}>
+          {run.isPending ? <Spinner size={14} /> : null} {running ? t('Running…') : t('Run now')}
+        </button>
+        <span className="muted small">{t('Its suggestions show on each person’s Home, and in Activity.')}</span>
       </div>
     </div>
   );

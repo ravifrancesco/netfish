@@ -14,6 +14,7 @@ import type {
   SubtitleRequest,
   TogetherControl,
   TogetherTracks,
+  SuggestArrStatus,
   TraktStatus,
   User,
 } from '@netfish/shared';
@@ -39,7 +40,7 @@ import { settle } from './lib/async';
 import { publicLanguages } from './lib/languages';
 import { HttpError, UpstreamError } from './lib/upstream';
 import { discoverPage, libraryPage, search, serviceStatus } from './services/browse';
-import { allDownloads } from './services/downloads';
+import { allDownloads, detailsFor } from './services/downloads';
 import { buildHome } from './services/home';
 import { titleRatings } from './services/ratings';
 import { grabRelease, grabbedKeys, searchReleases } from './services/releases';
@@ -56,6 +57,8 @@ import { cleanupSuggestions, keepForGood } from './services/cleanup';
 import { cancelRequest, deleteFromDisk, downloadAgain, removedTitles, stopDownload, storage } from './services/manage';
 import { createRequest, listRequests, myRequestKeys } from './services/requests';
 import { scrobble, setScrobble, startImport, startLink, traktStatus, unlink } from './services/trakt';
+import { runSuggestarr, suggestarrStatus } from './services/suggestarr';
+import { trailersFor } from './services/trailers';
 import { jellyfinDetail, jellyfinSeason, movieDetail, seasonDetail, tvDetail } from './services/titles';
 import { t } from './lib/i18n';
 
@@ -233,6 +236,11 @@ export async function apiRoutes(app: FastifyInstance) {
       return mediaType === 'movie' ? movieDetail(user, tmdbId) : tvDetail(user, tmdbId);
     });
 
+    api.get<{ Params: TitleParams }>('/title/:type/:id/trailers', async (req) => {
+      const { mediaType, tmdbId } = mediaTitle(req);
+      return trailersFor(userOf(req), mediaType, tmdbId);
+    });
+
     api.get<{ Params: TitleParams & { n: string } }>('/title/:type/:id/season/:n', async (req) => {
       const user = userOf(req);
       const n = int(req.params.n, -1, 0, 500);
@@ -282,7 +290,7 @@ export async function apiRoutes(app: FastifyInstance) {
       const mine = new Set([...requested, ...grabbedKeys(userOf(req))]);
       return {
         items: items.map((d) => ({
-          ...d,
+          ...detailsFor(userOf(req).isAdmin, d),
           mine: mine.has(`${d.mediaType}-${d.tmdbId}`) || (d.tvdbId !== undefined && mine.has(`tvdb-${d.tvdbId}`)),
         })),
       };
@@ -457,6 +465,8 @@ export async function apiRoutes(app: FastifyInstance) {
 
     // The server's one Trakt account: linking, sending watches, importing past ones.
     api.get('/admin/trakt', { preHandler: requireAdmin }, async (): Promise<TraktStatus> => traktStatus());
+    api.get('/admin/suggestarr', { preHandler: requireAdmin }, async (): Promise<SuggestArrStatus> => suggestarrStatus());
+    api.post('/admin/suggestarr/run', { preHandler: requireAdmin }, async (): Promise<SuggestArrStatus> => runSuggestarr());
     api.post('/admin/trakt/link', { preHandler: requireAdmin }, async () => startLink());
     api.put<{ Body: { scrobble?: boolean } }>('/admin/trakt', { preHandler: requireAdmin }, async (req) => setScrobble(req.body?.scrobble !== false));
     api.post('/admin/trakt/import', { preHandler: requireAdmin }, async (req) => startImport(userOf(req), req.log));

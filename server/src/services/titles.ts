@@ -22,7 +22,7 @@ import { movieNotOut, showNotOut } from './notOut';
 import { diskOf, removedInfo } from './manage';
 import { availabilityFromSeerr, episodeLabel, resolveAvailability, seerrCards } from './cards';
 import { catalog } from './catalog';
-import { allDownloads, downloadsFor, progressByTitle } from './downloads';
+import { allDownloads, detailsFor, downloadsFor, progressByTitle } from './downloads';
 import { findInLibrary, libraryIndex } from './library';
 import { toSummary } from './requests';
 import { maybeSeerrUserId } from './seerrUsers';
@@ -80,6 +80,12 @@ async function nextEpisode(user: SessionUser, seriesId: string): Promise<JfItem 
   return pick ? settle(jellyfin.item(user.token, user.id, pick.Id), pick) : undefined;
 }
 
+/** What Play starts for a title in the library: the film, or the show's next episode. */
+export async function playTarget(user: SessionUser, mediaType: 'movie' | 'tv', jellyfinId: string): Promise<TitleDetail['play']> {
+  const item = mediaType === 'tv' ? await nextEpisode(user, jellyfinId) : await settle(jellyfin.item(user.token, user.id, jellyfinId), undefined);
+  return playOf(item);
+}
+
 // ---------- People ----------
 
 function castFromTmdb(credits?: SeerrMovie['credits']): Person[] {
@@ -112,7 +118,7 @@ function castFromJellyfin(item: JfItem): { cast: Person[]; crew: Person[] } {
   };
 }
 
-const trailerOf = (videos?: SeerrMovie['relatedVideos']) =>
+export const trailerOf = (videos?: SeerrMovie['relatedVideos']) =>
   (videos?.find((v) => v.site === 'YouTube' && v.type === 'Trailer') ?? videos?.find((v) => v.site === 'YouTube'))?.key;
 
 function requestsOf(mediaInfo: SeerrMediaInfo | undefined, mySeerrId: number | undefined) {
@@ -171,7 +177,7 @@ export async function movieDetail(user: SessionUser, tmdbId: number): Promise<Ti
     watched: item ? Boolean(item.UserData?.Played) : undefined,
     ...tracksFrom(streamsOf(item)),
     requests: requestsOf(movie.mediaInfo, mySeerrId),
-    downloads: downloadsFor(downloads, 'movie', tmdbId),
+    downloads: downloadsFor(downloads, 'movie', tmdbId).map((d) => detailsFor(user.isAdmin, d)),
     recommendations: seerrCards(recs.results, index, progressByTitle(downloads)).slice(0, 18),
     managed: Boolean(managed),
     notOut: status === 'available' ? undefined : movieNotOut(movie, managed),
@@ -257,7 +263,7 @@ export async function tvDetail(user: SessionUser, tmdbId: number): Promise<Title
     watched: series ? Boolean(series.UserData?.Played) : undefined,
     ...tracksFrom(streamsOf(playItem)),
     requests: requestsOf(tv.mediaInfo, mySeerrId),
-    downloads: downloadsFor(downloads, 'tv', tmdbId, tvdbId),
+    downloads: downloadsFor(downloads, 'tv', tmdbId, tvdbId).map((d) => detailsFor(user.isAdmin, d)),
     seasons,
     recommendations: seerrCards(recs.results, index, progressByTitle(downloads)).slice(0, 18),
     managed: Boolean(managed),
@@ -387,7 +393,7 @@ export async function jellyfinDetail(user: SessionUser, itemId: string): Promise
     play: playOf(playItem),
     ...tracksFrom(streamsOf(playItem)),
     requests: [],
-    downloads: tmdbId || tvdbId ? downloadsFor(downloads, mediaType, tmdbId, tvdbId) : [],
+    downloads: tmdbId || tvdbId ? downloadsFor(downloads, mediaType, tmdbId, tvdbId).map((d) => detailsFor(user.isAdmin, d)) : [],
     seasons,
     recommendations: [],
     managed: Boolean(managed),

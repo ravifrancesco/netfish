@@ -63,6 +63,8 @@ export const config = {
   mdblist: { url: url('MDBLIST_URL') ?? 'https://api.mdblist.com', apiKey: env('MDBLIST_API_KEY') },
   /** Optional Trakt app (free at trakt.tv): recommendations and a watch history for the whole server. */
   trakt: { url: url('TRAKT_URL') ?? 'https://api.trakt.tv', apiKey: env('TRAKT_CLIENT_ID'), password: env('TRAKT_CLIENT_SECRET') },
+  /** Optional SuggestArr (2.11+): what it requested for each person, from what they watched. */
+  suggestarr: { url: url('SUGGESTARR_URL'), apiKey: env('SUGGESTARR_API_KEY') } satisfies ServiceConfig,
   /** Where TMDB images come from (Seerr returns bare paths like "/abc.jpg"). */
   tmdbImageBase: url('TMDB_IMAGE_BASE') ?? 'https://image.tmdb.org/t/p',
   /** Default for who may pick specific releases; admins can change it in the app. */
@@ -79,4 +81,5 @@ export const has = {
   bazarr: () => Boolean(config.bazarr.url && config.bazarr.apiKey),
   qbittorrent: () => Boolean(config.qbittorrent.url),
   trakt: () => Boolean(config.trakt.apiKey && config.trakt.password),
+  suggestarr: () => Boolean(config.suggestarr.url && config.suggestarr.apiKey),
 };

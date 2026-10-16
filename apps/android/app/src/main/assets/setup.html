@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <title>Netfish</title>
     <style>
       :root {
@@ -13,6 +13,10 @@
       * {
         box-sizing: border-box;
       }
+      html,
+      body {
+        overflow-x: hidden;
+      }
       body {
         margin: 0;
         min-height: 100vh;
@@ -22,10 +26,19 @@
         color: #eef3f6;
         font: 18px/1.5 sans-serif;
       }
+      /* Never wider than the screen, whatever the phone's font size. */
       form {
-        width: min(520px, calc(100vw - 96px));
+        width: 100%;
+        max-width: 568px;
+        padding: 0 24px;
         display: grid;
+        grid-template-columns: minmax(0, 1fr);
         gap: 18px;
+      }
+      input,
+      button {
+        width: 100%;
+        min-width: 0;
       }
       .brand {
         display: flex;

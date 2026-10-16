@@ -41,6 +41,8 @@ import type {
   ServiceConnectionUpdate,
   ServiceStatus,
   TitleDetail,
+  TrailerChoices,
+  SuggestArrStatus,
   TraktStatus,
   User,
 } from '@netfish/shared';
@@ -116,6 +118,7 @@ export const api = {
   title: (t: TitleRef) => call<TitleDetail>(`/title/${t.type}/${enc(String(t.id))}`),
   season: (t: TitleRef, n: number) => call<SeasonDetail>(`/title/${t.type}/${enc(String(t.id))}/season/${n}`),
   ratings: (type: MediaType, tmdbId: number) => call<Ratings>(`/title/${type}/${tmdbId}/ratings`),
+  trailers: (type: MediaType, tmdbId: number) => call<TrailerChoices>(`/title/${type}/${tmdbId}/trailers`),
   jobs: (type: MediaType, tmdbId: number) => call<{ items: Job[] }>(`/title/${type}/${tmdbId}/jobs`),
   releases: (type: MediaType, tmdbId: number, body: ReleaseSearch) => call<ReleasesResponse>(`/title/${type}/${tmdbId}/releases`, { body }),
   grab: (type: MediaType, tmdbId: number, guid: string, indexerId: number) =>
@@ -137,6 +140,8 @@ export const api = {
   setupJellyfin: (url: string, code?: string) => call<ConnectionTest>('/setup/jellyfin', { body: { url, code } }),
   saveAdminSettings: (patch: Partial<ServerSettings>) => call<ServerSettings>('/admin/settings', { method: 'PUT', body: patch }),
   trakt: () => call<TraktStatus>('/admin/trakt'),
+  suggestarr: () => call<SuggestArrStatus>('/admin/suggestarr'),
+  suggestarrRun: () => call<SuggestArrStatus>('/admin/suggestarr/run', { method: 'POST' }),
   traktLink: () => call<TraktStatus>('/admin/trakt/link', { method: 'POST' }),
   traktScrobble: (scrobble: boolean) => call<TraktStatus>('/admin/trakt', { method: 'PUT', body: { scrobble } }),
   traktImport: () => call<TraktStatus>('/admin/trakt/import', { method: 'POST' }),

@@ -52,9 +52,17 @@ interface Round {
   cursor: number;
   cycle: number;
 }
+/**
+ * The rules schedules are made by. Raised when they change (a new timetable for Netfish's own
+ * channel, say), so a week already planned is made again, from a few minutes ahead.
+ */
+const PLAN = 5;
+
 interface Schedule {
   /** What the channel was built from: a different source starts a new schedule. */
   key: string;
+  /** Which rules made it (PLAN). */
+  plan?: number;
   seed: number;
   entries: Entry[];
   rounds: Record<string, Round>;
@@ -140,7 +148,7 @@ interface Library {
   episodes: Program[];
   /** Each show's episodes, in order. */
   bySeries: Map<string, Program[]>;
-  series: Array<{ id: string; name: string; genres: string[]; key?: string }>;
+  series: Array<{ id: string; name: string; genres: string[]; rating?: string; key?: string }>;
   /** New on the channel looking (Netfish brought them in for it), due on now: first in line. */
   fresh?: { films: string[]; shows: string[] };
   /** All of this channel's new ones (due or not): they go on only as new, never in the usual turns. */
@@ -176,6 +184,10 @@ const COMEDY = ['comedy', 'commedia'];
 const KIDS = ['kids', 'family', 'children', 'bambini', 'famiglia'];
 /** Shows made for children ("Family" alone isn't: The Simpsons is Animation, Comedy, Family). */
 const CHILDREN = ['kids', 'children', 'bambini'];
+/** Ratings for children's television (Bluey is TV-Y, Avatar: The Last Airbender TV-Y7; The Simpsons is TV-PG). */
+const CHILDRENS_RATING = /^TV-(Y|Y7|Y7-FV|G)$/i;
+/** A show for children: by its genre, or its rating where the library has one. */
+const forChildren = (s: { genres: string[]; rating?: string }) => has(s.genres, CHILDREN) || CHILDRENS_RATING.test(s.rating ?? '');
 const ADVENTURE = ['adventure', 'avventura', 'action & adventure'];
 const SCARY = ['horror'];
 const SERIOUS = ['drama', 'dramma', 'thriller', 'crime', 'crimine', 'mystery', 'mistero', 'war', 'guerra', 'war & politics', 'history', 'storia', 'western'];
@@ -261,6 +273,7 @@ function libraryFrom(movies: { Items: JfItem[] }, series: { Items: JfItem[] }, e
   const shows = series.Items.filter((s) => bySeries.has(s.Id));
   const toons = shows.filter((s) => has(s.Genres ?? [], ANIMATION));
   const idsOf = (list: JfItem[]) => list.map((s) => s.Id);
+  const childish = (s: JfItem) => forChildren({ genres: s.Genres ?? [], rating: s.OfficialRating });
   const best = <T extends { score?: number }>(list: T[]) => [...list].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
   const nice = (genres: string[]) => has(genres, DOCUMENTARY) && !has(genres, GRIM);
   const evening = movieList.filter((m) => !has(m.genres, ANIMATION) && !has(m.genres, KIDS) && !has(m.genres, DOCUMENTARY));
@@ -270,12 +283,12 @@ function libraryFrom(movies: { Items: JfItem[] }, series: { Items: JfItem[] }, e
     movies: movieList,
     episodes: episodeList,
     bySeries,
-    series: series.Items.map((s) => ({ id: s.Id, name: s.Name, genres: s.Genres ?? [], key: keyOf(s) })),
+    series: series.Items.map((s) => ({ id: s.Id, name: s.Name, genres: s.Genres ?? [], rating: s.OfficialRating, key: keyOf(s) })),
     kinds: {
       toons: idsOf(toons),
-      kidsToons: idsOf(toons.filter((s) => has(s.Genres ?? [], CHILDREN) || !has(s.Genres ?? [], COMEDY))),
+      kidsToons: idsOf(toons.filter((s) => childish(s) || !has(s.Genres ?? [], COMEDY))),
       // The Simpsons, Family Guy: animated comedy, not for children.
-      adultToons: idsOf(toons.filter((s) => has(s.Genres ?? [], COMEDY) && !has(s.Genres ?? [], CHILDREN))),
+      adultToons: idsOf(toons.filter((s) => has(s.Genres ?? [], COMEDY) && !childish(s))),
       sitcoms: idsOf(shows.filter((s) => has(s.Genres ?? [], COMEDY) && !has(s.Genres ?? [], ANIMATION) && median(bySeries.get(s.Id)!.map((e) => e.seconds)) <= SITCOM_MAX)),
       shows: idsOf(shows),
       films: movieList.map((m) => m.id),
@@ -547,9 +560,9 @@ function fitting(sched: Schedule, lib: Library, room: number, shows: string[]): 
  */
 function film(sched: Schedule, lib: Library, name: string, ids: string[], at: number): Program | undefined {
   // A film new on this channel: the first slot that suits it (on Netfish's own, nine o'clock:
-  // not the middle of the night, nor the weekend afternoon).
+  // not the middle of the night, nor one o'clock).
   const fresh = lib.fresh?.films.find((id) => ids.includes(id) && dueNow(lib, id));
-  if (fresh && name !== 'night' && name !== 'matinee') return lib.byId.get(fresh);
+  if (fresh && name !== 'night' && name !== 'matinee' && name !== 'noon') return lib.byId.get(fresh);
   ids = usual(lib, ids);
   const since = (id: string) => at - (sched.films?.[id] ?? -Infinity);
   let first: string | undefined;
@@ -614,7 +627,10 @@ function eveningLineup(lib: Library): string[] {
 
 /** Without children's shows: Netfish's own channel is for grown-ups (they have the Cartoons channel). */
 function grownUpShows(lib: Library, ids: string[]): string[] {
-  return ids.filter((id) => !has(lib.series.find((x) => x.id === id)?.genres ?? [], CHILDREN));
+  return ids.filter((id) => {
+    const show = lib.series.find((x) => x.id === id);
+    return !show || !forChildren(show);
+  });
 }
 
 /**
@@ -635,6 +651,26 @@ function documentary(sched: Schedule, lib: Library, at: number, day: number): Pr
   return film(sched, lib, 'documentaries', lib.kinds.docFilms, at);
 }
 
+/**
+ * Weekdays at one: a documentary. A series' next episode, in order, on a run of its own (from the
+ * second-best series: Sunday nights start with the best), else a documentary film.
+ */
+function noonDocumentary(sched: Schedule, lib: Library, at: number): Pick {
+  const shows = usual(lib, lib.kinds.docShows);
+  if (shows.length) {
+    const order = [...shows.slice(1), shows[0]];
+    const i = sched.next['noon:turn'] ?? 0;
+    const show = order[i % order.length];
+    const list = lib.bySeries.get(show)!;
+    const last = (sched.next[`noon:${show}`] ?? 0) % list.length === list.length - 1;
+    const episode = nextEpisode(sched, lib, show, true, 'noon');
+    if (last) sched.next['noon:turn'] = i + 1;
+    return episode ? { program: episode, track: 'noon' } : undefined;
+  }
+  const doc = film(sched, lib, 'noon', lib.kinds.docFilms, at);
+  return doc ? { program: doc } : undefined;
+}
+
 /** Shows from these kinds, in order, until there are at least `n` (a slot of one show would be that show all morning). */
 function atLeast(n: number, ...kinds: string[][]): string[] {
   const out: string[] = [];
@@ -645,15 +681,17 @@ function atLeast(n: number, ...kinds: string[][]): string[] {
   return out;
 }
 
-/** The weekend afternoon film, at one. */
+/** One o'clock: a film at the weekend, a documentary in the week. */
 const MATINEE = 13 * 60;
 
 /**
  * Netfish's own channel: a day of slots, like a network's, for grown-ups (nothing made for
  * children: they have the Cartoons channel).
- *   06:00 until the line-up, cartoons (The Simpsons, Family Guy), with a film at one on weekends
- *   (a comedy, an adventure) · 18:30 the evening line-up · 21:00 the film (or documentary) ·
- *   late-night comedy until 01:00 · a late film (some nights), then reruns until morning.
+ *   06:00 until the line-up, comedy cartoons (The Simpsons, Family Guy, South Park), with at one
+ *   a documentary on weekdays and a film at weekends (a comedy, an adventure) · 18:30 the
+ *   evening line-up · 21:00 the film (or documentary) · until 01:00 animation after dark (every
+ *   grown-up cartoon, Love, Death & Robots too) and sitcoms · a late film (some nights), then
+ *   reruns until morning.
  * Every slot has a few shows to take turns (borrowed from the next kind if the library has few),
  * and no show plays more than two episodes in a row.
  */
@@ -670,6 +708,9 @@ function mix(sched: Schedule, lib: Library, at: number, timeZone: string): Pick 
   const afternoonFilms = k.lightFilms.filter((id) => !has(genresOf(id), [...KIDS, ...ANIMATION]));
   // Daytime: grown-up cartoons (sitcoms only if the library has few cartoons).
   const daytime = atLeast(3, evening, toons, k.sitcoms);
+  // Late at night, every grown-up cartoon takes its turn, the less usual ones too (Love, Death &
+  // Robots, Smiling Friends): animation after dark, with sitcoms in between.
+  const afterDark = atLeast(3, [...new Set([...evening, ...toons])], k.sitcoms);
   const comedy = atLeast(3, k.sitcoms, evening, toons);
   const grownUp = atLeast(3, evening, k.sitcoms, toons);
   const cartoons = atLeast(3, toons, k.sitcoms);
@@ -714,8 +755,8 @@ function mix(sched: Schedule, lib: Library, at: number, timeZone: string): Pick 
     if (roomUntil(PRIME) < 75 * 60) return landOn(PRIME, [...lineup, ...grownUp, ...comedy]);
     return program(alternate(sched, lib, ['evening', grownUp], ['sitcoms', comedy]));
   }
-  // Late night, after the big one: more grown-up comedy, until one.
-  if (m >= PRIME || m < 60) return program(alternate(sched, lib, ['evening', grownUp], ['sitcoms', comedy]));
+  // Late night, after the big one, until one: animation after dark and sitcoms, taking turns.
+  if (m >= PRIME || m < 60) return program(alternate(sched, lib, ['late', afterDark], ['sitcoms', comedy]));
   // Overnight: a late film, then reruns until morning. With fewer than 30 films, only on Friday
   // and Saturday nights, so the films stay fresh for nine o'clock.
   if (m < 6 * 60) {
@@ -724,9 +765,13 @@ function mix(sched: Schedule, lib: Library, at: number, timeZone: string): Pick 
     if (lateFilm && !filmTonight) return program(film(sched, lib, 'night', grownUpFilms, at));
     return program(alternate(sched, lib, ['sitcoms', comedy], ['evening', grownUp]));
   }
-  // Weekends at one: a film for the afternoon (a comedy, an adventure).
-  if (weekend && afternoonFilms.length) {
-    if (m >= MATINEE - SLACK && m < MATINEE + 30) return program(film(sched, lib, 'matinee', afternoonFilms, at));
+  // One o'clock: a film at the weekend (a comedy, an adventure), a documentary in the week.
+  const atOne = weekend ? afternoonFilms.length > 0 : k.docShows.length + k.docFilms.length > 0;
+  if (atOne) {
+    if (m >= MATINEE - SLACK && m < MATINEE + 30) {
+      const one = weekend ? program(film(sched, lib, 'matinee', afternoonFilms, at)) : noonDocumentary(sched, lib, at);
+      if (one) return one;
+    }
     if (m < MATINEE && m >= 6 * 60 && roomUntil(MATINEE) < 75 * 60) return landOn(MATINEE, daytime);
   }
   // From six to half six: cartoons, landing on the line-up (not with the show that opens it: it's on at half six).
@@ -753,9 +798,7 @@ function roomForSecond(def: ChannelDef, program: Program, at: number, timeZone: 
   if (def.source.kind !== 'mix') return true;
   const m = localMinutes(at, timeZone);
   const ends = m + program.seconds / 60;
-  const day = localDay(at, timeZone);
-  const anchors = day === 0 || day === 6 ? [MATINEE, EVENING, PRIME] : [EVENING, PRIME];
-  for (const time of anchors) {
+  for (const time of [MATINEE, EVENING, PRIME]) {
     if (m >= time - SLACK && m < time + SLACK) return false;
     if (m < time - SLACK && ends > time + SLACK) return false;
   }
@@ -865,8 +908,14 @@ function extend(def: ChannelDef, real: Library, now: number, timeZone: string): 
   let changed = false;
   if (!sched || sched.key !== key) {
     // New, or made from something else now: starts with a programme right away.
-    sched = { key, seed: Math.floor(Math.random() * 2 ** 31), entries: [], rounds: {}, next: {}, turn: 0 };
+    sched = { key, plan: PLAN, seed: Math.floor(Math.random() * 2 ** 31), entries: [], rounds: {}, next: {}, turn: 0 };
     stored.schedules[def.id] = sched;
+    changed = true;
+  }
+  // Made by older rules: what's on now and in the next quarter of an hour stays, the rest is made again.
+  if (sched.plan !== PLAN) {
+    truncate(sched, lib, now + 15 * 60_000);
+    sched.plan = PLAN;
     changed = true;
   }
   const before = sched.entries.length;

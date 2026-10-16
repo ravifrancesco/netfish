@@ -8,6 +8,7 @@ import { resolveAvailability } from './cards';
 import { catalog } from './catalog';
 import { allDownloads, downloadsFor } from './downloads';
 import { findInLibrary, libraryIndex } from './library';
+import { suggestedNotes } from './suggestarr';
 import { maybeSeerrUserId, seerrUserId } from './seerrUsers';
 import { forgetRadarrMovie, forgetSonarrSeries, radarrMovie, sonarrSeries } from './arrLookup';
 import { movieNotOut, showNotOut } from './notOut';
@@ -56,6 +57,7 @@ export async function listRequests(user: SessionUser, scope: 'mine' | 'all'): Pr
     allDownloads(),
   ]);
 
+  const notes = await settle(suggestedNotes(user, requests.map((r) => ({ mediaType: r.type, tmdbId: r.media.tmdbId })), index), new Map());
   return mapLimit(requests, 6, async (r) => {
     const tmdbId = r.media.tmdbId;
     const info = await settle(catalog.basics(r.type, tmdbId), undefined);
@@ -89,6 +91,7 @@ export async function listRequests(user: SessionUser, scope: 'mine' | 'all'): Pr
       mine: seerrId !== undefined && r.requestedBy?.id === seerrId,
       download,
       notOut: notOut?.kind === 'airing' && status === 'partial' ? undefined : notOut,
+      suggested: notes.get(`${r.type}-${tmdbId}`),
     };
   });
 }

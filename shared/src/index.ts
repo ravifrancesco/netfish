@@ -50,7 +50,7 @@ export interface AppConfig {
 
 // ---------- Connections (admin) ----------
 
-export type ServiceId = 'jellyfin' | 'seerr' | 'radarr' | 'sonarr' | 'bazarr' | 'qbittorrent' | 'mdblist' | 'trakt';
+export type ServiceId = 'jellyfin' | 'seerr' | 'radarr' | 'sonarr' | 'bazarr' | 'qbittorrent' | 'mdblist' | 'trakt' | 'suggestarr';
 
 /** What the admin sees for one service. Secrets are never sent back, only a hint. */
 export interface ServiceConnection {
@@ -135,7 +135,8 @@ export interface Row {
 }
 
 export interface HomeResponse {
-  hero?: Card & { tagline?: string };
+  /** Always from the library; with what Play starts (a show's next episode). */
+  hero?: Card & { tagline?: string; play?: { itemId: string; label: string; progress?: number } };
   rows: Row[];
 }
 
@@ -339,9 +340,19 @@ export interface DownloadItem {
   quality?: string;
   languages: string[];
   releaseTitle?: string;
+  /** Radarr/Sonarr's custom formats that matched the release, and their score. */
+  customFormats?: string[];
+  customFormatScore?: number;
+  indexer?: string;
+  /** qBittorrent, SABnzbd… */
+  downloadClient?: string;
+  protocol?: string;
   /** Requested by the current user through Seerr. */
   mine: boolean;
 }
+
+/** What Activity can tell about a download. Admins see all of it; they pick what everyone else sees. */
+export type DownloadDetail = 'quality' | 'languages' | 'release' | 'formats' | 'indexer' | 'client';
 
 /** stop: cancel it for good (Radarr/Sonarr stop looking) · replace: block this release and find another. */
 export type StopMode = 'stop' | 'replace';
@@ -563,6 +574,8 @@ export interface RequestItem {
   mine: boolean;
   download?: { progress: number; etaSeconds?: number; state: DownloadState; count: number };
   notOut?: NotOut;
+  /** SuggestArr asked for it: because of what someone watched (who, for admins; the title, when it's yours or you're an admin). */
+  suggested?: { because?: string; forName?: string };
 }
 
 export interface RequestsResponse {
@@ -636,6 +649,29 @@ export interface ReleasesResponse {
 }
 
 /** Server-wide settings admins can change from the app (stored on the server). */
+/**
+ * A title's trailers in the languages that matter to this person (their profile's, the app's, the
+ * title's own, English), and the one to start with.
+ */
+export interface TrailerChoices {
+  options: Array<{ language: string; label: string; youtubeKey: string; original: boolean }>;
+  chosen?: string;
+}
+
+/** Settings → Connections → SuggestArr (admins): whose key it is, and its jobs. */
+export interface SuggestArrStatus {
+  user?: { name: string; admin: boolean };
+  jobs: Array<{
+    id: number;
+    name: string;
+    /** "Every day at midnight", "0 4 * * 6"… */
+    schedule: string;
+    running: boolean;
+    lastRun?: { status: 'completed' | 'failed' | 'skipped' | 'running' | 'queued'; at?: string; requested?: number; error?: string };
+  }>;
+  error?: string;
+}
+
 export interface ServerSettings {
   /** Largest movie release users may pick, in GB. null = no limit. */
   maxMovieSizeGb: number | null;
@@ -643,6 +679,8 @@ export interface ServerSettings {
   maxEpisodeSizeGb: number | null;
   /** Who may pick specific releases. */
   manualGrabs: 'all' | 'admin';
+  /** What people who aren't admins see about a download in Activity. */
+  downloadDetails: DownloadDetail[];
 }
 
 export interface GrabRequest {

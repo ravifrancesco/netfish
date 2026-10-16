@@ -16,6 +16,13 @@ export const markPicked = () => {
     /* private window */
   }
 };
+export const forgetPicked = () => {
+  try {
+    sessionStorage.removeItem(PICKED);
+  } catch {
+    /* private window */
+  }
+};
 export const wasPicked = () => {
   try {
     return sessionStorage.getItem(PICKED) === '1';

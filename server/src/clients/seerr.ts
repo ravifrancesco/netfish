@@ -204,8 +204,9 @@ export const seerr = {
   search: (query: string, page = 1) => seerrRequest<SeerrPage>('/search', { query: { query, page, ...lang() } }),
   discover: (kind: DiscoverKind, page = 1, extra: Record<string, string | number> = {}) =>
     seerrRequest<SeerrPage>(`/discover/${kind}`, { query: { page, ...lang(), ...extra } }),
-  movie: (id: number) => seerrRequest<SeerrMovie>(`/movie/${id}`, { query: lang() }),
-  tv: (id: number) => seerrRequest<SeerrTv>(`/tv/${id}`, { query: lang() }),
+  /** `language`: another language than the person's (its trailers, say). */
+  movie: (id: number, language?: string) => seerrRequest<SeerrMovie>(`/movie/${id}`, { query: language ? { language } : lang() }),
+  tv: (id: number, language?: string) => seerrRequest<SeerrTv>(`/tv/${id}`, { query: language ? { language } : lang() }),
   season: (id: number, season: number) => seerrRequest<SeerrSeason>(`/tv/${id}/season/${season}`, { query: lang() }),
   movieRatings: (id: number) => seerrRequest<{ rt?: SeerrRT; imdb?: SeerrIMDb }>(`/movie/${id}/ratingscombined`, { timeoutMs: 20_000 }),
   tvRatings: (id: number) => seerrRequest<SeerrRT>(`/tv/${id}/ratings`, { timeoutMs: 20_000 }),

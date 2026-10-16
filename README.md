@@ -50,6 +50,8 @@ A Netflix-style front door for a home media server. One app to browse, discover,
 - **Set up from the app:** a first-run screen, then **Settings → Connections** for every service, with a test button.
 - **Disk space:** stop or replace downloads, delete a movie or some seasons from disk (it stays in the library, ready to download again), see how full each disk is and what could go.
 - **Trakt, optional:** one Trakt account for the whole server: history, scrobbling and its recommendations on Home (needs Trakt VIP, see *Good to know*).
+- **SuggestArr, optional:** what [SuggestArr](https://github.com/giuseppe99barchetta/SuggestArr) (2.11 or newer) requested from each person's viewing shows on their Home ("Because you watched…") and is marked in Activity; admins see its jobs and can run them now.
+- **Download details:** Activity shows each download's custom formats and score, indexer and client from Radarr/Sonarr; admins choose which details everyone else sees.
 
 ### Apps
 - **Everywhere:** the web app at `http://<pi>:7777` (phones too), plus apps for Mac, Windows, iPhone/iPad, Android (phones, tablets, Fire TV, Android TV) and Samsung TVs.
@@ -102,7 +104,7 @@ Guide in italiano: [docs/install/it](docs/install/it/README.md).
         └──────────────────┘              │
           │ streams & images (proxied)    │ JSON APIs
           ▼                               ▼
-      Jellyfin              Seerr · Radarr · Sonarr · Bazarr · qBittorrent · (MDBList) · (Trakt)
+      Jellyfin              Seerr · Radarr · Sonarr · Bazarr · qBittorrent · (MDBList) · (Trakt) · (SuggestArr)
 ```
 
 ### What's where
@@ -129,7 +131,7 @@ The apps show the interface from your server, so most new features arrive by upd
 
 **1. Portainer → Stacks → Add stack**, name it `netfish`, paste [`docker-compose.yml`](docker-compose.yml), and **Deploy**. No variables are needed: Portainer pulls the ready-made image `ghcr.io/ravifrancesco/netfish:latest` (built by GitHub for Raspberry Pi and PCs).
 
-**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.7.1`.
+**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.7.2`.
 
 <details>
 <summary>Or build the image on the Pi yourself</summary>
@@ -138,7 +140,7 @@ Download **Netfish-server.tar.gz** from [Releases](https://github.com/ravifrance
 
 </details>
 
-**3. Open `http://<pi-ip>:7777`.** Netfish asks for your Jellyfin address: `http://host.docker.internal:8096` if Jellyfin runs on the same Pi. Sign in with a Jellyfin **admin** account, then open **Settings → Connections** and fill in Seerr, Radarr, Sonarr, Bazarr, qBittorrent and (optionally) MDBList and Trakt. Each has a **Test** button, and changes apply immediately.
+**3. Open `http://<pi-ip>:7777`.** Netfish asks for your Jellyfin address: `http://host.docker.internal:8096` if Jellyfin runs on the same Pi. Sign in with a Jellyfin **admin** account, then open **Settings → Connections** and fill in Seerr, Radarr, Sonarr, Bazarr, qBittorrent and (optionally) MDBList, Trakt and SuggestArr. Each has a **Test** button, and changes apply immediately.
 
 If Netfish ever points at the wrong Jellyfin and nobody can sign in, use **Change the Jellyfin address** on the sign-in screen with the *setup code* printed in Netfish's log (Portainer → Containers → netfish → Logs).
 
@@ -158,7 +160,7 @@ You can also pre-fill connections from the stack (see [`.env.example`](.env.exam
 | --- | --- |
 | `NETFISH_IMAGE` | Defaults to `ghcr.io/ravifrancesco/netfish:latest`; `netfish:latest` if you built the image on the Pi. |
 | `JELLYFIN_URL`, `JELLYFIN_API_KEY` | API key optional: refreshes items when new subtitles arrive, and lets *Popular on this server* include people who watch in other Jellyfin apps. |
-| `SEERR_*`, `RADARR_*`, `SONARR_*`, `BAZARR_*`, `QBITTORRENT_*`, `MDBLIST_API_KEY`, `TRAKT_CLIENT_ID`, `TRAKT_CLIENT_SECRET` | Same as in Settings → Connections. The Trakt account itself is linked in the app. |
+| `SEERR_*`, `RADARR_*`, `SONARR_*`, `BAZARR_*`, `QBITTORRENT_*`, `MDBLIST_API_KEY`, `TRAKT_CLIENT_ID`, `TRAKT_CLIENT_SECRET`, `SUGGESTARR_URL`, `SUGGESTARR_API_KEY` | Same as in Settings → Connections. The Trakt account itself is linked in the app. |
 | `MANUAL_GRABS` | Starting value for who may pick versions (`all` / `admin`). |
 | `METADATA_LANGUAGE` | Language for TMDB titles and descriptions (`en`, `es`…). |
 | `TRUST_PROXY` | `true` behind a reverse proxy. |

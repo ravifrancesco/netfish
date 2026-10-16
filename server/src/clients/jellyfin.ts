@@ -40,6 +40,8 @@ export interface JfUser {
   Name: string;
   PrimaryImageTag?: string;
   Policy?: { IsAdministrator?: boolean; EnableContentDownloading?: boolean };
+  /** The person's own playback settings ("ita", "eng"…; empty for any). */
+  Configuration?: { AudioLanguagePreference?: string; SubtitleLanguagePreference?: string };
 }
 
 export interface JfAuthResult {

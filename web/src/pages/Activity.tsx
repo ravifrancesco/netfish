@@ -6,7 +6,7 @@ import { api } from '../api';
 import { Empty, ErrorState, Img, PageLoader, Progress, StatusChip } from '../components/ui';
 import { AVAILABILITY_LABEL, DOWNLOAD_LABEL, ago, bytes, duration, percent } from '../lib/format';
 import { useConfig, useMe } from '../lib/hooks';
-import { t, tn } from '../i18n';
+import { locale, t, tn } from '../i18n';
 import { isNotAvailable, notOutShort } from '../components/NotOut';
 import { StopDownload } from '../components/Manage';
 
@@ -17,6 +17,13 @@ function DownloadRow({ d, canStop }: { d: DownloadItem; canStop: boolean }) {
     d.size ? t('{done} of {total}', { done: bytes(d.size - d.sizeLeft), total: bytes(d.size) }) : undefined,
     d.etaSeconds ? t('{time} left', { time: duration(d.etaSeconds) }) : undefined,
     d.speed ? `${bytes(d.speed)}/s` : undefined,
+  ].filter(Boolean);
+  // What Radarr/Sonarr know about the release (what an admin lets everyone see).
+  const score = d.customFormatScore ? `${d.customFormatScore > 0 ? '+' : ''}${d.customFormatScore.toLocaleString(locale)}` : undefined;
+  const facts = [
+    d.customFormats?.length ? `${d.customFormats.join(', ')}${score ? ` (${score})` : ''}` : score && t('Score {score}', { score }),
+    d.indexer && t('From {indexer}', { indexer: d.indexer }),
+    d.downloadClient && (d.protocol ? `${d.downloadClient} (${d.protocol})` : d.downloadClient),
   ].filter(Boolean);
   const body = (
     <>
@@ -31,6 +38,7 @@ function DownloadRow({ d, canStop }: { d: DownloadItem; canStop: boolean }) {
         </div>
         <Progress value={d.progress} tone={d.state === 'stalled' || d.state === 'warning' || d.state === 'failed' ? 'warn' : 'accent'} />
         <div className="item__stats muted small">{stats.join(' · ')}</div>
+        {facts.length > 0 && <div className="item__facts muted small">{facts.join(' · ')}</div>}
         {d.message && (
           <div className="item__warn">
             <TriangleAlert size={14} /> {d.message}
@@ -79,6 +87,13 @@ function Downloads() {
   );
 }
 
+/** SuggestArr asked for it: because of what (and whose) viewing, when the server can say. */
+function suggestedText(s: NonNullable<RequestItem['suggested']>): string {
+  if (s.because && s.forName) return t('Suggested by SuggestArr, because {name} watched {title}', { name: s.forName, title: s.because });
+  if (s.because) return t('Suggested by SuggestArr, because you watched {title}', { title: s.because });
+  return t('Suggested by SuggestArr');
+}
+
 const REQUEST_LABEL: Record<RequestItem['requestStatus'], string> = {
   pending: t('Waiting for approval'),
   approved: t('Approved'),
@@ -117,6 +132,7 @@ function Requests({ scope }: { scope: 'mine' | 'all' }) {
                 {r.mediaType === 'tv' && r.seasons?.length ? `${tn(r.seasons.length, 'Season {list}', 'Seasons {list}', { list: r.seasons.join(', ') })} · ` : ''}
                 {r.mine ? t('You') : r.requestedBy} · {ago(r.createdAt)}
               </div>
+              {r.suggested && <div className="item__suggested small">{suggestedText(r.suggested)}</div>}
               {r.notOut && !r.download && notOutShort(r.notOut) && (
                 <div className="item__notout small">
                   <CalendarClock size={14} /> {notOutShort(r.notOut)}

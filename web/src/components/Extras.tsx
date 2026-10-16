@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowUpRight, X } from 'lucide-react';
@@ -53,7 +53,25 @@ export function RatingsStrip({ mediaType, tmdbId }: { mediaType: MediaType; tmdb
 }
 
 /** Plays a YouTube trailer inside Netfish (no API key needed for embeds). */
-export function TrailerPlayer({ youtubeKey, title, onClose }: { youtubeKey: string; title: string; onClose: () => void }) {
+/**
+ * A title's trailer. With its TMDB id, in the person's language when there's one (their Jellyfin
+ * profile's, else the app's, else English), and a switch to the other languages it has.
+ */
+export function TrailerPlayer({ youtubeKey, title, mediaType, tmdbId, onClose }: { youtubeKey: string; title: string; mediaType?: MediaType; tmdbId?: number; onClose: () => void }) {
+  const choices = useQuery({
+    queryKey: ['trailers', mediaType, tmdbId],
+    queryFn: () => api.trailers(mediaType!, tmdbId!),
+    enabled: Boolean(mediaType && tmdbId),
+    staleTime: 60 * 60_000,
+    retry: false,
+  });
+  const [picked, setPicked] = useState<string>();
+  const options = choices.data?.options ?? [];
+  const language = picked ?? choices.data?.chosen;
+  const current = options.find((o) => o.language === language)?.youtubeKey;
+  // Waiting for the languages (briefly): nothing plays yet, so it doesn't start over in another one.
+  const waiting = choices.isLoading && Boolean(mediaType && tmdbId);
+  const key = current ?? youtubeKey;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -63,12 +81,23 @@ export function TrailerPlayer({ youtubeKey, title, onClose }: { youtubeKey: stri
       document.body.classList.remove('no-scroll');
     };
   }, [onClose]);
-  const src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(youtubeKey)}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
+  const src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(key)}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
   return createPortal(
     <div className="trailer" role="dialog" aria-modal="true" aria-label={t('{title} trailer', { title })}>
       <div className="trailer__backdrop" onClick={onClose} />
-      <div className="trailer__frame">
-        <iframe src={src} title={t('{title} trailer', { title })} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
+      <div className="trailer__stage">
+        <div className="trailer__frame">
+          {!waiting && <iframe key={key} src={src} title={t('{title} trailer', { title })} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />}
+        </div>
+        {options.length > 1 && (
+          <div className="tabs trailer__langs" role="group" aria-label={t('Trailer language')}>
+            {options.map((o) => (
+              <button key={o.language} className={`tab${o.language === language ? ' is-active' : ''}`} aria-pressed={o.language === language} onClick={() => setPicked(o.language)}>
+                {o.original ? t('{language} (original)', { language: o.label }) : o.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <button className="icon-btn icon-btn--lg trailer__close" onClick={onClose} aria-label={t('Close trailer')}>
         <X size={26} />

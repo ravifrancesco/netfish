@@ -494,7 +494,9 @@ export default function Title() {
           episodeNumber={sheet.episodeNumber}
         />
       )}
-      {trailer && d.trailerYoutubeKey && <TrailerPlayer youtubeKey={d.trailerYoutubeKey} title={d.title} onClose={() => setTrailer(false)} />}
+      {trailer && d.trailerYoutubeKey && (
+        <TrailerPlayer youtubeKey={d.trailerYoutubeKey} title={d.title} mediaType={d.mediaType} tmdbId={d.tmdbId} onClose={() => setTrailer(false)} />
+      )}
       {sheet?.kind === 'subtitles' && <SubtitlesSheet title={d} onClose={() => setSheet(undefined)} seasonNumber={sheet.seasonNumber} />}
     </div>
   );

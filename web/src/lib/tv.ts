@@ -53,8 +53,11 @@ const REMOTE_KEYS: Record<number, string> = {
  * page. From Netfish's first page that returns to the TV app's start page,
  * which closes the app, like any TV app.
  */
+/** Newer TV browsers name the Back key instead (or as well). */
+const BACK_NAMES = new Set(['XF86Back', 'GoBack', 'BrowserBack']);
+
 function onRemoteKey(e: KeyboardEvent) {
-  const name = REMOTE_KEYS[e.keyCode];
+  const name = REMOTE_KEYS[e.keyCode] ?? (BACK_NAMES.has(e.key) ? 'Back' : undefined);
   if (!name) return;
   if (name === 'Back') {
     e.preventDefault();

@@ -16,7 +16,7 @@ The image is `ghcr.io/ravifrancesco/netfish`, built by GitHub for Raspberry Pi (
 4. Open `http://<your-pi>:7777` in a browser.
 5. Netfish asks for your **Jellyfin address**: `http://host.docker.internal:8096` if Jellyfin runs on the same Pi, otherwise its normal address.
 6. Sign in with a Jellyfin **administrator** account.
-7. Open **Settings → Connections** and fill in Seerr, Radarr, Sonarr, Bazarr, qBittorrent and (optionally) MDBList and Trakt. Each has a **Test** button; changes apply immediately.
+7. Open **Settings → Connections** and fill in Seerr, Radarr, Sonarr, Bazarr, qBittorrent and (optionally) MDBList, Trakt and SuggestArr. Each has a **Test** button; changes apply immediately.
 
 Everyone else signs in with their own Jellyfin account.
 
@@ -42,7 +42,7 @@ Your settings and sign-ins live in `/docker-data-volumes/netfish-data` on the Pi
 
 Portainer → **Stacks** → **netfish** → **Editor** → **Update the stack**, with **Re-pull image and redeploy** on. (Or **Containers → netfish → Recreate** with **Pull latest image**.)
 
-To stay on a particular version instead of always the newest, use a version tag: `ghcr.io/ravifrancesco/netfish:0.7.1`. The versions are listed on the [Releases page](https://github.com/ravifrancesco/netfish/releases).
+To stay on a particular version instead of always the newest, use a version tag: `ghcr.io/ravifrancesco/netfish:0.7.2`. The versions are listed on the [Releases page](https://github.com/ravifrancesco/netfish/releases).
 
 ## Building the image on the Pi instead
 

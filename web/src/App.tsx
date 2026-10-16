@@ -22,7 +22,7 @@ import { JoinRoom } from './components/Together';
 import { useLive } from './lib/together';
 import { useOfflineAware } from './lib/offline';
 import { RemoteBar } from './components/PlayOn';
-import { ProfilePicker, useProfiles, wasPicked } from './components/ProfilePicker';
+import { forgetPicked, ProfilePicker, useProfiles, wasPicked } from './components/ProfilePicker';
 
 // The player pulls in hls.js; only load it when someone presses play.
 const Watch = lazy(() => import('./pages/Watch'));
@@ -129,6 +129,21 @@ export function App() {
   const [picked, setPicked] = useState(wasPicked);
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  // TVs keep apps running in the background: coming back after a while is like opening it, so
+  // a TV several people use asks who's watching again.
+  useEffect(() => {
+    if (!isTV()) return;
+    let hiddenAt = 0;
+    const onVisibility = () => {
+      if (document.hidden) hiddenAt = Date.now();
+      else if (hiddenAt && Date.now() - hiddenAt > 10 * 60_000) {
+        forgetPicked();
+        setPicked(false);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
   /** Someone picked (or signed in) when Netfish opened: on to Home if it opened on the profiles page. */
   const choose = () => {
     setPicked(true);
