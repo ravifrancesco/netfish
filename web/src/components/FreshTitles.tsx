@@ -112,6 +112,21 @@ export function FreshTitles({ data, save, busy }: { data: ChannelAdmin; save: (p
   });
   const set = (patch: Partial<FreshSettings>) => save({ fresh: { ...fresh, ...patch } });
   const s = status.data;
+  // "Check now": a look straight away, and what it found.
+  const check = useMutation({
+    mutationFn: api.freshRun,
+    onSuccess: (next) => {
+      const before = new Set((s?.titles ?? []).map((x) => `${x.key}:${x.state}`));
+      const changed = next.titles.filter((x) => !before.has(`${x.key}:${x.state}`));
+      qc.setQueryData(['freshStatus'], next);
+      void qc.invalidateQueries({ queryKey: ['channels'] });
+      const said = changed.length
+        ? changed.map((x) => `${x.title}: ${stateLabel(x, fresh.fromHour)}`).join(' · ')
+        : (waitingText(next.waiting) ?? t('Up to date: nothing new right now.'));
+      toast('ok', said);
+    },
+    onError: (e) => toast('error', (e as Error).message),
+  });
   const services = s?.services;
   const canFind = services ? services.seerr && (services.radarr || services.sonarr) : true;
   const names = new Map(data.channels.map((c) => [c.id, `${c.number} · ${c.name}`]));
@@ -213,8 +228,8 @@ export function FreshTitles({ data, save, busy }: { data: ChannelAdmin; save: (p
           <div className="fresh__status">
             <span className="muted small">{note ?? (s?.titles.length ? '' : t('Nothing yet.'))}</span>
             <span className="spacer" />
-            <button className="btn btn--ghost btn--sm" onClick={() => act.mutate(api.freshRun)} disabled={act.isPending}>
-              <RefreshCw size={14} className={act.isPending ? 'spin' : undefined} /> {t('Look now')}
+            <button className="btn btn--ghost btn--sm" onClick={() => check.mutate()} disabled={check.isPending}>
+              <RefreshCw size={14} className={check.isPending ? 'spin' : undefined} /> {check.isPending ? t('Checking…') : t('Check now')}
             </button>
           </div>
           {Boolean(s?.titles.length) && (

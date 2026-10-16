@@ -104,6 +104,7 @@ export default {
   "Who's watching?": 'Chi guarda?',
   'Add profile': 'Aggiungi profilo',
   'Add a profile: sign in with another Jellyfin account.': 'Aggiungi un profilo: accedi con un altro account Jellyfin.',
+  '{name}, sign in again: this device’s sign-in has run out.': '{name}, accedi di nuovo: l’accesso su questo dispositivo è scaduto.',
   "Back to who's watching": 'Torna a chi guarda',
   'Profiles on this device': 'Profili su questo dispositivo',
 

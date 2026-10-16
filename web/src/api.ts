@@ -85,7 +85,8 @@ async function call<T>(path: string, init: { method?: string; body?: unknown; ke
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    if (res.status === 401 && !path.startsWith('/auth/login')) onUnauthorized();
+    // Not this device's sign-in: a wrong password, or another profile's sign-in that has run out.
+    if (res.status === 401 && !path.startsWith('/auth/login') && !path.startsWith('/profiles/switch')) onUnauthorized();
     throw new ApiError(res.status, data.error ?? res.statusText, data.service);
   }
   return data as T;

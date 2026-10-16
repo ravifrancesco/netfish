@@ -52,12 +52,20 @@ function TvFocus() {
 /** "Switch profile" from the menu. */
 function SwitchProfile() {
   const navigate = useNavigate();
-  return <ProfilePicker onAdd={() => navigate('/profiles/add')} onPicked={() => navigate('/', { replace: true })} />;
+  return (
+    <ProfilePicker
+      onAdd={() => navigate('/profiles/add')}
+      onPicked={() => navigate('/', { replace: true })}
+      onSignIn={(name) => navigate(`/profiles/add?again=${encodeURIComponent(name)}`)}
+    />
+  );
 }
 
+/** Adding someone, or someone signing in again (`?again=<name>`). */
 function AddProfile() {
   const navigate = useNavigate();
-  return <Login adding onCancel={() => navigate('/profiles', { replace: true })} onDone={() => navigate('/', { replace: true })} />;
+  const again = new URLSearchParams(useLocation().search).get('again') ?? undefined;
+  return <Login adding again={again} onCancel={() => navigate('/profiles', { replace: true })} onDone={() => navigate('/', { replace: true })} />;
 }
 
 function Shell({ user }: { user: NonNullable<ReturnType<typeof useMe>['data']> }) {
@@ -116,7 +124,16 @@ export function App() {
   const signedOut = me.data === null || (me.error instanceof ApiError && me.error.status === 401);
   const profiles = useProfiles();
   const [adding, setAdding] = useState(false);
+  /** Someone picked whose sign-in has run out: their name, for signing in again. */
+  const [again, setAgain] = useState<string>();
   const [picked, setPicked] = useState(wasPicked);
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  /** Someone picked (or signed in) when Netfish opened: on to Home if it opened on the profiles page. */
+  const choose = () => {
+    setPicked(true);
+    if (pathname.startsWith('/profiles')) navigate('/', { replace: true });
+  };
   const ready = !config.isLoading && (me.isSuccess || me.isError) && (profiles.isSuccess || profiles.isError);
   const known = profiles.data?.profiles ?? [];
   // A device several people use asks who's watching when Netfish opens.
@@ -124,7 +141,8 @@ export function App() {
   // Whoever just signed in is who's watching.
   const signedIn = () => {
     setAdding(false);
-    setPicked(true);
+    setAgain(undefined);
+    choose();
   };
 
   return (
@@ -133,12 +151,14 @@ export function App() {
       {ready &&
         (config.data?.setupRequired ? (
           <Setup />
+        ) : again ? (
+          <Login adding again={again} onCancel={() => setAgain(undefined)} onDone={signedIn} />
         ) : signedOut && known.length && !adding ? (
-          <ProfilePicker onAdd={() => setAdding(true)} onPicked={() => setPicked(true)} />
+          <ProfilePicker onAdd={() => setAdding(true)} onPicked={choose} onSignIn={setAgain} />
         ) : signedOut ? (
           <Login adding={adding} onCancel={known.length ? () => setAdding(false) : undefined} onDone={signedIn} />
         ) : me.data && ask ? (
-          <ProfilePicker onAdd={() => setAdding(true)} onPicked={() => setPicked(true)} />
+          <ProfilePicker onAdd={() => setAdding(true)} onPicked={choose} onSignIn={setAgain} />
         ) : me.data && adding ? (
           <Login adding onCancel={() => setAdding(false)} onDone={signedIn} />
         ) : me.data ? (

@@ -10,10 +10,11 @@ import { markPicked } from '../components/ProfilePicker';
 import { t } from '../i18n';
 
 /** `adding`: another person signing in on this device ("Add profile"); `onCancel` goes back to the picker. */
-export default function Login({ adding, onCancel, onDone }: { adding?: boolean; onCancel?: () => void; onDone?: () => void } = {}) {
+export default function Login({ adding, again, onCancel, onDone }: { adding?: boolean; again?: string; onCancel?: () => void; onDone?: () => void } = {}) {
   const qc = useQueryClient();
   const { data: config } = useConfig();
-  const [username, setUsername] = useState('');
+  // `again`: someone on this device whose sign-in has run out.
+  const [username, setUsername] = useState(again ?? '');
   const [password, setPassword] = useState('');
   const [changing, setChanging] = useState(false);
   const login = useMutation({
@@ -48,17 +49,19 @@ export default function Login({ adding, onCancel, onDone }: { adding?: boolean; 
           <Mark size={44} />
           <Wordmark className="wordmark--lg" />
         </div>
-        <p className="muted">{adding ? t('Add a profile: sign in with another Jellyfin account.') : t('Sign in with your Jellyfin account.')}</p>
+        <p className="muted">
+          {again ? t('{name}, sign in again: this device’s sign-in has run out.', { name: again }) : adding ? t('Add a profile: sign in with another Jellyfin account.') : t('Sign in with your Jellyfin account.')}
+        </p>
         {config && !config.jellyfinConfigured && (
           <p className="login__error">{t("This server isn't connected to Jellyfin yet. Set {variable} in the stack.", { variable: 'JELLYFIN_URL' })}</p>
         )}
         <label className="field">
           <span>{t('Username')}</span>
-          <input className="input" autoComplete="username" autoCapitalize="none" value={username} onChange={(e) => setUsername(e.target.value)} autoFocus required />
+          <input className="input" autoComplete="username" autoCapitalize="none" value={username} onChange={(e) => setUsername(e.target.value)} autoFocus={!again} required />
         </label>
         <label className="field">
           <span>{t('Password')}</span>
-          <input className="input" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input className="input" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus={Boolean(again)} />
         </label>
         {login.isError && <p className="login__error">{(login.error as Error).message}</p>}
         {unreachable && (

@@ -13,7 +13,6 @@ import { clockTime, episodeLine, onNow, programEnd, programTitle, serverNow, use
 import { desktop } from '../lib/desktop';
 import { deviceId, getPrefs, setPrefs } from '../lib/prefs';
 import { screenId } from '../lib/screens';
-import { isTV } from '../lib/tv';
 import { buildDeviceProfile } from '../player/profile';
 import { OverlayVideo, trackPositions } from '../player/overlay';
 import { PageSubtitles, TrackMenu, useVolume } from '../player/PlayerView';
@@ -22,9 +21,9 @@ import { t, tn } from '../i18n';
 
 /**
  * A channel: the programme that's on, from the minute it's at, for everyone. No pausing or
- * skipping (that's the point); "Watch from here" leaves the channel for the normal player.
- * Up and down (the remote, the keyboard, a swipe, the CH buttons) change channel, numbers
- * jump to one. Between programmes, a short break with the fish (ChannelBreak).
+ * skipping (that's the point). Up and down (the remote, the keyboard, a swipe, the buttons)
+ * change channel, numbers jump to one, and the channel's name (or OK) lists them all with
+ * what's on. Between programmes, a short break with the fish (ChannelBreak).
  * The film plays like any other: in the app's own player where there is one, else the page's.
  */
 
@@ -113,6 +112,23 @@ export default function ChannelPlayer() {
     return pickSubtitle(s, undefined, useOverlay && appDrawsSubtitles);
   };
 
+  /**
+   * A programme that won't play gets one more go a moment later (a hiccup on the way), then the
+   * break says it can't play here until the next one.
+   */
+  const [attempt, setAttempt] = useState(0);
+  const retried = useRef<string>(undefined);
+  const fail = useCallback(() => {
+    const p = programRef.current;
+    const which = p ? `${p.itemId}:${p.start}` : '';
+    if (p && retried.current !== which) {
+      retried.current = which;
+      setTimeout(() => setAttempt((n) => n + 1), 2000);
+      return;
+    }
+    setStatus('failed');
+  }, []);
+
   const handlers = useRef<Record<string, () => void>>({});
   handlers.current = {
     onPlaying: () => setStatus('playing'),
@@ -125,7 +141,7 @@ export default function ChannelPlayer() {
         overlayVideo.current = null;
         video.current = null;
         setOverlayFailed(true);
-      } else setStatus('failed');
+      } else fail();
     },
     onVolumeChange: volume.onVolumeChange,
   };
@@ -155,7 +171,7 @@ export default function ChannelPlayer() {
           externalSubtitles: appDrawsSubtitles ? positions.externals.map((tr) => ({ url: absolute(tr.vttUrl!), label: tr.label, language: tr.code })) : [],
           segments: [],
         })
-        .catch(() => setStatus('failed'));
+        .catch(fail);
       ov.volume = getPrefs().volume;
       return;
     }
@@ -164,7 +180,7 @@ export default function ChannelPlayer() {
     v.volume = getPrefs().volume;
     if (s.isHls && Hls.isSupported()) {
       const h = new Hls({ startPosition: start, maxBufferLength: 40, backBufferLength: 30 });
-      h.on(Hls.Events.ERROR, (_e, data) => data.fatal && setStatus('failed'));
+      h.on(Hls.Events.ERROR, (_e, data) => data.fatal && fail());
       h.loadSource(s.url);
       h.attachMedia(v);
       hls.current = h;
@@ -207,14 +223,14 @@ export default function ChannelPlayer() {
         attach(s, position(), sub, program);
         report('start', s);
       } catch {
-        if (alive) setStatus('failed');
+        if (alive) fail();
       }
     })();
     return () => {
       alive = false;
       stopStream();
     };
-  }, [key, useOverlay]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [key, useOverlay, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Leaving the channels (or the page): everything stops.
   useEffect(() => {
@@ -338,6 +354,8 @@ export default function ChannelPlayer() {
   const container = useRef<HTMLDivElement>(null);
   const [showUi, setShowUi] = useState(true);
   const [menu, setMenu] = useState(false);
+  /** Every channel, with what's on: pick one. */
+  const [list, setList] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const poke = useCallback((ms = 3500) => {
@@ -350,7 +368,7 @@ export default function ChannelPlayer() {
   useEffect(() => {
     if (key) poke(6000);
   }, [key, poke]);
-  const uiVisible = showUi || menu || status === 'tap';
+  const uiVisible = showUi || menu || list || status === 'tap';
   useEffect(() => {
     if (useOverlay) overlay?.command('controls', uiVisible);
   }, [useOverlay, uiVisible, overlay]);
@@ -391,11 +409,6 @@ export default function ChannelPlayer() {
       .catch((e) => toast('error', (e as Error).message));
   };
 
-  const watchFromHere = () => {
-    if (!program) return;
-    navigate(`/watch/${program.itemId}?t=${Math.floor(position())}`);
-  };
-
   // Keys: up/down change channel, numbers jump, and the usual player keys.
   const digits = useRef('');
   const digitTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -406,6 +419,20 @@ export default function ChannelPlayer() {
       poke();
       if (e.defaultPrevented) return;
       const onControl = uiVisible && target?.closest?.('.channel__controls button');
+      // The channel list open: up and down move through it, Escape closes it.
+      if (list) {
+        const items = [...(container.current?.querySelectorAll<HTMLElement>('.channel__list button') ?? [])];
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setList(false);
+        } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          const i = items.indexOf(target?.closest?.('button') as HTMLElement);
+          const at = i < 0 ? items.findIndex((b) => b.classList.contains('is-on')) : i + (e.key === 'ArrowDown' ? 1 : -1);
+          items[Math.max(0, Math.min(items.length - 1, at))]?.focus();
+        }
+        return;
+      }
       if (/^[0-9]$/.test(e.key)) {
         digits.current = (digits.current + e.key).slice(-2);
         clearTimeout(digitTimer.current);
@@ -445,9 +472,11 @@ export default function ChannelPlayer() {
           break;
         }
         case 'Enter':
-          if (!onControl && isTV()) {
+          // A remote's OK: the list of channels, as on a TV.
+          if (!onControl) {
             e.preventDefault();
-            container.current?.querySelector<HTMLElement>('.channel__watch')?.focus();
+            setMenu(false);
+            setList(true);
           }
           break;
         case 'g':
@@ -512,6 +541,12 @@ export default function ChannelPlayer() {
   // A longer wait in the schedule (before the 9pm film): the sea, with what's coming, until the break itself.
   const gap = inBreak && Boolean(next) && next!.start - now > breakMs;
   const showSea = inBreak || status === 'ended' || status === 'failed';
+  // A click on the picture: the controls back, any open menu closed.
+  const onStage = () => {
+    poke();
+    setMenu(false);
+    setList(false);
+  };
   const left = program ? Math.max(0, Math.ceil((programEnd(program) - now) / 60_000)) : 0;
   const fraction = program ? Math.min(1, (now - program.start) / (program.seconds * 1000)) : 0;
   const breakStart = next ? next.start - breakMs : now;
@@ -526,9 +561,9 @@ export default function ChannelPlayer() {
       onTouchEnd={onTouchEnd}
     >
       {useOverlay ? (
-        <div className="player__surface" style={!pictureShown && program?.image ? { backgroundImage: `url(${program.image})` } : undefined} onClick={() => poke()} onDoubleClick={toggleFullscreen} />
+        <div className="player__surface" style={!pictureShown && program?.image ? { backgroundImage: `url(${program.image})` } : undefined} onClick={onStage} onDoubleClick={toggleFullscreen} />
       ) : (
-        <video ref={video} className="player__video" playsInline preload="auto" onClick={() => poke()} onDoubleClick={toggleFullscreen}
+        <video ref={video} className="player__video" playsInline preload="auto" onClick={onStage} onDoubleClick={toggleFullscreen}
           onPlaying={() => handlers.current.onPlaying()} onLoadedMetadata={() => handlers.current.onLoaded()} onEnded={() => handlers.current.onEnded()}
           onError={() => handlers.current.onError()} onVolumeChange={() => handlers.current.onVolumeChange()}>
           {subtitle?.vttUrl && <track key={subtitle.vttUrl} kind="subtitles" src={subtitle.vttUrl} srcLang={subtitle.code} label={subtitle.label} default />}
@@ -621,7 +656,7 @@ export default function ChannelPlayer() {
           </div>
           {session && (session.subtitleTracks.length > 0 || session.audioTracks.length > 1) && (
             <div className="player__menu-wrap">
-              <button className={`icon-btn${menu ? ' is-active' : ''}`} onClick={() => setMenu((m) => !m)} aria-label={t('Audio and subtitles')} aria-expanded={menu}>
+              <button className={`icon-btn${menu ? ' is-active' : ''}`} onClick={() => (setList(false), setMenu((m) => !m))} aria-label={t('Audio and subtitles')} aria-expanded={menu}>
                 <Captions size={24} />
               </button>
               {menu && (
@@ -644,17 +679,56 @@ export default function ChannelPlayer() {
               <Check size={16} /> {t('Keep')}
             </button>
           )}
-          {program && (
-            <button className="btn btn--ghost btn--sm channel__watch" onClick={watchFromHere} title={t('Leave the channel and keep watching, with pause')}>
-              <Play size={16} fill="currentColor" /> {t('Watch from here')}
-            </button>
-          )}
-          <div className="channel__ch" role="group" aria-label={t('Change channel')}>
-            <button className="icon-btn" onClick={() => step(1)} aria-label={t('Next channel')}>
+          <div className="channel__switch" role="group" aria-label={t('Change channel')}>
+            <button className="icon-btn" onClick={() => step(1)} aria-label={t('Next channel')} title={t('Next channel')}>
               <ChevronUp size={22} />
             </button>
-            <span>CH</span>
-            <button className="icon-btn" onClick={() => step(-1)} aria-label={t('Previous channel')}>
+            <div className="player__menu-wrap">
+              <button
+                className={`channel__current${list ? ' is-active' : ''}`}
+                onClick={() => {
+                  setMenu(false);
+                  setList((open) => !open);
+                }}
+                aria-expanded={list}
+                aria-label={t('All channels')}
+                title={t('All channels')}
+              >
+                <span className="channel__num">{channel.number}</span>
+                <span className="channel__current-name">{channel.name}</span>
+              </button>
+              {list && (
+                <div className="player__menu channel__list">
+                  {channels.map((c) => {
+                    const on = onNow(c, now);
+                    const shown = on.program ?? on.next;
+                    return (
+                      <button
+                        key={c.id}
+                        className={`player__opt channel__opt${c.number === channel.number ? ' is-on' : ''}`}
+                        onClick={() => {
+                          setList(false);
+                          goTo(c.number);
+                        }}
+                      >
+                        <span className="channel__num">{c.number}</span>
+                        <span className="channel__opt-text">
+                          <strong>{c.name}</strong>
+                          <span className="muted small">
+                            {shown ? programTitle(shown) : t('Nothing to play yet')}
+                            {shown?.isNew && <> <NewBadge /></>}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                  <button className="player__opt channel__opt-guide" onClick={() => navigate('/channels')}>
+                    <LayoutList size={16} /> {t('Channel guide')}
+                  </button>
+                </div>
+              )}
+            </div>
+            <button className="icon-btn" onClick={() => step(-1)} aria-label={t('Previous channel')} title={t('Previous channel')}>
               <ChevronDown size={22} />
             </button>
           </div>

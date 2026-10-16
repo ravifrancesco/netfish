@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Delete, Lock, Plus } from 'lucide-react';
 import type { DeviceProfile } from '@netfish/shared';
-import { api } from '../api';
+import { api, ApiError } from '../api';
 import { Mark, SwimmingFish } from './Logo';
 import { Img, Spinner } from './ui';
 import { t } from '../i18n';
@@ -37,7 +37,10 @@ export const Initial = ({ name }: { name: string }) => (
 
 export const useProfiles = () => useQuery({ queryKey: ['profiles'], queryFn: api.profiles, staleTime: 60_000 });
 
-function PinPad({ profile, onBack, onDone }: { profile: DeviceProfile; onBack: () => void; onDone: () => void }) {
+/** Their sign-in has run out (signed out elsewhere, a new password): a fresh one, then they're in. */
+const expired = (e: unknown) => e instanceof ApiError && e.status === 401;
+
+function PinPad({ profile, onBack, onDone, onSignIn }: { profile: DeviceProfile; onBack: () => void; onDone: () => void; onSignIn: (name: string) => void }) {
   const qc = useQueryClient();
   const [pin, setPin] = useState('');
   const go = useMutation({
@@ -47,7 +50,7 @@ function PinPad({ profile, onBack, onDone }: { profile: DeviceProfile; onBack: (
       qc.setQueryData(['me'], user);
       onDone();
     },
-    onError: () => setPin(''),
+    onError: (e) => (expired(e) ? onSignIn(profile.name) : setPin('')),
   });
   // Digits add up even when pressed quickly; the fourth one tries the PIN.
   const press = (digit: string) => setPin((p) => (p.length >= 4 ? p : p + digit));
@@ -101,7 +104,7 @@ function PinPad({ profile, onBack, onDone }: { profile: DeviceProfile; onBack: (
  * a device with two or more of them, when it's signed out but knows profiles, and from
  * the profile menu.
  */
-export function ProfilePicker({ onAdd, onPicked }: { onAdd: () => void; onPicked: () => void }) {
+export function ProfilePicker({ onAdd, onPicked, onSignIn }: { onAdd: () => void; onPicked: () => void; onSignIn: (name: string) => void }) {
   const qc = useQueryClient();
   const q = useProfiles();
   const [locked, setLocked] = useState<DeviceProfile>();
@@ -113,7 +116,7 @@ export function ProfilePicker({ onAdd, onPicked }: { onAdd: () => void; onPicked
       markPicked();
       onPicked();
     },
-    onError: () => void q.refetch(),
+    onError: (e, p) => (expired(e) ? onSignIn(p.name) : void q.refetch()),
   });
   const done = () => {
     markPicked();
@@ -121,7 +124,7 @@ export function ProfilePicker({ onAdd, onPicked }: { onAdd: () => void; onPicked
   };
 
   if (!q.data) return <div className="profiles"><SwimmingFish /></div>;
-  if (locked) return <div className="profiles"><PinPad profile={locked} onBack={() => setLocked(undefined)} onDone={done} /></div>;
+  if (locked) return <div className="profiles"><PinPad profile={locked} onBack={() => setLocked(undefined)} onDone={done} onSignIn={onSignIn} /></div>;
 
   return (
     <div className="profiles">
@@ -135,7 +138,12 @@ export function ProfilePicker({ onAdd, onPicked }: { onAdd: () => void; onPicked
             className={`profile-tile${p.current ? ' is-current' : ''}`}
             disabled={pick.isPending}
             autoFocus={i === 0}
-            onClick={() => (p.locked && !p.current ? setLocked(p) : p.current ? done() : pick.mutate(p))}
+            onClick={() => {
+              // Already this person (and signed in): on to Home. Otherwise switch (their PIN first).
+              if (p.current && qc.getQueryData(['me'])) done();
+              else if (p.locked) setLocked(p);
+              else pick.mutate(p);
+            }}
           >
             <Img
               src={p.avatar}

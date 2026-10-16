@@ -68,7 +68,11 @@ async function resolve(token: string): Promise<SessionUser | null> {
 }
 
 /** Who a sign-in belongs to, or null when Jellyfin no longer accepts it. */
-export const checkToken = (token: string) => resolve(token);
+export const checkToken = (token: string, fresh = false) => {
+  // `fresh`: asks Jellyfin now (switching to someone: their sign-in may have run out since).
+  if (fresh) sessions.delete(token);
+  return resolve(token);
+};
 
 export async function requireUser(req: FastifyRequest, reply: FastifyReply) {
   const token = tokenFrom(req);

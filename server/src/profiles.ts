@@ -122,13 +122,9 @@ export async function switchProfile(deviceId: string | undefined, userId: string
     }
     misses.delete(key);
   }
-  const user = await checkToken(profile.token);
-  if (!user) {
-    // Signed out elsewhere (or the password changed): this profile needs a fresh sign-in.
-    device.profiles = device.profiles.filter((p) => p.userId !== userId);
-    save();
-    throw new HttpError(401, t('Sign in to {name} again', { name: profile.name }));
-  }
+  const user = await checkToken(profile.token, true);
+  // Signed out elsewhere (or the password changed): the profile stays, and asks for a fresh sign-in.
+  if (!user) throw new HttpError(401, t('Sign in to {name} again', { name: profile.name }));
   profile.lastUsed = Date.now();
   device.seen = Date.now();
   save();

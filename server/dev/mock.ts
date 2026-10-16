@@ -225,6 +225,13 @@ function nextUpFor(userId: string, t: Title, opts: { resumable: boolean; firstEp
   return undefined;
 }
 
+// Tests only: one person signed out everywhere (as if from Jellyfin's Devices page).
+app.post<{ Params: { name: string } }>('/__test/expire/:name', async (req) => {
+  let ended = 0;
+  for (const [token, user] of [...sessions]) if (user.name === req.params.name) sessions.delete(token), ended++;
+  return { ended };
+});
+
 void app.register(
   async (jf) => {
     jf.post<{ Body: { Username: string; Pw: string } }>('/Users/AuthenticateByName', async (req, reply) => {

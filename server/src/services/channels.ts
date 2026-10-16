@@ -181,6 +181,8 @@ const keyOf = (item: JfItem) => {
 function toProgram(item: JfItem, seriesGenres: Map<string, string[]>, seriesKeys: Map<string, string | undefined>): Program | undefined {
   const seconds = Math.round(ticksToSeconds(item.RunTimeTicks));
   if (seconds < MIN_SECONDS || (item.Type !== 'Movie' && item.Type !== 'Episode')) return undefined;
+  // Episodes Jellyfin knows of but has no file for ("missing" ones): nothing to play.
+  if (item.LocationType === 'Virtual') return undefined;
   const episode = item.Type === 'Episode';
   const image = episode
     ? (jfImage(item.Id, 'Primary', item.ImageTags?.Primary, { maxWidth: 780 }) ??
@@ -217,7 +219,7 @@ async function fetchLibrary(user: SessionUser): Promise<Library> {
   const [movies, series, episodes] = await Promise.all([
     jellyfin.items(token, { ...common, includeItemTypes: 'Movie', fields: 'Genres,DateCreated,ProviderIds' }),
     jellyfin.items(token, { ...common, includeItemTypes: 'Series', fields: 'Genres,ProviderIds' }),
-    jellyfin.items(token, { ...common, includeItemTypes: 'Episode', fields: 'DateCreated' }),
+    jellyfin.items(token, { ...common, includeItemTypes: 'Episode', fields: 'DateCreated', isMissing: false }),
   ]);
   return libraryFrom(movies, series, episodes);
 }
