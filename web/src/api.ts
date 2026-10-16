@@ -153,7 +153,9 @@ export const api = {
   // Channels
   /** `from`: the guide looking ahead (up to three days). */
   channels: (hours = 4, from?: number) => call<ChannelsResponse>(`/channels?hours=${hours}${from ? `&from=${Math.round(from)}` : ''}`),
-  channelWatching: (id: string, clientId: string) => call<{ ok: true }>(`/channels/${enc(id)}/watching`, { body: { clientId } }),
+  /** This screen is on a channel (every half minute), or has just left it (`leaving`). */
+  channelWatching: (id: string, clientId: string, leaving = false) =>
+    call<{ ok: true }>(`/channels/${enc(id)}/watching`, { body: { clientId, ...(leaving ? { leaving } : {}) }, keepalive: leaving }),
   channelAdmin: () => call<ChannelAdmin>('/admin/channels'),
   saveChannels: (patch: Partial<ChannelSettings>) => call<ChannelAdmin>('/admin/channels', { method: 'PUT', body: patch }),
   resetChannels: () => call<ChannelAdmin>('/admin/channels/reset', { method: 'POST' }),

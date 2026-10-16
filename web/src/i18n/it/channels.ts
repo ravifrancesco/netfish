@@ -136,4 +136,5 @@ export default {
   Earlier: 'Prima',
   Later: 'Dopo',
   When: 'Quando',
+  'always channel 1': 'sempre il canale 1',
 } as Record<string, string>;

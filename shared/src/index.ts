@@ -858,6 +858,8 @@ export interface ChannelDef {
   hidden?: boolean;
   /** Brings in new titles for itself (Settings → Channels → New titles). */
   fresh?: boolean;
+  /** Netfish's own channel: always there, always channel 1, as it is. */
+  builtIn?: boolean;
 }
 
 /**

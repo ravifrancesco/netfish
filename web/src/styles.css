@@ -4445,11 +4445,71 @@ html.is-tv .guide__row:focus {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.guide__prog-title,
 .guide__prog-meta {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* Titles go onto two lines rather than being cut short. */
+.guide__prog-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: 1.15;
+}
+/* A short slot: the title is what matters (its time is where it sits). */
+.guide__prog.is-narrow {
+  padding: 6px 8px;
+}
+.guide__prog.is-narrow .guide__prog-title {
+  font-size: 0.8rem;
+}
+.guide__prog.is-narrow:not(.is-now) .guide__prog-meta {
+  display: none;
+}
+/* A short slot, hovered (or tapped where there's no hover): opened out over its neighbours to read it all. */
+.guide__prog.is-narrow:hover,
+.guide__prog.is-tiny:hover,
+.guide__prog.is-open {
+  z-index: 3;
+  width: max-content !important;
+  min-width: 140px;
+  max-width: 300px;
+  padding: 8px 12px;
+  border-width: 1px 1px 1px 3px;
+  background: var(--surface-2);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+}
+.guide__prog.is-end:is(.is-narrow:hover, .is-tiny:hover, .is-open) {
+  left: auto !important;
+  right: var(--right);
+}
+.guide__prog:is(.is-narrow:hover, .is-tiny:hover, .is-open) > * {
+  display: block;
+}
+.guide__prog:is(.is-narrow:hover, .is-tiny:hover, .is-open) .guide__prog-title {
+  display: -webkit-box;
+  font-size: 0.92rem;
+}
+.guide__prog:is(.is-narrow:hover, .is-tiny:hover, .is-open) .guide__prog-meta {
+  display: block;
+}
+.guide__prog:is(.is-narrow:hover, .is-tiny:hover, .is-open) .guide__prog-bar {
+  display: block;
+}
+/* The minute it is now, across the row. */
+.guide__nowline {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  z-index: 1;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: var(--accent);
+  pointer-events: none;
 }
 .guide__prog-title {
   font-weight: 700;
@@ -4541,6 +4601,19 @@ html.is-tv .guide__row:focus {
   }
   .guide__prog.is-tiny > * {
     display: block;
+  }
+  /* Here every slot is wide: all of it shows, and there's no time line to draw. */
+  .guide__prog.is-narrow {
+    padding: 8px 12px;
+  }
+  .guide__prog.is-narrow .guide__prog-title {
+    font-size: 0.92rem;
+  }
+  .guide__prog.is-narrow:not(.is-now) .guide__prog-meta {
+    display: block;
+  }
+  .guide__nowline {
+    display: none;
   }
 }
 
@@ -4848,15 +4921,6 @@ html.is-desktop.is-mac .channel__top {
   height: 100%;
   image-rendering: pixelated;
   pointer-events: none;
-  animation: cstatic-out 0.45s ease-in forwards;
-}
-@keyframes cstatic-out {
-  70% {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
 }
 
 /* ---------- The break between programmes ---------- */
@@ -5230,6 +5294,10 @@ html.is-desktop.is-mac .channel__top {
   display: grid;
   gap: 4px;
   min-width: 0;
+}
+.chanset__fixed {
+  padding: 8px 2px;
+  font-size: 1rem;
 }
 .chanset__name .input {
   max-width: 320px;

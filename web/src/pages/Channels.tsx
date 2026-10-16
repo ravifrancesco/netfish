@@ -18,6 +18,11 @@ import { locale, t, tn } from '../i18n';
 
 const SPAN = 3 * 3600_000;
 const HALF_HOUR = 30 * 60_000;
+/**
+ * Now, the guide starts at the half hour a little before (as TV guides do), with a line at the
+ * minute; what's on now fills from there, so one nearly over is still readable.
+ */
+const liveStart = (now: number) => Math.floor((now - 20 * 60_000) / HALF_HOUR) * HALF_HOUR;
 /** How far ahead the guide goes (the server's limit too). */
 const AHEAD = 3 * 24 * 3600_000;
 
@@ -30,18 +35,34 @@ function evening(now: number, days: number) {
 }
 const weekday = (at: number) => new Date(at).toLocaleDateString(locale, { weekday: 'long' });
 
-function Block({ program, from, until, now, index }: { program: ChannelProgram; from: number; until: number; now: number; index: number }) {
-  const start = Math.max(program.start, from);
-  const end = Math.min(programEnd(program), until);
+/**
+ * Tablets (the full grid, no hover): a first tap opens a short slot to read it, the next tunes
+ * in. Phones show now and next at full width, so there's nothing to open.
+ */
+const noHover = () => window.matchMedia?.('(hover: none) and (min-width: 641px)').matches;
+
+function Block({ program, from, until, now, live, index }: { program: ChannelProgram; from: number; until: number; now: number; live: boolean; index: number }) {
+  const [open, setOpen] = useState(false);
   const onNowBlock = program.start <= now && now < programEnd(program);
+  const start = onNowBlock && live ? from : Math.max(program.start, from);
+  const end = Math.min(programEnd(program), until);
   const left = Math.max(0, Math.ceil((programEnd(program) - now) / 60_000));
   const sub = episodeLine(program);
   const width = ((end - start) / SPAN) * 100;
+  const at = ((start - from) / SPAN) * 100;
+  // Too thin for a word (under ~10 minutes): blank until hovered. Short: a smaller title, no time.
+  const short = width < 5 && !onNowBlock ? ' is-tiny' : width < 11 ? ' is-narrow' : '';
   return (
     <span
-      className={`guide__prog${onNowBlock ? ' is-now' : ''}${index === 1 ? ' is-next' : index > 1 ? ' is-later' : ''}${width < 4 && !onNowBlock ? ' is-tiny' : ''}`}
-      style={{ left: `${((start - from) / SPAN) * 100}%`, width: `${width}%` }}
+      className={`guide__prog${onNowBlock ? ' is-now' : ''}${index === 1 ? ' is-next' : index > 1 ? ' is-later' : ''}${short}${at + width > 72 ? ' is-end' : ''}${open ? ' is-open' : ''}`}
+      style={{ left: `${at}%`, width: `${width}%`, ['--right' as string]: `${100 - at - width}%` }}
       title={programTitle(program)}
+      onClick={(e) => {
+        if (!short || open || !noHover()) return;
+        e.preventDefault();
+        setOpen(true);
+      }}
+      onMouseLeave={() => setOpen(false)}
     >
       <span className="guide__prog-title">
         {program.isNew && <><NewBadge /> </>}
@@ -60,9 +81,9 @@ function Block({ program, from, until, now, index }: { program: ChannelProgram; 
   );
 }
 
-function Row({ channel, from, now }: { channel: Channel; from: number; now: number }) {
+function Row({ channel, from, now, live }: { channel: Channel; from: number; now: number; live: boolean }) {
   const until = from + SPAN;
-  const shown = channel.programs.filter((p) => programEnd(p) > from && p.start < until);
+  const shown = channel.programs.filter((p) => programEnd(p) > (live ? now : from) && p.start < until);
   const on = onNow(channel, now);
   const label = on.program
     ? t('{channel}: {title}, on now', { channel: `${channel.number} ${channel.name}`, title: programTitle(on.program) })
@@ -78,7 +99,8 @@ function Row({ channel, from, now }: { channel: Channel; from: number; now: numb
           </span>
         </span>
         <span className="guide__line">
-          {shown.length ? shown.map((p, i) => <Block key={`${p.itemId}${p.start}`} program={p} from={from} until={until} now={now} index={i} />) : <span className="guide__empty muted small">{t('Nothing to play yet')}</span>}
+          {shown.length ? shown.map((p, i) => <Block key={`${p.itemId}${p.start}`} program={p} from={from} until={until} now={now} live={live} index={i} />) : <span className="guide__empty muted small">{t('Nothing to play yet')}</span>}
+          {live && <span className="guide__nowline" style={{ left: `${((now - from) / SPAN) * 100}%` }} aria-hidden="true" />}
         </span>
       </Link>
     </li>
@@ -102,7 +124,8 @@ export default function ChannelsPage() {
   if (live.isLoading) return <PageLoader />;
   if (q.isError) return <div className="page container"><ErrorState error={q.error} retry={() => void q.refetch()} /></div>;
   const channels = q.data?.channels ?? live.data?.channels ?? [];
-  const start = from ?? now;
+  const atNow = from === undefined;
+  const start = from ?? liveStart(now);
   const last = now + AHEAD - SPAN;
   const go = (at?: number) => setFrom(at === undefined || at <= now + 15 * 60_000 ? undefined : Math.min(at, last));
   // Straight to an evening: tonight (while it's still to come), tomorrow, the day after.
@@ -114,7 +137,10 @@ export default function ChannelsPage() {
   ];
   // Half-hour marks across the three hours shown.
   const ticks: number[] = [];
-  for (let at = Math.ceil((start + 1) / HALF_HOUR) * HALF_HOUR; at < start + SPAN; at += HALF_HOUR) ticks.push(at);
+  for (let at = Math.ceil(start / HALF_HOUR) * HALF_HOUR; at < start + SPAN; at += HALF_HOUR) {
+    // Not right under "Now".
+    if (!atNow || Math.abs(at - now) > SPAN * 0.06) ticks.push(at);
+  }
   return (
     <div className="page container guide">
       <h1 className="page__title">{t('Channels')}</h1>
@@ -149,9 +175,11 @@ export default function ChannelsPage() {
           <div className="guide__times" aria-hidden="true">
             <span className="guide__chan" />
             <span className="guide__line">
-              <span className="guide__tick is-now" style={{ left: 0 }}>
-                {from === undefined ? t('Now') : clockTime(start)}
-              </span>
+              {atNow && (
+                <span className="guide__tick is-now" style={{ left: `${((now - start) / SPAN) * 100}%` }}>
+                  {t('Now')}
+                </span>
+              )}
               {ticks.map((at) => (
                 <span key={at} className="guide__tick" style={{ left: `${((at - start) / SPAN) * 100}%` }}>
                   {clockTime(at)}
@@ -161,7 +189,7 @@ export default function ChannelsPage() {
           </div>
           <ul className={`guide__rows${ahead.isFetching && from !== undefined ? ' is-loading' : ''}`}>
             {channels.map((channel) => (
-              <Row key={channel.id} channel={channel} from={start} now={now} />
+              <Row key={channel.id} channel={channel} from={start} now={now} live={atNow} />
             ))}
           </ul>
         </>

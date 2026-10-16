@@ -167,17 +167,22 @@ export function ChannelSettings() {
               <li key={c.id} className={`chanset__row${c.hidden ? ' is-hidden' : ''}`}>
                 <span className="chanset__num">{c.number}</span>
                 <span className="chanset__name">
-                  <input
-                    className="input"
-                    defaultValue={c.name}
-                    maxLength={40}
-                    aria-label={t('Name of channel {n}', { n: c.number })}
-                    onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== c.name && setChannels(channels.map((x) => (x.id === c.id ? { ...x, name: e.target.value.trim() } : x)))}
-                    onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-                  />
+                  {c.builtIn ? (
+                    <strong className="chanset__fixed">{c.name}</strong>
+                  ) : (
+                    <input
+                      className="input"
+                      defaultValue={c.name}
+                      maxLength={40}
+                      aria-label={t('Name of channel {n}', { n: c.number })}
+                      onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== c.name && setChannels(channels.map((x) => (x.id === c.id ? { ...x, name: e.target.value.trim() } : x)))}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                    />
+                  )}
                   <span className="muted small">
                     {describe(c.source, data.genres.map((g) => g.name))}
                     {c.hidden ? ` · ${t('hidden')}` : ''}
+                    {c.builtIn ? ` · ${t('always channel 1')}` : ''}
                     {data.fresh?.enabled && c.fresh ? ` · ${t('new titles')}` : ''}
                   </span>
                 </span>
@@ -194,18 +199,23 @@ export function ChannelSettings() {
                       <Sparkles size={16} />
                     </button>
                   )}
-                  <button className="icon-btn icon-btn--sm" disabled={i === 0 || save.isPending} onClick={() => move(i, -1)} aria-label={t('Move up')}>
-                    <ArrowUp size={16} />
-                  </button>
-                  <button className="icon-btn icon-btn--sm" disabled={i === channels.length - 1 || save.isPending} onClick={() => move(i, 1)} aria-label={t('Move down')}>
-                    <ArrowDown size={16} />
-                  </button>
-                  <button className="icon-btn icon-btn--sm" disabled={save.isPending} onClick={() => setChannels(channels.map((x) => (x.id === c.id ? { ...x, hidden: !x.hidden } : x)))} aria-label={c.hidden ? t('Show') : t('Hide')}>
-                    {c.hidden ? <Eye size={16} /> : <EyeOff size={16} />}
-                  </button>
-                  <button className="icon-btn icon-btn--sm" disabled={save.isPending} onClick={() => setChannels(channels.filter((x) => x.id !== c.id))} aria-label={t('Remove {name}', { name: c.name })}>
-                    <Trash2 size={16} />
-                  </button>
+                  {/* Netfish's own channel stays as it is, first. */}
+                  {!c.builtIn && (
+                    <>
+                      <button className="icon-btn icon-btn--sm" disabled={i === 0 || (i === 1 && channels[0].builtIn) || save.isPending} onClick={() => move(i, -1)} aria-label={t('Move up')}>
+                        <ArrowUp size={16} />
+                      </button>
+                      <button className="icon-btn icon-btn--sm" disabled={i === channels.length - 1 || save.isPending} onClick={() => move(i, 1)} aria-label={t('Move down')}>
+                        <ArrowDown size={16} />
+                      </button>
+                      <button className="icon-btn icon-btn--sm" disabled={save.isPending} onClick={() => setChannels(channels.map((x) => (x.id === c.id ? { ...x, hidden: !x.hidden } : x)))} aria-label={c.hidden ? t('Show') : t('Hide')}>
+                        {c.hidden ? <Eye size={16} /> : <EyeOff size={16} />}
+                      </button>
+                      <button className="icon-btn icon-btn--sm" disabled={save.isPending} onClick={() => setChannels(channels.filter((x) => x.id !== c.id))} aria-label={t('Remove {name}', { name: c.name })}>
+                        <Trash2 size={16} />
+                      </button>
+                    </>
+                  )}
                 </span>
               </li>
             ))}

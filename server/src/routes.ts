@@ -420,8 +420,8 @@ export async function apiRoutes(app: FastifyInstance) {
     api.get<{ Querystring: { hours?: string; from?: string } }>('/channels', async (req) =>
       listChannels(userOf(req), Math.min(24, Number(req.query.hours) || 4), Date.now(), Number(req.query.from) || undefined),
     );
-    api.post<{ Params: { id: string }; Body: { clientId?: string } }>('/channels/:id/watching', async (req) => {
-      watching(clean(req.params.id, 40), clean(req.body?.clientId, 64));
+    api.post<{ Params: { id: string }; Body: { clientId?: string; leaving?: boolean } }>('/channels/:id/watching', async (req) => {
+      watching(clean(req.params.id, 40), clean(req.body?.clientId, 64), req.body?.leaving === true);
       return { ok: true };
     });
     // A new title on a channel: anyone can keep it (it joins the library).

@@ -201,14 +201,18 @@ export function ChannelBreak({ channel, next, breakStart, now, scene, filler, fa
   );
 }
 
-/** Switching channels: a moment of static, as on an old TV (tinted like the sea). */
-export function ChannelStatic({ onDone }: { onDone: () => void }) {
+/**
+ * Switching channels, and until the picture arrives: static, as on an old TV (tinted like the
+ * sea). It lasts as long as it's shown; `onDone` says the shortest flash of it is over.
+ */
+export function ChannelStatic({ onDone }: { onDone?: () => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     const c = canvas.current;
     const ctx = c?.getContext('2d');
     let frame = 0;
+    let flashed = false;
     const started = performance.now();
     const draw = () => {
       if (!c || !ctx) return;
@@ -221,13 +225,13 @@ export function ChannelStatic({ onDone }: { onDone: () => void }) {
         img.data[i + 3] = 255;
       }
       ctx.putImageData(img, 0, 0);
-      if (performance.now() - started < 420) frame = requestAnimationFrame(draw);
-      else onDone();
+      if (!flashed && performance.now() - started >= 420) {
+        flashed = true;
+        onDone?.();
+      }
+      // Moving noise (a still frame for reduced motion).
+      if (!reduced || !flashed) frame = requestAnimationFrame(draw);
     };
-    if (reduced) {
-      const timer = setTimeout(onDone, 150);
-      return () => clearTimeout(timer);
-    }
     draw();
     return () => cancelAnimationFrame(frame);
   }, [onDone]);

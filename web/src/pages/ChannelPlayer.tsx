@@ -57,7 +57,6 @@ export default function ChannelPlayer() {
   const programRef = useRef<ChannelProgram | undefined>(undefined);
   const [session, setSession] = useState<PlaybackSession>();
   const [status, setStatus] = useState<'loading' | 'playing' | 'ended' | 'failed' | 'tap'>('loading');
-  const [pictureShown, setPictureShown] = useState(false);
   const [subtitle, setSubtitle] = useState<StreamTrack>();
   const [audioIndex, setAudioIndex] = useState<number>();
   /** Subtitles chosen on this channel carry on to the next programme: a language, or off (null). */
@@ -132,7 +131,7 @@ export default function ChannelPlayer() {
   const handlers = useRef<Record<string, () => void>>({});
   handlers.current = {
     onPlaying: () => setStatus('playing'),
-    onLoaded: () => setPictureShown(true),
+    onLoaded: () => {},
     onEnded: () => setStatus('ended'),
     onError: () => {
       if (overlayVideo.current) {
@@ -198,7 +197,6 @@ export default function ChannelPlayer() {
     let alive = true;
     programRef.current = program;
     setStatus('loading');
-    setPictureShown(false);
     setSession(undefined);
     void (async () => {
       try {
@@ -314,6 +312,7 @@ export default function ChannelPlayer() {
 
   // "3 watching": this screen counts while it's on the channel.
   const channelId = channel?.id;
+  const qc = useQueryClient();
   useEffect(() => {
     if (!channelId) return;
     try {
@@ -324,8 +323,20 @@ export default function ChannelPlayer() {
     const say = () => void api.channelWatching(channelId, screenId()).catch(() => {});
     say();
     const timer = setInterval(say, 30_000);
-    return () => clearInterval(timer);
-  }, [channelId, number]);
+    // Gone (another channel, the guide, the app closed): not watching any more, straight away,
+    // and the guide's count is fetched again.
+    const leave = () =>
+      void api
+        .channelWatching(channelId, screenId(), true)
+        .catch(() => {})
+        .finally(() => void qc.invalidateQueries({ queryKey: ['channels'] }));
+    window.addEventListener('pagehide', leave);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('pagehide', leave);
+      leave();
+    };
+  }, [channelId, number]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------- changing channel ----------
 
@@ -393,7 +404,6 @@ export default function ChannelPlayer() {
     else navigate('/channels', { replace: true });
   }, [navigate]);
   // A new title on the channel: keeping it stops it being deleted after it airs (it joins the library).
-  const qc = useQueryClient();
   const toast = useToast();
   const [kept, setKept] = useState<string>();
   const keep = () => {
@@ -561,7 +571,7 @@ export default function ChannelPlayer() {
       onTouchEnd={onTouchEnd}
     >
       {useOverlay ? (
-        <div className="player__surface" style={!pictureShown && program?.image ? { backgroundImage: `url(${program.image})` } : undefined} onClick={onStage} onDoubleClick={toggleFullscreen} />
+        <div className="player__surface" onClick={onStage} onDoubleClick={toggleFullscreen} />
       ) : (
         <video ref={video} className="player__video" playsInline preload="auto" onClick={onStage} onDoubleClick={toggleFullscreen}
           onPlaying={() => handlers.current.onPlaying()} onLoadedMetadata={() => handlers.current.onLoaded()} onEnded={() => handlers.current.onEnded()}
@@ -583,11 +593,6 @@ export default function ChannelPlayer() {
           failed={!inBreak && status === 'failed'}
         />
       )}
-      {!showSea && status === 'loading' && (
-        <div className="player__center">
-          <SwimmingFish size={56} className="swimming-fish--player" />
-        </div>
-      )}
       {status === 'tap' && !showSea && (
         <div className="player__center">
           <button className="btn btn--primary btn--lg" onClick={() => void video.current?.play().then(() => setStatus('playing'))}>
@@ -595,7 +600,8 @@ export default function ChannelPlayer() {
           </button>
         </div>
       )}
-      {switching && <ChannelStatic onDone={doneSwitching} />}
+      {/* Changing channel, and until the picture comes: static (not a still of what's coming). */}
+      {(switching || (!showSea && status === 'loading')) && <ChannelStatic onDone={doneSwitching} />}
 
       {/* The last minutes of a programme: what's next, in the corner, like TV. */}
       {program && next && status === 'playing' && programEnd(program) - now <= 90_000 && (
