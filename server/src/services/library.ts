@@ -5,6 +5,7 @@ import { onConnectionChange } from '../connections';
 import { MINUTE, TTLCache } from '../lib/cache';
 import { warmImages } from '../lib/imageCache';
 import { jfPoster } from '../lib/images';
+import { freshHidden, onFreshChange } from './fresh';
 
 /**
  * A per-user map of what's in the library, keyed by TMDB/TVDB id. This is how
@@ -28,11 +29,43 @@ export interface LibraryIndex {
 }
 
 const indexes = new TTLCache<LibraryIndex>(200);
-onConnectionChange((id) => id === 'jellyfin' && indexes.clear());
+const shown = new TTLCache<LibraryIndex>(200);
+onConnectionChange((id) => id === 'jellyfin' && (indexes.clear(), shown.clear()));
+// A new title for channels kept by someone joins the library; one deleted leaves it.
+onFreshChange(() => shown.clear());
 
 const num = (v: string | undefined) => (v && /^\d+$/.test(v) ? Number(v) : undefined);
 
+/** The library as people see it: without the new titles brought in for channels (until someone keeps one). */
 export function libraryIndex(user: SessionUser): Promise<LibraryIndex> {
+  return shown.wrap(user.id, 2 * MINUTE, async () => {
+    const all = await everything(user);
+    const hidden = freshHidden();
+    if (!hidden.size) return all;
+    const index: LibraryIndex = { byKey: new Map(), byId: new Map(), byTvdb: new Map() };
+    for (const entry of all.byId.values()) {
+      if (entry.tmdbId && hidden.has(`${entry.mediaType}-${entry.tmdbId}`)) continue;
+      index.byId.set(entry.id, entry);
+      if (entry.tmdbId) index.byKey.set(`${entry.mediaType}-${entry.tmdbId}`, entry);
+      if (entry.tvdbId && entry.mediaType === 'tv') index.byTvdb.set(entry.tvdbId, entry);
+    }
+    return index;
+  });
+}
+
+/**
+ * Jellyfin's ids for the new titles brought in for channels, for leaving them out of lists
+ * (`excludeItemIds`). Undefined when there are none.
+ */
+export async function hiddenIds(user: SessionUser): Promise<string | undefined> {
+  const hidden = freshHidden();
+  if (!hidden.size) return undefined;
+  const all = await everything(user);
+  const ids = [...hidden].flatMap((key) => (all.byKey.has(key) ? [all.byKey.get(key)!.id] : []));
+  return ids.length ? ids.join(',') : undefined;
+}
+
+function everything(user: SessionUser): Promise<LibraryIndex> {
   return indexes.wrap(user.id, 2 * MINUTE, async () => {
     const res = await jellyfin.items(user.token, {
       userId: user.id,
@@ -72,4 +105,5 @@ export function findInLibrary(index: LibraryIndex, mediaType: MediaType, tmdbId?
 /** Call after something lands in the library so cards flip to "Play" quickly. */
 export function invalidateLibrary() {
   indexes.clear();
+  shown.clear();
 }

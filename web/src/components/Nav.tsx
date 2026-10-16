@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Activity, Clapperboard, Film, HardDriveDownload, House, LogOut, Search, Settings, Tv, Users, X } from 'lucide-react';
+import { Activity, Clapperboard, Film, HardDriveDownload, House, LogOut, RadioTower, Search, Settings, Tv, Users, X } from 'lucide-react';
 import type { User } from '@netfish/shared';
 import { api } from '../api';
 import { appKind, desktop } from '../lib/desktop';
@@ -138,10 +138,14 @@ const LINKS = [
   { to: '/movies', label: t('Movies'), icon: Film },
   { to: '/activity', label: t('Activity'), icon: Activity },
 ];
+const CHANNELS = { to: '/channels', label: t('Channels'), icon: RadioTower, end: false };
 
 export function Nav({ user }: { user: User }) {
   const [scrolled, setScrolled] = useState(false);
   const active = useActiveDownloads();
+  // Channels, when an admin has turned them on: in the top bar (phones find them on Home).
+  const channels = Boolean(useConfig().data?.features.channels);
+  const links = channels ? [...LINKS.slice(0, 3), CHANNELS, LINKS[3]] : LINKS;
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
     onScroll();
@@ -156,7 +160,7 @@ export function Nav({ user }: { user: User }) {
           <Logo />
         </Link>
         <nav className="nav__links">
-          {LINKS.map(({ to, label, end }) => (
+          {links.map(({ to, label, end }) => (
             <NavLink key={to} to={to} end={end} className="nav__link">
               {label}
               {to === '/activity' && active > 0 && <span className="nav__count">{active}</span>}

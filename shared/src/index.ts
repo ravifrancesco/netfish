@@ -33,6 +33,8 @@ export interface Features {
   versions: boolean;
   /** Fetch subtitles through Bazarr. */
   subtitles: boolean;
+  /** An admin turned Channels on. */
+  channels: boolean;
 }
 
 export interface AppConfig {
@@ -784,6 +786,8 @@ export interface ProgressReport {
   method: PlaybackSession['method'];
   audioStreamIndex?: number;
   subtitleStreamIndex?: number;
+  /** Watched on a channel (not someone choosing to watch it). */
+  channel?: boolean;
 }
 
 /** Everything the desktop app needs to save a movie/episode for offline viewing. */
@@ -823,4 +827,156 @@ export interface ServiceStatus {
 export interface ApiError {
   error: string;
   service?: string;
+}
+
+// ---------- Channels ----------
+
+/**
+ * What a channel plays:
+ * - mix: Netfish's own channel, a day like a TV network's (cartoons in the morning, sitcoms,
+ *   grown-up cartoons in the evening, a film at 9pm, late-night comedy, films overnight);
+ * - cartoons, sitcoms: those shows, a different one each time, each carrying on where it left off;
+ * - films: films of some genres (and none of `avoid`);
+ * - genre: films and/or episodes of one genre; series: one show in order;
+ * - recent: the newest films; shows: episodes of every show.
+ */
+export type ChannelSource =
+  | { kind: 'mix' }
+  | { kind: 'cartoons' }
+  | { kind: 'sitcoms' }
+  | { kind: 'films'; genres: string[]; avoid?: string[] }
+  | { kind: 'genre'; genre: string; movies: boolean; episodes: boolean }
+  | { kind: 'series'; seriesId: string; seriesName: string }
+  | { kind: 'recent' }
+  | { kind: 'shows' };
+
+export interface ChannelDef {
+  id: string;
+  number: number;
+  name: string;
+  source: ChannelSource;
+  hidden?: boolean;
+  /** Brings in new titles for itself (Settings → Channels → New titles). */
+  fresh?: boolean;
+}
+
+/**
+ * New titles for channels: Netfish picks films and first seasons for a channel and puts them in
+ * its guide (a week ahead), downloads each a few days before it airs (Radarr/Sonarr, tagged
+ * netfish-channel), keeps them out of everyone's library and Activity, then deletes them once
+ * aired. Never anything someone requested, kept or started watching.
+ */
+export interface FreshSettings {
+  enabled: boolean;
+  /** The most space they may take (GB), downloading ones included. */
+  maxGb: number;
+  /** Nothing new while the disk has less free than this (GB). */
+  minFreeGb: number;
+  /** Downloads only between these hours (0–23, the household's time); the same hour twice: any time. */
+  fromHour: number;
+  toHour: number;
+  /** Their download speed, at most (MB/s; 0: no limit). Needs qBittorrent. */
+  maxSpeed: number;
+  /** New titles a week for each channel, at most. */
+  perWeek: number;
+  /** How long before it airs each one is downloaded (days: 1, 3, 7), in case a download has trouble. */
+  aheadDays: number;
+  /** Radarr's and Sonarr's quality profiles for them (their first one otherwise). */
+  movieProfile?: number;
+  showProfile?: number;
+}
+
+/** planned: in the guide, not downloading yet. */
+export type FreshState = 'planned' | 'downloading' | 'ready' | 'aired' | 'kept';
+
+export interface FreshTitle {
+  key: string;
+  mediaType: MediaType;
+  tmdbId: number;
+  title: string;
+  year?: number;
+  poster?: string;
+  channelId: string;
+  state: FreshState;
+  /** Bytes on disk, or being downloaded. */
+  size: number;
+  /** While downloading (0–1). */
+  progress?: number;
+  /** Paused outside the download hours. */
+  paused?: boolean;
+  addedAt: string;
+  /** When it's on (first), and when its download starts. */
+  airAt?: string;
+  downloadAt?: string;
+  /** Who kept it, if someone did ("watched" when someone chose to watch it, "requested"). */
+  keptBy?: string;
+}
+
+/** Settings → Channels → New titles: what they take and where they are. */
+export interface FreshStatus {
+  usedBytes: number;
+  freeBytes?: number;
+  addedThisWeek: number;
+  /** Why nothing's being added right now. */
+  waiting?: 'off' | 'no-channels' | 'hours' | 'space' | 'disk' | 'week' | 'enough' | 'services';
+  titles: FreshTitle[];
+  /** What it can use: Radarr for films, Sonarr for shows, Seerr to find them, qBittorrent for hours and speed. */
+  services: { radarr: boolean; sonarr: boolean; seerr: boolean; qbittorrent: boolean };
+  profiles: { movie: Array<{ id: number; name: string }>; show: Array<{ id: number; name: string }> };
+}
+
+/** Settings → Channels (admins). */
+export interface ChannelSettings {
+  enabled: boolean;
+  /** Watching a channel counts like watching the film (Continue Watching, watched). Off: it leaves no trace. */
+  countWatched: boolean;
+  channels: ChannelDef[];
+  /** Where the household is (the admin's device's time zone): the 9pm film is at 9pm there. */
+  timeZone?: string;
+  fresh?: FreshSettings;
+}
+
+export interface ChannelAdmin extends ChannelSettings {
+  /** What there is to make channels from. */
+  genres: Array<{ name: string; movies: number; episodes: number }>;
+  series: Array<{ id: string; name: string; episodes: number }>;
+}
+
+export interface ChannelProgram {
+  itemId: string;
+  /** The film's title, or the episode's. */
+  title: string;
+  seriesTitle?: string;
+  seasonNumber?: number;
+  episodeNumber?: number;
+  year?: number;
+  /** PG-13, TV-14… */
+  rating?: string;
+  /** Landscape artwork. */
+  image?: string;
+  /** When it starts (ms since 1970). The break before it ends there. */
+  start: number;
+  seconds: number;
+  /** New on this channel: brought in for it, deleted after it airs (unless someone keeps it). */
+  isNew?: boolean;
+}
+
+export interface Channel {
+  id: string;
+  number: number;
+  name: string;
+  /** From the one on now, a few hours ahead. */
+  programs: ChannelProgram[];
+  /** Netfish screens on it right now. */
+  watching: number;
+}
+
+export interface ChannelsResponse {
+  /** The server's clock (ms), so every screen agrees on what's on. */
+  now: number;
+  /** The break between programmes (seconds), before each one starts. */
+  breakSeconds: number;
+  /** Watching counts like watching the film (otherwise Jellyfin isn't told). */
+  countWatched: boolean;
+  channels: Channel[];
 }

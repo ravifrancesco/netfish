@@ -12,6 +12,7 @@ import { desktop } from '../lib/desktop';
 import { buildDeviceProfile } from '../player/profile';
 import { OverlayVideo, trackPositions } from '../player/overlay';
 import { PlayerView, useVolume } from '../player/PlayerView';
+import { pickSubtitle } from '../player/tracks';
 import { explainReasons } from '../player/reasons';
 import { useTogether } from '../lib/together';
 import { TogetherChip, TogetherNotes, TogetherPanel } from '../components/Together';
@@ -23,16 +24,6 @@ import { t } from '../i18n';
 const REPORT_EVERY = 10;
 
 const absolute = (url: string) => new URL(url, location.origin).toString();
-
-/** The subtitle to start with: the server's pick, else forced ones, else your language if you want subtitles. */
-function pickSubtitle(s: PlaybackSession, current: StreamTrack | undefined, anyKind: boolean) {
-  const usable = (t: StreamTrack) => anyKind || Boolean(t.vttUrl);
-  if (current) return s.subtitleTracks.find((t) => t.index === current.index) ?? current;
-  const fromServer = s.subtitleTracks.find((t) => t.index === s.subtitleStreamIndex);
-  if (fromServer) return fromServer;
-  if (!getPrefs().subtitlesByDefault) return s.subtitleTracks.find((t) => t.forced && usable(t));
-  return s.subtitleTracks.find((t) => t.code === getPrefs().subtitleLanguage && !t.forced && usable(t));
-}
 
 interface LoadOptions {
   start: number;

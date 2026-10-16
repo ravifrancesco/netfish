@@ -274,6 +274,7 @@ void app.register(
       return reply.code(204).send();
     });
 
+    const endedEncodings: Array<{ deviceId: string; playSessionId: string }> = [];
     jf.get<{ Querystring: Q }>('/Items', async (req) => {
       const q = req.query;
       const userId = q.userId;
@@ -294,6 +295,7 @@ void app.register(
       if (userId && q.filters?.includes('IsUnplayed')) items = items.filter((i) => !(dto(i, userId).UserData as { Played?: boolean })?.Played);
       if (userId && q.filters?.includes('IsResumable')) items = items.filter((i) => i.kind !== 'series' && ud(userId, i.id).pos > 0 && !ud(userId, i.id).played);
       if (q.ids) items = items.filter((i) => q.ids!.split(',').includes(i.id));
+      if (q.excludeItemIds) items = items.filter((i) => !q.excludeItemIds!.split(',').includes(i.id));
       const sort = (q.sortBy ?? 'SortName').split(',')[0];
       const key = (i: Item): number | string => {
         switch (sort) {
@@ -459,6 +461,12 @@ void app.register(
     jf.post('/Sessions/Playing', report(false));
     jf.post('/Sessions/Playing/Progress', report(false));
     jf.post('/Sessions/Playing/Stopped', report(true));
+    // Channels end a programme's transcode without reporting a play; the mock just counts them.
+    jf.delete<{ Querystring: { deviceId?: string; playSessionId?: string } }>('/Videos/ActiveEncodings', async (req, reply) => {
+      endedEncodings.push({ deviceId: req.query.deviceId ?? '', playSessionId: req.query.playSessionId ?? '' });
+      return reply.code(204).send();
+    });
+    jf.get('/__test/ended-encodings', async () => endedEncodings);
     jf.post('/Items/:id/Refresh', async (_req, reply) => reply.code(204).send());
   },
   { prefix: '/jf' },
@@ -732,9 +740,9 @@ function queueRecords(type: 'movie' | 'tv') {
       const secondsLeft = Math.max(0, Math.round(((1 - progress) * d.durationMs) / 1000));
       const base = {
         size: d.size, sizeleft: left, timeleft: `00:${String(Math.floor(secondsLeft / 60)).padStart(2, '0')}:${String(secondsLeft % 60).padStart(2, '0')}`,
-        status: importing ? 'completed' : 'downloading', trackedDownloadStatus: d.stalledAt !== undefined ? 'warning' : 'ok',
+        status: d.stopped ? 'paused' : importing ? 'completed' : 'downloading', trackedDownloadStatus: d.stalledAt !== undefined && !d.stopped ? 'warning' : 'ok',
         trackedDownloadState: importing ? 'importing' : 'downloading',
-        statusMessages: d.stalledAt !== undefined ? [{ title: d.release, messages: ['The download is stalled with no connections'] }] : [],
+        statusMessages: d.stalledAt !== undefined && !d.stopped ? [{ title: d.release, messages: ['The download is stalled with no connections'] }] : [],
         downloadId: d.downloadId, protocol: 'torrent', title: d.release, quality: { quality: { name: d.quality } }, languages: langList(d.languages),
       };
       const t = d.title;
@@ -809,6 +817,28 @@ const seasonsDto = (t: Title) =>
       statistics: { episodeFileCount: has ? EPISODES_PER_SEASON : 0, episodeCount: EPISODES_PER_SEASON, totalEpisodeCount: EPISODES_PER_SEASON, sizeOnDisk: has ? fileSize(t, s) : 0 },
     };
   });
+/** Tags, like Radarr/Sonarr's (each has its own list), and which titles carry them. */
+const arrTags = { radarr: [] as Array<{ id: number; label: string }>, sonarr: [] as Array<{ id: number; label: string }> };
+const titleTags = new Map<string, number[]>();
+const PROFILES = [{ id: 1, name: 'Any' }, { id: 4, name: 'HD-1080p' }, { id: 6, name: 'HD-720p' }];
+/** Gone for good (deleteFiles): the title, its files, its download. */
+function forgetTitle(t: Title) {
+  arrKnown.delete(`${t.type}-${t.tmdbId}`);
+  titleTags.delete(`${t.type}-${t.tmdbId}`);
+  for (const key of [...unmonitored]) if (key === `${t.type}-${t.tmdbId}` || key.startsWith(`${t.type}-${t.tmdbId}-`)) unmonitored.delete(key);
+  for (const key of [...library]) if (key === `movie-${t.tmdbId}` || key.startsWith(`tv-${t.tmdbId}-`)) library.delete(key);
+  for (const d of downloads.filter((x) => x.title === t)) downloads.splice(downloads.indexOf(d), 1);
+}
+const tagRoutes = (r: import('fastify').FastifyInstance, service: 'radarr' | 'sonarr') => {
+  r.get('/tag', async () => arrTags[service]);
+  r.post<{ Body: { label: string } }>('/tag', async (req) => {
+    const tag = { id: arrTags[service].length + 1, label: String(req.body.label).toLowerCase() };
+    arrTags[service].push(tag);
+    return tag;
+  });
+  r.get('/qualityprofile', async () => PROFILES);
+};
+
 const fileDto = (t: Title, season?: number) => ({
   id: t.n * 100 + (season ?? 0), seasonNumber: season, size: fileSize(t, season), quality: { quality: { name: 'Bluray-1080p', resolution: 1080 } },
   languages: langList(audioOf(t).map((l) => ISO3_NAME[l] ?? 'English')), customFormatScore: 0,
@@ -819,13 +849,29 @@ void app.register(
     r.addHook('onRequest', arrAuth);
     r.get('/system/status', async () => ({ version: '6.0.4-mock', appName: 'Radarr' }));
     r.get('/queue', async () => ({ page: 1, totalRecords: 0, records: queueRecords('movie') }));
+    const movieDto = (t: Title) => ({
+      id: t.n, title: t.title, tmdbId: t.tmdbId, hasFile: inLibrary(t), images: [{ coverType: 'poster', remoteUrl: posterUrl(t) }],
+      movieFile: inLibrary(t) ? fileDto(t) : undefined, ...releaseOf(t), year: t.year,
+      monitored: !unmonitored.has(`movie-${t.tmdbId}`), sizeOnDisk: inLibrary(t) ? fileSize(t) : 0, tags: titleTags.get(`movie-${t.tmdbId}`) ?? [],
+    });
     r.get<{ Querystring: Q }>('/movie', async (req) =>
-      TITLES.filter((t) => t.type === 'movie' && managed(t) && (!req.query.tmdbId || t.tmdbId === Number(req.query.tmdbId))).map((t) => ({
-        id: t.n, title: t.title, tmdbId: t.tmdbId, hasFile: inLibrary(t), images: [{ coverType: 'poster', remoteUrl: posterUrl(t) }],
-        movieFile: inLibrary(t) ? fileDto(t) : undefined, ...releaseOf(t), year: t.year,
-        monitored: !unmonitored.has(`movie-${t.tmdbId}`), sizeOnDisk: inLibrary(t) ? fileSize(t) : 0,
-      })),
+      TITLES.filter((t) => t.type === 'movie' && managed(t) && (!req.query.tmdbId || t.tmdbId === Number(req.query.tmdbId))).map(movieDto),
     );
+    tagRoutes(r, 'radarr');
+    r.get<{ Querystring: Q }>('/movie/lookup/tmdb', async (req, reply) => {
+      const t = titleByTmdb.get(`movie-${req.query.tmdbId}`);
+      return t ? { title: t.title, tmdbId: t.tmdbId, year: t.year, images: [{ coverType: 'poster', remoteUrl: posterUrl(t) }] } : reply.code(404).send({ message: 'Movie not found' });
+    });
+    r.post<{ Body: { tmdbId: number; tags?: number[]; qualityProfileId?: number; rootFolderPath?: string; addOptions?: { searchForMovie?: boolean } } }>('/movie', async (req, reply) => {
+      const t = titleByTmdb.get(`movie-${req.body.tmdbId}`);
+      if (!t) return reply.code(400).send([{ errorMessage: 'Movie not found' }]);
+      if (managed(t)) return reply.code(400).send([{ propertyName: 'TmdbId', errorMessage: 'This movie has already been added' }]);
+      if (!req.body.qualityProfileId || !req.body.rootFolderPath) return reply.code(400).send([{ errorMessage: 'Quality profile and root folder are required' }]);
+      arrKnown.add(`movie-${t.tmdbId}`);
+      titleTags.set(`movie-${t.tmdbId}`, req.body.tags ?? []);
+      if (req.body.addOptions?.searchForMovie && isOut(t)) startDownload(t, { durationMs: 45_000 });
+      return reply.code(201).send(movieDto(t));
+    });
     r.get<{ Querystring: Q }>('/release', async (req) => {
       await sleep(1500);
       const t = TITLES.find((x) => x.type === 'movie' && x.n === Number(req.query.movieId));
@@ -853,9 +899,10 @@ void app.register(
       }
       return [];
     });
-    r.delete<{ Params: { id: string } }>('/movie/:id', async (req, reply) => {
+    r.delete<{ Params: { id: string }; Querystring: Q }>('/movie/:id', async (req, reply) => {
       const t = TITLES.find((x) => x.type === 'movie' && x.n === Number(req.params.id));
       if (!t) return reply.code(404).send();
+      if (req.query.deleteFiles === 'true') forgetTitle(t);
       arrKnown.delete(`movie-${t.tmdbId}`);
       unmonitored.delete(`movie-${t.tmdbId}`);
       return reply.code(200).send({});
@@ -893,12 +940,34 @@ void app.register(
     r.addHook('onRequest', arrAuth);
     r.get('/system/status', async () => ({ version: '4.0.15-mock', appName: 'Sonarr' }));
     r.get('/queue', async () => ({ page: 1, totalRecords: 0, records: queueRecords('tv') }));
+    const seriesDto = (t: Title) => ({
+      id: t.n, title: t.title, tvdbId: t.tvdbId, tmdbId: t.tmdbId, images: [{ coverType: 'poster', remoteUrl: posterUrl(t) }], ...releaseOf(t),
+      year: t.year, monitored: !unmonitored.has(`tv-${t.tmdbId}`), seasons: seasonsDto(t), tags: titleTags.get(`tv-${t.tmdbId}`) ?? [],
+      statistics: { sizeOnDisk: librarySeasons(t).reduce((n, s) => n + fileSize(t, s), 0), episodeFileCount: librarySeasons(t).length * EPISODES_PER_SEASON },
+    });
     r.get<{ Querystring: Q }>('/series', async (req) =>
-      TITLES.filter((t) => t.type === 'tv' && managed(t) && (!req.query.tvdbId || t.tvdbId === Number(req.query.tvdbId))).map((t) => ({
-        id: t.n, title: t.title, tvdbId: t.tvdbId, tmdbId: t.tmdbId, images: [{ coverType: 'poster', remoteUrl: posterUrl(t) }], ...releaseOf(t),
-        year: t.year, monitored: !unmonitored.has(`tv-${t.tmdbId}`), seasons: seasonsDto(t),
-        statistics: { sizeOnDisk: librarySeasons(t).reduce((n, s) => n + fileSize(t, s), 0), episodeFileCount: librarySeasons(t).length * EPISODES_PER_SEASON },
-      })),
+      TITLES.filter((t) => t.type === 'tv' && managed(t) && (!req.query.tvdbId || t.tvdbId === Number(req.query.tvdbId))).map(seriesDto),
+    );
+    tagRoutes(r, 'sonarr');
+    r.get<{ Querystring: Q }>('/series/lookup', async (req) => {
+      const tvdb = Number((req.query.term ?? '').replace(/^tvdb:/, ''));
+      const t = TITLES.find((x) => x.type === 'tv' && x.tvdbId === tvdb);
+      return t ? [{ title: t.title, tvdbId: t.tvdbId, tmdbId: t.tmdbId, year: t.year, seasons: Array.from({ length: t.seasons }, (_, i) => ({ seasonNumber: i + 1, monitored: true })) }] : [];
+    });
+    r.post<{ Body: { tvdbId: number; tags?: number[]; qualityProfileId?: number; rootFolderPath?: string; seasons?: Array<{ seasonNumber: number; monitored: boolean }>; addOptions?: { searchForMissingEpisodes?: boolean } } }>(
+      '/series',
+      async (req, reply) => {
+        const t = TITLES.find((x) => x.type === 'tv' && x.tvdbId === req.body.tvdbId);
+        if (!t) return reply.code(400).send([{ errorMessage: 'Series not found' }]);
+        if (managed(t)) return reply.code(400).send([{ propertyName: 'TvdbId', errorMessage: 'This series has already been added' }]);
+        if (!req.body.qualityProfileId || !req.body.rootFolderPath) return reply.code(400).send([{ errorMessage: 'Quality profile and root folder are required' }]);
+        arrKnown.add(`tv-${t.tmdbId}`);
+        titleTags.set(`tv-${t.tmdbId}`, req.body.tags ?? []);
+        const wanted = (req.body.seasons ?? []).filter((x) => x.monitored).map((x) => x.seasonNumber);
+        for (let season = 1; season <= t.seasons; season++) if (!wanted.includes(season)) unmonitored.add(`tv-${t.tmdbId}-${season}`);
+        if (req.body.addOptions?.searchForMissingEpisodes && isOut(t)) for (const season of wanted) startDownload(t, { season, durationMs: 50_000 });
+        return reply.code(201).send(seriesDto(t));
+      },
     );
     r.get<{ Querystring: Q }>('/episodefile', async (req) => {
       const t = TITLES.find((x) => x.type === 'tv' && x.n === Number(req.query.seriesId));
@@ -946,9 +1015,10 @@ void app.register(
       }
       return [];
     });
-    r.delete<{ Params: { id: string } }>('/series/:id', async (req, reply) => {
+    r.delete<{ Params: { id: string }; Querystring: Q }>('/series/:id', async (req, reply) => {
       const t = TITLES.find((x) => x.type === 'tv' && x.n === Number(req.params.id));
       if (!t) return reply.code(404).send();
+      if (req.query.deleteFiles === 'true') forgetTitle(t);
       arrKnown.delete(`tv-${t.tmdbId}`);
       for (const key of [...unmonitored]) if (key === `tv-${t.tmdbId}` || key.startsWith(`tv-${t.tmdbId}-`)) unmonitored.delete(key);
       return reply.code(200).send({});
@@ -1066,13 +1136,36 @@ void app.register(
         const progress = progressOf(d);
         const stalled = d.stalledAt !== undefined;
         return {
-          hash: d.downloadId.toLowerCase(), name: d.release, progress, num_seeds: stalled ? 0 : 23,
+          hash: d.downloadId.toLowerCase(), name: d.release, progress, num_seeds: stalled ? 0 : 23, dl_limit: d.limit ?? 0,
           dlspeed: stalled || progress >= 1 ? 0 : Math.round((d.size / (d.durationMs / 1000)) * (0.85 + Math.random() * 0.3)),
           eta: stalled ? 8_640_000 : Math.max(0, Math.round(((1 - progress) * d.durationMs) / 1000)),
-          state: stalled ? 'stalledDL' : progress >= 1 ? 'uploading' : 'downloading',
+          state: d.stopped ? 'stoppedDL' : stalled ? 'stalledDL' : progress >= 1 ? 'uploading' : 'downloading',
         };
       }),
     );
+    // Like qBittorrent 5 (4 said pause/resume): hashes separated by |.
+    const hashesOf = (body: unknown) => new Set(String(new URLSearchParams(String(body ?? '')).get('hashes') ?? '').toLowerCase().split('|'));
+    const formOf = (body: unknown) => new URLSearchParams(String(body ?? ''));
+    q.post('/torrents/stop', async (req) => {
+      const hashes = hashesOf(req.body);
+      for (const d of downloads) if (hashes.has(d.downloadId.toLowerCase()) && !d.stopped) Object.assign(d, { stalledAt: progressOf(d), stopped: true });
+      return 'Ok.';
+    });
+    q.post('/torrents/start', async (req) => {
+      const hashes = hashesOf(req.body);
+      for (const d of downloads) {
+        if (!hashes.has(d.downloadId.toLowerCase()) || !d.stopped) continue;
+        Object.assign(d, { startedAt: Date.now() - (d.stalledAt ?? 0) * d.durationMs, stalledAt: undefined, stopped: false });
+      }
+      return 'Ok.';
+    });
+    q.post('/torrents/setDownloadLimit', async (req) => {
+      const hashes = hashesOf(req.body);
+      const limit = Number(formOf(req.body).get('limit') ?? 0);
+      for (const d of downloads) if (hashes.has(d.downloadId.toLowerCase())) d.limit = limit;
+      return 'Ok.';
+    });
+    q.post('/torrents/bottomPrio', async () => 'Ok.');
   },
   { prefix: '/qbit/api/v2' },
 );

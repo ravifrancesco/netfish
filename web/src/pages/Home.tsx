@@ -12,6 +12,7 @@ import { useConfig, useMe } from '../lib/hooks';
 import { desktop } from '../lib/desktop';
 import { UpdateNudge } from '../components/AppUpdate';
 import { TogetherRow } from '../components/Together';
+import { ChannelsRow } from '../components/ChannelsRow';
 
 /** Admins: a nudge to finish connecting services until they're all there. */
 function SetupNudge() {
@@ -144,6 +145,7 @@ export default function Home() {
         <SetupNudge />
         <UpdateNudge />
         <TogetherRow />
+        <ChannelsRow />
         {rows.map((row) => (
           <Row key={row.id} row={row} />
         ))}

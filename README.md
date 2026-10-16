@@ -23,6 +23,8 @@ A Netflix-style front door for a home media server. One app to browse, discover,
 - **A real player:** plays the file as it is when it can; otherwise Jellyfin repackages it (cheap on a Pi) and only transcodes as a last resort. Audio and subtitle switching, resume, skip intro, next episode, keyboard shortcuts.
 - **Play on TV:** connect to the TV (or any device with Netfish open) with the cast button next to your profile picture, like YouTube; then Play plays there and your phone becomes the remote: pause, skip, audio and subtitles. A film you're already watching can be handed over mid-way.
 - **Watch together:** turn what you're watching into a room from the player (or from a title's **⋯** menu). Play, pause, skipping and the next episode stay in step on every device, and the room shows up for everyone on your server right away.
+- **Channels:** your library as TV, when an admin turns them on. Each channel plays around the clock and everyone on it sees the same minute; there's no pausing, a short fish-and-net break between programmes with a look at what's next, and a guide up to three days ahead. Netfish's own channel keeps a real timetable: cartoons in the morning, sitcoms in the afternoon, The Simpsons at half six, then a film at nine (a documentary on some nights).
+- **New on the channels (optional):** Netfish can bring in well-liked films and shows nobody here has for the channels you pick. They're in the guide a week ahead marked *New*, downloaded a few days before they air, and deleted afterwards unless someone presses **Keep**.
 - **Mark as watched:** a film, an episode or a whole season; take anything off *Continue Watching* with one click.
 - **Offline:** download movies and episodes in the Mac, Windows, iPhone/iPad and Android phone apps. Play then always uses the downloaded copy, and where you stop still counts on the server. When the server can't be reached, the apps switch to offline mode: your downloads first, the rest of your Home greyed out.
 
@@ -127,7 +129,7 @@ The apps show the interface from your server, so most new features arrive by upd
 
 **1. Portainer → Stacks → Add stack**, name it `netfish`, paste [`docker-compose.yml`](docker-compose.yml), and **Deploy**. No variables are needed: Portainer pulls the ready-made image `ghcr.io/ravifrancesco/netfish:latest` (built by GitHub for Raspberry Pi and PCs).
 
-**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.6.3`.
+**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.7.0`.
 
 <details>
 <summary>Or build the image on the Pi yourself</summary>
@@ -143,6 +145,7 @@ If Netfish ever points at the wrong Jellyfin and nobody can sign in, use **Chang
 ### Admin settings in the app
 
 - **Connections:** addresses and API keys of every service, with live status. Keys are stored on the server in a file only Netfish can read and are never sent back to browsers. Stack variables, if you set any, are just starting values.
+- **Channels:** turn them on (Netfish starts with a line-up made from the library), then rename, reorder, hide, remove or add channels (a genre, one show in order, the newest films…). **New titles:** pick the channels with ✨, then set the space they may take, how much disk to always leave free, the download hours, a speed limit (needs qBittorrent), how many per channel each week, and how far ahead to download (1 day to a week). They're added to Radarr/Sonarr tagged `netfish-channel`, kept out of everyone's library and Activity in Netfish (Jellyfin's own apps still show them), and never include anything someone requested.
 - **Downloads:** who can pick specific versions (everyone or admins), and max release size for movies and per episode. Releases over the limit are hidden in Versions and refused by the server, and season packs count per episode. Admins can still show and pick them. Automatic downloads from requests follow Radarr/Sonarr's own size settings.
 
 Everything is kept in `/docker-data-volumes/netfish-data` on the Pi (change the path in the stack if you keep container data elsewhere), so updates don't lose it. Netfish creates that folder and gives it to `PUID`/`PGID` (1000 by default) on startup.

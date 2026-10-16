@@ -89,6 +89,7 @@ export interface RadarrMovie {
   year?: number;
   monitored?: boolean;
   sizeOnDisk?: number;
+  tags?: number[];
 }
 
 export interface SonarrSeason {
@@ -141,7 +142,21 @@ export interface SonarrSeries {
   previousAiring?: string;
   nextAiring?: string;
   images?: ArrImage[];
+  tags?: number[];
 }
+
+export interface ArrTag {
+  id: number;
+  label: string;
+}
+
+export interface ArrProfile {
+  id: number;
+  name: string;
+}
+
+/** What Radarr/Sonarr's lookup returns: the title as they'd add it. */
+export type ArrLookup = Record<string, unknown> & { title: string; seasons?: Array<{ seasonNumber: number; monitored?: boolean }> };
 
 function arrRequest<T>(service: 'radarr' | 'sonarr', path: string, opts: RequestOptions = {}) {
   const name = service === 'radarr' ? 'Radarr' : 'Sonarr';
@@ -175,6 +190,14 @@ export const radarr = {
   search: (movieIds: number[]) => arrRequest<unknown>('radarr', '/command', { body: { name: 'MoviesSearch', movieIds } }),
   rootFolders: () => arrRequest<ArrRootFolder[]>('radarr', '/rootfolder'),
   diskSpace: () => arrRequest<ArrDisk[]>('radarr', '/diskspace'),
+  tags: () => arrRequest<ArrTag[]>('radarr', '/tag'),
+  addTag: (label: string) => arrRequest<ArrTag>('radarr', '/tag', { method: 'POST', body: { label } }),
+  qualityProfiles: () => arrRequest<ArrProfile[]>('radarr', '/qualityprofile'),
+  lookup: (tmdbId: number) => arrRequest<ArrLookup>('radarr', '/movie/lookup/tmdb', { query: { tmdbId }, timeoutMs: 30_000 }),
+  add: (movie: ArrLookup) => arrRequest<RadarrMovie>('radarr', '/movie', { method: 'POST', body: movie, timeoutMs: 30_000 }),
+  /** Gone for good: the movie and its files. */
+  remove: (movieId: number) =>
+    arrRequest<void>('radarr', `/movie/${movieId}`, { method: 'DELETE', query: { deleteFiles: true, addImportExclusion: false } }),
 };
 
 export const sonarr = {
@@ -209,6 +232,16 @@ export const sonarr = {
     arrRequest<unknown>('sonarr', '/command', { body: { name: 'SeasonSearch', seriesId, seasonNumber } }),
   rootFolders: () => arrRequest<ArrRootFolder[]>('sonarr', '/rootfolder'),
   diskSpace: () => arrRequest<ArrDisk[]>('sonarr', '/diskspace'),
+  tags: () => arrRequest<ArrTag[]>('sonarr', '/tag'),
+  addTag: (label: string) => arrRequest<ArrTag>('sonarr', '/tag', { method: 'POST', body: { label } }),
+  qualityProfiles: () => arrRequest<ArrProfile[]>('sonarr', '/qualityprofile'),
+  /** Sonarr 3 needs one when adding a show; Sonarr 4 has none. */
+  languageProfiles: () => arrRequest<ArrProfile[]>('sonarr', '/languageprofile'),
+  lookup: (tvdbId: number) => arrRequest<ArrLookup[]>('sonarr', '/series/lookup', { query: { term: `tvdb:${tvdbId}` }, timeoutMs: 30_000 }),
+  add: (series: ArrLookup) => arrRequest<SonarrSeries>('sonarr', '/series', { method: 'POST', body: series, timeoutMs: 30_000 }),
+  /** Gone for good: the show and its files. */
+  remove: (seriesId: number) =>
+    arrRequest<void>('sonarr', `/series/${seriesId}`, { method: 'DELETE', query: { deleteFiles: true, addImportListExclusion: false } }),
 };
 
 export const posterOf = (images?: ArrImage[]) => images?.find((i) => i.coverType === 'poster')?.remoteUrl;

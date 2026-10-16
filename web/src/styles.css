@@ -637,9 +637,20 @@ p {
   flex: none;
 }
 .fish-pair__fish {
+  fill: currentColor;
+  stroke: currentColor;
+}
+.fish-pair__fish.is-back {
+  opacity: 0.55;
+}
+.fish-pair__halo {
+  fill: var(--bg);
+  stroke: var(--bg);
+}
+.fish-pair__swim {
   animation: fish-bob 2.6s ease-in-out infinite;
 }
-.fish-pair g:nth-child(2) .fish-pair__fish {
+.fish-pair__swim.is-front {
   animation-delay: -1.3s;
 }
 .fish-pair__tail {
@@ -4311,5 +4322,1008 @@ html.is-tv .round-btn[data-tip]:focus::after {
 @media (prefers-reduced-motion: reduce) {
   .round-btn__splash {
     display: none;
+  }
+}
+
+/* ==========================================================================
+   Channels: the library as TV
+   ========================================================================== */
+
+/* ---------- The guide ---------- */
+.guide__intro {
+  margin: -8px 0 22px;
+  max-width: 720px;
+}
+.guide__times,
+.guide__row {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) 1fr;
+  gap: 12px;
+  align-items: stretch;
+}
+.guide__times {
+  position: sticky;
+  top: var(--nav-h);
+  z-index: 2;
+  padding: 6px 0;
+  background: var(--bg);
+}
+.guide__times .guide__line {
+  position: relative;
+  height: 20px;
+}
+.guide__tick {
+  position: absolute;
+  top: 0;
+  padding-left: 6px;
+  border-left: 1px solid var(--line-2);
+  color: var(--text-3);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.guide__tick.is-now {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+}
+.guide__rows {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.guide__row {
+  padding: 4px 0;
+  border-radius: var(--radius);
+}
+.guide__chan {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.guide__num {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--accent);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.guide__name {
+  display: grid;
+  min-width: 0;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.guide__watching {
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.guide__line {
+  position: relative;
+  height: 66px;
+}
+.guide__prog {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.guide__prog + .guide__prog {
+  margin-left: 4px;
+}
+.guide__prog.is-now {
+  background: var(--surface-2);
+  border-left-color: var(--accent);
+}
+.guide__row:hover .guide__prog.is-now,
+.guide__row:focus-visible .guide__prog.is-now,
+html.is-tv .guide__row:focus .guide__prog.is-now {
+  border-color: var(--accent);
+  background: rgba(54, 226, 198, 0.12);
+}
+.guide__row:focus-visible,
+html.is-tv .guide__row:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.guide__prog-title,
+.guide__prog-meta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.guide__prog-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+.guide__prog-meta {
+  color: var(--text-3);
+  font-size: 0.78rem;
+}
+.guide__prog.is-tiny {
+  padding: 0;
+  border-left-width: 1px;
+}
+.guide__prog.is-tiny > * {
+  display: none;
+}
+.guide__prog-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.guide__prog-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.guide__empty {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+/* Looking ahead: earlier, later, straight to an evening. */
+.guide__when {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.guide__when .tab {
+  text-transform: capitalize;
+}
+.guide__span {
+  margin-left: 4px;
+  text-transform: capitalize;
+}
+.guide__rows.is-loading {
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+/* Phones: what's on now, and next. */
+@media (max-width: 640px) {
+  .guide__times {
+    display: none;
+  }
+  .guide__row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .guide__line {
+    display: flex;
+    gap: 6px;
+    height: auto;
+  }
+  .guide__prog {
+    position: static;
+    flex: 1 1 0;
+    width: auto !important;
+    min-height: 58px;
+  }
+  .guide__prog + .guide__prog {
+    margin-left: 0;
+  }
+  .guide__prog.is-now {
+    flex-grow: 1.8;
+  }
+  .guide__prog.is-later {
+    display: none;
+  }
+  /* A short one next is as wide as any other here. */
+  .guide__prog.is-tiny {
+    padding: 8px 12px;
+    border-left-width: 3px;
+  }
+  .guide__prog.is-tiny > * {
+    display: block;
+  }
+}
+
+/* ---------- Home: on now ---------- */
+.row__title-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.row__title-link svg {
+  color: var(--accent);
+}
+.channel-card__bug {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px 3px 3px;
+  border-radius: 7px;
+  background: rgba(6, 8, 11, 0.78);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.channel-card__bug .channel__num {
+  min-width: 22px;
+  height: 22px;
+  font-size: 0.75rem;
+  border-radius: 5px;
+}
+
+/* ---------- The channel player ---------- */
+.channel__num {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+/* The channel's mark in the corner, like a broadcaster's. */
+.channel__bug {
+  position: absolute;
+  top: max(18px, var(--safe-top));
+  right: max(clamp(16px, 3vw, 40px), env(safe-area-inset-right, 0px));
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 12px 5px 5px;
+  border-radius: 10px;
+  border: 1px solid rgba(54, 226, 198, 0.35);
+  background: rgba(6, 8, 11, 0.5);
+  color: var(--accent);
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  pointer-events: none;
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+.channel.show-ui .channel__bug {
+  opacity: 0.95;
+}
+.channel__top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  padding: max(18px, var(--safe-top)) 0 0 max(clamp(16px, 3vw, 40px), env(safe-area-inset-left, 0px));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+html.is-desktop.is-mac .channel__top {
+  padding-left: 92px;
+}
+.channel__bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px 28px;
+  padding: 90px max(clamp(16px, 3vw, 40px), env(safe-area-inset-right, 0px)) max(22px, env(safe-area-inset-bottom, 0px)) max(clamp(16px, 3vw, 40px), env(safe-area-inset-left, 0px));
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.88), transparent);
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.channel.show-ui .channel__top,
+.channel.show-ui .channel__bottom {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.channel__info {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  max-width: 640px;
+}
+.channel__on {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.channel__title {
+  font-size: clamp(1.4rem, 2.6vw, 2.2rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+.channel__meta {
+  color: var(--text-2);
+}
+.channel__progress {
+  max-width: 420px;
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+.channel__progress > div {
+  height: 100%;
+  background: var(--accent);
+}
+.channel__next {
+  color: var(--text-3);
+  font-size: 0.9rem;
+}
+.channel__controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.channel__watch {
+  margin-left: 4px;
+  white-space: nowrap;
+}
+/* Channel up and down, as on a remote. */
+.channel__ch {
+  display: grid;
+  justify-items: center;
+  margin-left: 8px;
+  padding: 2px;
+  border-radius: 999px;
+  border: 2px solid var(--accent);
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.channel__ch .icon-btn {
+  width: 38px;
+  height: 30px;
+  color: var(--accent);
+}
+.channel--missing .player__center {
+  gap: 16px;
+  text-align: center;
+}
+/* "Next": the last minutes of a programme, in the corner (the controls say it too, so it steps aside for them). */
+.channel__upnext {
+  position: absolute;
+  right: max(clamp(16px, 3vw, 40px), env(safe-area-inset-right, 0px));
+  bottom: max(26px, env(safe-area-inset-bottom, 0px));
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(460px, 82vw);
+  padding: 8px 16px 8px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--line-2);
+  background: rgba(6, 8, 11, 0.82);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+  animation: upnext-in 0.6s var(--ease) both;
+  transition: opacity 0.3s ease;
+}
+.channel.show-ui .channel__upnext {
+  opacity: 0;
+}
+.channel__upnext img {
+  flex: none;
+  width: 128px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.channel__upnext-text {
+  display: grid;
+  min-width: 0;
+}
+.channel__upnext-text > span {
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.channel__upnext-text > strong {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@keyframes upnext-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+@media (max-width: 640px) {
+  .channel__controls {
+    flex-wrap: wrap;
+  }
+  .channel__upnext img {
+    width: 88px;
+  }
+}
+
+/* Switching channel: a moment of static. */
+.cstatic {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  pointer-events: none;
+  animation: cstatic-out 0.45s ease-in forwards;
+}
+@keyframes cstatic-out {
+  70% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* ---------- The break between programmes ---------- */
+.cbreak {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  color: var(--text);
+}
+.cbreak__sea {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 125%, #106058 0%, #0a3330 32%, #061418 70%, #04090c 100%);
+}
+/* Light from above, slowly moving. */
+.cbreak__sea::after {
+  content: '';
+  position: absolute;
+  inset: -20% -40%;
+  background: repeating-linear-gradient(100deg, rgba(140, 248, 230, 0.05) 0 60px, transparent 60px 190px);
+  animation: cb-rays 16s linear infinite;
+}
+@keyframes cb-rays {
+  to {
+    transform: translateX(190px);
+  }
+}
+.cbreak__art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* The net draws itself, then lets the fish through. */
+.cbreak__net line {
+  stroke: rgba(140, 248, 230, 0.32);
+  stroke-width: 0.35;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: cb-draw 1.4s ease-out forwards;
+  animation-delay: calc(var(--i) * 0.035s + var(--elapsed, 0s));
+}
+.cbreak__net {
+  animation: cb-net-out 1.2s ease-in forwards;
+  animation-delay: calc(3s + var(--elapsed, 0s));
+}
+@keyframes cb-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes cb-net-out {
+  to {
+    opacity: 0;
+    transform: scale(1.15);
+  }
+}
+.cbreak__net {
+  transform-origin: 80px 45px;
+}
+/* The fish: the first four seconds, centre stage (through the net, among the bubbles), then away before what's next. */
+.cbreak__fish {
+  transform: translate(-40px, 42px);
+  animation: cb-cross 4.4s cubic-bezier(0.45, 0, 0.3, 1) forwards;
+  animation-delay: var(--elapsed, 0s);
+}
+.cbreak--bubbles .cbreak__fish {
+  animation-name: cb-hover;
+}
+.cbreak--filler .cbreak__fish {
+  animation: cb-wander 20s ease-in-out infinite;
+}
+@keyframes cb-cross {
+  from {
+    transform: translate(-40px, 42px);
+  }
+  40% {
+    transform: translate(78px, 40px);
+  }
+  62% {
+    transform: translate(86px, 39px);
+  }
+  to {
+    transform: translate(200px, 24px);
+  }
+}
+@keyframes cb-hover {
+  from {
+    transform: translate(80px, 110px);
+  }
+  30%,
+  70% {
+    transform: translate(80px, 40px);
+  }
+  to {
+    transform: translate(80px, -40px);
+  }
+}
+/* Waiting (before the 9pm film, or after a programme ended early): the fish idles about. */
+@keyframes cb-wander {
+  from,
+  to {
+    transform: translate(-40px, 30px);
+  }
+  50% {
+    transform: translate(200px, 52px);
+  }
+}
+.cbreak__tail {
+  transform-box: fill-box;
+  transform-origin: 100% 50%;
+  animation: fish-wag 0.6s ease-in-out infinite alternate;
+}
+.cbreak__bubbles circle {
+  fill: none;
+  stroke: rgba(140, 248, 230, 0.32);
+  stroke-width: 0.4;
+  animation: cb-rise var(--dur) linear infinite;
+  animation-delay: calc(var(--d) + var(--elapsed, 0s));
+}
+.cbreak__bubbles:not(.is-many) circle:nth-child(2n) {
+  display: none;
+}
+.cbreak__bubbles.is-many circle {
+  stroke: rgba(140, 248, 230, 0.5);
+  stroke-width: 0.45;
+}
+@keyframes cb-rise {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-110px);
+  }
+}
+.cbreak__shoal {
+  transform: translate(-40px, 46px);
+  animation: cb-shoal 4.6s linear forwards;
+  animation-delay: var(--elapsed, 0s);
+}
+@keyframes cb-shoal {
+  from {
+    transform: translate(-40px, 46px);
+  }
+  to {
+    transform: translate(230px, 38px);
+  }
+}
+.cbreak__swimmer {
+  animation: fish-bob 1.6s ease-in-out infinite;
+  animation-delay: var(--d);
+}
+/* The first seconds: Netfish, and the channel. */
+.cbreak__ident {
+  position: absolute;
+  top: 66%;
+  left: 0;
+  right: 0;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  font-size: clamp(1.6rem, 4vw, 3rem);
+  letter-spacing: -0.035em;
+  opacity: 0;
+  animation: cb-ident 4.2s ease forwards;
+  animation-delay: var(--elapsed, 0s);
+}
+.cbreak__ident .wordmark {
+  font-size: 1em;
+}
+.cbreak__ident .channel__num {
+  min-width: 1.45em;
+  height: 1.45em;
+  padding: 0 0.3em;
+  border-radius: 0.3em;
+  font-size: 0.8em;
+  letter-spacing: 0;
+}
+.cbreak__ident > span:last-child {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  font-size: 0.42em;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+}
+@keyframes cb-ident {
+  10%,
+  80% {
+    opacity: 1;
+    transform: none;
+  }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+/* Then: what's next, with a look at it. */
+.cbreak__card {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(18px, 3vw, 40px);
+  width: min(1100px, 88vw);
+  opacity: 0;
+  animation: cb-card-in 0.8s var(--ease) forwards;
+  animation-delay: calc(4s + var(--elapsed, 0s));
+}
+.cbreak--filler .cbreak__card {
+  animation-delay: 0s;
+}
+@keyframes cb-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.cbreak__preview {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(140, 248, 230, 0.18);
+}
+.cbreak__preview video,
+.cbreak__preview img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* No clip: the artwork, slowly drifting. */
+.cbreak__preview img {
+  animation: cb-drift 14s ease-out both;
+}
+@keyframes cb-drift {
+  from {
+    transform: scale(1.02);
+  }
+  to {
+    transform: scale(1.12) translate(-1.5%, -1%);
+  }
+}
+.cbreak__text {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.cbreak__label {
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.cbreak__title {
+  font-size: clamp(1.5rem, 3.2vw, 2.6rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.cbreak__meta {
+  color: var(--text-2);
+}
+.cbreak__in {
+  margin-top: 6px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 700px) {
+  .cbreak__card {
+    grid-template-columns: 1fr;
+    width: 86vw;
+  }
+}
+/* Short screens (a phone on its side): a smaller card. */
+@media (max-height: 560px) {
+  .cbreak__card {
+    width: min(88vw, 150vh);
+  }
+  .cbreak__label {
+    font-size: 0.7rem;
+  }
+}
+/* Phones: with the controls up, the channel's own panel says what's next, so the card steps aside. */
+@media (max-width: 700px), (max-height: 560px) {
+  .cbreak__card > * {
+    transition: opacity 0.3s ease;
+  }
+  .channel.show-ui .cbreak__card > * {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cbreak *,
+  .cbreak__sea::after,
+  .cstatic,
+  .channel__upnext {
+    animation: none !important;
+  }
+  .cbreak__card {
+    opacity: 1;
+  }
+  .cbreak__ident,
+  .cbreak__fish,
+  .cbreak__shoal {
+    display: none;
+  }
+  .cbreak__net line {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ---------- Settings → Channels ---------- */
+.chanset {
+  display: grid;
+  gap: 16px;
+}
+.chanset__about {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.chanset__list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chanset__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.chanset__row.is-hidden {
+  opacity: 0.55;
+}
+.chanset__num {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  min-width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--accent);
+  font-weight: 800;
+}
+.chanset__name {
+  flex: 1;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.chanset__name .input {
+  max-width: 320px;
+  height: 36px;
+}
+.chanset__actions {
+  display: flex;
+  gap: 2px;
+}
+.chanset__add h3 {
+  margin: 4px 0 10px;
+  font-size: 0.95rem;
+}
+.chanset__fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.chanset__fields .input {
+  width: 200px;
+}
+.cbreak__preview img {
+  transition: opacity 0.6s ease;
+}
+
+/* ---------- New titles on channels ---------- */
+.new-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 1.45em;
+  padding: 0 0.45em;
+  border-radius: 4px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 0.62em;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  vertical-align: 0.2em;
+  white-space: nowrap;
+}
+.guide__prog-title .new-badge {
+  font-size: 0.7em;
+  vertical-align: 0.1em;
+  margin-right: 2px;
+}
+.channel__keep {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.chanset__fresh.is-on {
+  color: var(--accent);
+  background: rgba(54, 226, 198, 0.14);
+}
+.fresh {
+  display: grid;
+  gap: 14px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.fresh__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 14px 18px;
+}
+.fresh__field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  align-content: start;
+  min-width: 0;
+}
+.fresh__field > span:first-child {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.fresh__input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fresh__input .input {
+  width: 96px;
+}
+.fresh__input .select {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-left: 12px;
+  padding-right: 28px;
+  background-position: right 10px center;
+}
+.fresh__status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.fresh__list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.fresh__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--surface);
+}
+.fresh__item img,
+.fresh__poster {
+  flex: none;
+  width: 42px;
+  aspect-ratio: 2 / 3;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+.fresh__text {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.fresh__text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fresh__state {
+  color: var(--text-2);
+}
+.fresh__item.is-downloading .fresh__state,
+.fresh__item.is-ready .fresh__state {
+  color: var(--accent);
+}
+.fresh__item.is-aired {
+  opacity: 0.6;
+}
+.fresh__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+@media (max-width: 640px) {
+  .fresh__item {
+    flex-wrap: wrap;
+  }
+  .fresh__actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 }

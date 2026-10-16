@@ -8,6 +8,7 @@ import { jellyfin, type JfItem } from '../clients/jellyfin';
 import { mapLimit, settle } from '../lib/async';
 import { MINUTE, TTLCache } from '../lib/cache';
 import { writeJson } from '../lib/storage';
+import { freshHidden } from './fresh';
 
 /**
  * What could go to free space, from Radarr/Sonarr's sizes and everyone's viewing in
@@ -118,15 +119,17 @@ export function cleanupSuggestions(admin: SessionUser): Promise<CleanupSuggestio
     };
 
     const out: CleanupSuggestion[] = [];
+    // New titles for channels go by themselves once they've aired.
+    const fresh = freshHidden();
     for (const m of movies) {
-      if (!m.sizeOnDisk || !m.tmdbId) continue;
+      if (!m.sizeOnDisk || !m.tmdbId || fresh.has(`movie-${m.tmdbId}`)) continue;
       const key = `movie-${m.tmdbId}`;
       const verdict = kept[key] ? undefined : judge(byKey.get(key));
       if (verdict) out.push({ key, mediaType: 'movie' as MediaType, tmdbId: m.tmdbId, title: m.title, year: m.year, poster: small(posterOf(m.images)), size: m.sizeOnDisk, ...verdict });
     }
     for (const s of series) {
       const size = s.statistics?.sizeOnDisk ?? 0;
-      if (!size || !s.tmdbId) continue;
+      if (!size || !s.tmdbId || fresh.has(`tv-${s.tmdbId}`)) continue;
       const key = `tv-${s.tmdbId}`;
       const verdict = kept[key] ? undefined : judge(byKey.get(key) ?? byKey.get(`tvdb-${s.tvdbId}`));
       if (verdict) out.push({ key, mediaType: 'tv', tmdbId: s.tmdbId, title: s.title, year: s.year, poster: small(posterOf(s.images)), size, ...verdict });

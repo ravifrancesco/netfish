@@ -50,6 +50,8 @@ import { hideFromContinue, setPosition, setWatched } from './services/watched';
 import { readyToWatch } from './services/ready';
 import { command, control, createRoom, endRoom, getRoom, leave, listRooms, openStream, setTracks, setWaiting } from './services/together';
 import { listDevices, listScreens, openLive, playOn } from './services/screens';
+import { channelAdmin, channelsEnabled, keyOfItem, listChannels, resetChannels, updateChannels, watching } from './services/channels';
+import { freshStatus, keepFresh, noteChosen, removeFresh, runFresh } from './services/fresh';
 import { cleanupSuggestions, keepForGood } from './services/cleanup';
 import { cancelRequest, deleteFromDisk, downloadAgain, removedTitles, stopDownload, storage } from './services/manage';
 import { createRequest, listRequests, myRequestKeys } from './services/requests';
@@ -73,6 +75,7 @@ function appConfig(): AppConfig {
       downloads: arr,
       versions: arr,
       subtitles: has.bazarr(),
+      channels: channelsEnabled(),
     },
   };
 }
@@ -392,8 +395,17 @@ export async function apiRoutes(app: FastifyInstance) {
       }
       return session;
     });
+    // Channels (when they don't count as watching): the programme is over, the transcode can stop.
+    api.post<{ Body: { playSessionId?: string; deviceId?: string } }>('/play/end', async (req, reply) => {
+      const playSessionId = clean(req.body?.playSessionId, 64);
+      const deviceId = clean(req.body?.deviceId, 64);
+      if (playSessionId && deviceId) await jellyfin.endEncoding(userOf(req).token, deviceId, playSessionId).catch(() => {});
+      reply.code(204);
+    });
     api.post<{ Body: ProgressReport }>('/play/progress', async (req, reply) => {
       if (req.body?.itemId && req.body.playSessionId) scrobble(userOf(req), req.body, req.log);
+      // A new title for channels someone chose to watch: theirs now.
+      if (req.body?.itemId && !req.body.channel) noteChosen(keyOfItem(req.body.itemId), userOf(req).name);
       await reportProgress(userOf(req), req.body);
       reply.code(204);
     });
@@ -403,6 +415,38 @@ export async function apiRoutes(app: FastifyInstance) {
     // Connections to the other services (addresses, API keys), editable by admins.
     api.get('/admin/connections', { preHandler: requireAdmin }, async () => ({ items: listConnections() }));
     api.get('/admin/devices', { preHandler: requireAdmin }, async () => ({ devices: listDevices() }));
+
+    // Channels: the library as old-school TV (an admin turns them on).
+    api.get<{ Querystring: { hours?: string; from?: string } }>('/channels', async (req) =>
+      listChannels(userOf(req), Math.min(24, Number(req.query.hours) || 4), Date.now(), Number(req.query.from) || undefined),
+    );
+    api.post<{ Params: { id: string }; Body: { clientId?: string } }>('/channels/:id/watching', async (req) => {
+      watching(clean(req.params.id, 40), clean(req.body?.clientId, 64));
+      return { ok: true };
+    });
+    // A new title on a channel: anyone can keep it (it joins the library).
+    api.post<{ Body: { itemId?: string } }>('/channels/keep', async (req) => {
+      const key = keyOfItem(clean(req.body?.itemId, 64));
+      if (!key) throw new HttpError(404, t('Not a new title on a channel'));
+      keepFresh(key, userOf(req).name);
+      return { ok: true };
+    });
+    api.get('/admin/channels', { preHandler: requireAdmin }, async (req) => channelAdmin(userOf(req)));
+    api.get('/admin/channels/fresh', { preHandler: requireAdmin }, async () => freshStatus());
+    api.post('/admin/channels/fresh/run', { preHandler: requireAdmin }, async () => {
+      await runFresh();
+      return freshStatus();
+    });
+    api.post<{ Body: { key?: string } }>('/admin/channels/fresh/keep', { preHandler: requireAdmin }, async (req) => {
+      keepFresh(clean(req.body?.key, 40), userOf(req).name);
+      return freshStatus();
+    });
+    api.post<{ Body: { key?: string } }>('/admin/channels/fresh/remove', { preHandler: requireAdmin }, async (req) => {
+      await removeFresh(clean(req.body?.key, 40));
+      return freshStatus();
+    });
+    api.put<{ Body: Record<string, unknown> }>('/admin/channels', { preHandler: requireAdmin }, async (req) => updateChannels(userOf(req), req.body ?? {}));
+    api.post('/admin/channels/reset', { preHandler: requireAdmin }, async (req) => resetChannels(userOf(req)));
     api.put<{ Params: { id: string }; Body: ServiceConnectionUpdate }>('/admin/connections/:id', { preHandler: requireAdmin }, async (req) =>
       updateConnection(req.params.id, req.body ?? {}),
     );

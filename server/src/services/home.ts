@@ -7,7 +7,7 @@ import { settle } from '../lib/async';
 import { jfPlayableCard, jfToCard, seerrCards, type ProgressMap } from './cards';
 import { catalog } from './catalog';
 import { allDownloads, progressByTitle } from './downloads';
-import { libraryIndex, type LibraryIndex } from './library';
+import { hiddenIds, libraryIndex, type LibraryIndex } from './library';
 import { listRequests } from './requests';
 import { traktPicks } from './trakt';
 import { isHidden } from './watched';
@@ -40,12 +40,12 @@ function seedsFrom(items: JfItem[], index: LibraryIndex): { seeds: Seed[]; watch
   return { seeds, watched, watchedIds };
 }
 
-function continueWatching(userId: string, resume: JfItem[], nextUp: JfItem[], index: LibraryIndex): Card[] {
+function continueWatching(userId: string, resume: JfItem[], nextUp: JfItem[], index: LibraryIndex, fresh: Set<string>): Card[] {
   const seen = new Set<string>();
   const cards: Card[] = [];
   for (const item of [...resume, ...nextUp]) {
     const group = item.Type === 'Episode' ? (item.SeriesId ?? item.Id) : item.Id;
-    if (seen.has(group) || isHidden(userId, group, item)) continue;
+    if (seen.has(group) || fresh.has(group) || isHidden(userId, group, item)) continue;
     seen.add(group);
     cards.push(jfPlayableCard(item, index));
   }
@@ -57,8 +57,11 @@ export async function buildHome(user: SessionUser): Promise<HomeResponse> {
   const index = await libraryIndex(user);
   const downloads = await settle(allDownloads(), []);
   const progress: ProgressMap = progressByTitle(downloads);
+  // New titles brought in for channels aren't in anyone's library.
+  const excludeItemIds = await hiddenIds(user);
+  const fresh = new Set(excludeItemIds?.split(',') ?? []);
   const jfQuery = (q: Record<string, string | number | boolean>) =>
-    settle(jellyfin.items(token, { userId, recursive: true, fields: CARD_FIELDS, enableImageTypes: 'Primary,Backdrop,Thumb', ...q }), EMPTY);
+    settle(jellyfin.items(token, { userId, recursive: true, fields: CARD_FIELDS, enableImageTypes: 'Primary,Backdrop,Thumb', excludeItemIds, ...q }), EMPTY);
 
   const [resume, nextUp, latestMovies, latestShows, unwatched, history] = await Promise.all([
     settle(jellyfin.resume(token, userId), EMPTY),
@@ -163,7 +166,7 @@ export async function buildHome(user: SessionUser): Promise<HomeResponse> {
   const [popularHere, ready] = await Promise.all([householdCards, settle(readyToWatch(user), [])]);
   const candidates: Row[] = [
     { id: 'ready', title: t('Ready to watch'), style: 'poster', items: ready },
-    { id: 'continue', title: t('Continue Watching'), style: 'wide', items: continueWatching(userId, resume.Items, nextUp.Items, index) },
+    { id: 'continue', title: t('Continue Watching'), style: 'wide', items: continueWatching(userId, resume.Items, nextUp.Items, index, fresh) },
     { id: 'requested', title: t('Your requests'), style: 'poster', items: requested, href: '/activity' },
     { id: 'picks', title: t('Top picks for {name}', { name: user.name }), style: 'poster', items: picks },
     { id: 'popular-here', title: t('Popular on this server'), style: 'poster', items: popularHere.length >= 3 ? popularHere : [] },

@@ -225,4 +225,21 @@ const IT: Record<string, string> = {
 
   'Movie size limit': 'Il limite per i film',
   'Episode size limit': 'Il limite per gli episodi',
+
+  // Channels
+  'No such channel': 'Questo canale non esiste',
+  'Channels are off': 'I canali sono spenti',
+  'New arrivals': 'Nuovi arrivi',
+  Cartoons: 'Cartoni',
+  Sitcoms: 'Sitcom',
+  'Drama & thrillers': 'Drammi e thriller',
+  'Comedy films': 'Film comici',
+  'Family films': 'Film per famiglie',
+  'Sci-fi & fantasy': 'Fantascienza e fantasy',
+  'A channel needs something to play': 'Un canale ha bisogno di qualcosa da trasmettere',
+  'Up to 99 channels': 'Al massimo 99 canali',
+  'Channel {n}': 'Canale {n}',
+  'Not a new title on a channel': 'Non è un titolo nuovo di un canale',
+  'Radarr has no library folder or quality profile': 'Radarr non ha una cartella della libreria o un profilo di qualità',
+  'Sonarr has no library folder or quality profile': 'Sonarr non ha una cartella della libreria o un profilo di qualità',
 };

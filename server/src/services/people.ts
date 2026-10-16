@@ -9,7 +9,7 @@ import { t } from '../lib/i18n';
 import { jfToCard, seerrCards, type ProgressMap } from './cards';
 import { catalog } from './catalog';
 import { allDownloads, progressByTitle } from './downloads';
-import { libraryIndex, type LibraryIndex } from './library';
+import { hiddenIds, libraryIndex, type LibraryIndex } from './library';
 
 /**
  * Directors, actors and writers: a person's films and shows, and finding them
@@ -74,10 +74,12 @@ function tmdbSections(credits: { cast?: SeerrCredit[]; crew?: SeerrCredit[] }, d
 }
 
 async function jellyfinSections(user: SessionUser, personId: string, index: LibraryIndex) {
+  const excludeItemIds = await hiddenIds(user);
   const credited = (personTypes: string) =>
     settle(
       jellyfin.items(user.token, {
         userId: user.id,
+        excludeItemIds,
         personIds: personId,
         personTypes,
         includeItemTypes: 'Movie,Series',

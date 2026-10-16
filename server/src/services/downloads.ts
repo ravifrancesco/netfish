@@ -6,6 +6,7 @@ import { onConnectionChange } from '../connections';
 import { SECOND, TTLCache } from '../lib/cache';
 import { languageLabel } from '../lib/languages';
 import { lang, t } from '../lib/i18n';
+import { freshHidden } from './fresh';
 
 /**
  * Live download state, straight from Radarr/Sonarr's queues (and qBittorrent
@@ -125,8 +126,14 @@ const ORDER: Record<DownloadState, number> = {
   failed: 6,
 };
 
-/** All active downloads. Never throws: a dead service just contributes nothing. */
-export function allDownloads(): Promise<DownloadItem[]> {
+/** All active downloads (not the new titles brought in for channels). Never throws: a dead service just contributes nothing. */
+export async function allDownloads(): Promise<DownloadItem[]> {
+  const items = await everyDownload();
+  const fresh = freshHidden();
+  return fresh.size ? items.filter((d) => !d.tmdbId || !fresh.has(`${d.mediaType}-${d.tmdbId}`)) : items;
+}
+
+function everyDownload(): Promise<DownloadItem[]> {
   // Kept per language: the list carries messages and language names for people.
   return cache.wrap(`all:${lang()}`, 3 * SECOND, async () => {
     const [movies, shows, torrents] = await Promise.allSettled([

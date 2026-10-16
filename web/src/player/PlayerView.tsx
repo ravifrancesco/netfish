@@ -120,7 +120,7 @@ export function useVolume(video: RefObject<HTMLVideoElement | null>): Volume {
 }
 
 /** Subtitles drawn by the page over the film, for players that can't draw them (Apple's, downloads in the page). */
-function PageSubtitles({ url, time, raised }: { url: string; time: number; raised: boolean }) {
+export function PageSubtitles({ url, time, raised }: { url: string; time: number; raised: boolean }) {
   const [cues, setCues] = useState<Cue[]>([]);
   useEffect(() => {
     let alive = true;
@@ -142,6 +142,51 @@ function PageSubtitles({ url, time, raised }: { url: string; time: number; raise
           {c.text}
         </span>
       ))}
+    </div>
+  );
+}
+
+/** The Audio and Subtitles menu (the player's, and a channel's). */
+export function TrackMenu(props: {
+  audio: MenuTrack[];
+  audioIndex?: number;
+  chooseAudio: (index: number) => void;
+  subtitles: MenuTrack[];
+  subtitleIndex?: number;
+  chooseSubtitle: (index?: number) => void;
+  audioMore?: ReactNode;
+  subtitlesMore?: ReactNode;
+}) {
+  return (
+    <div className="player__menu">
+      {(props.audio.length > 0 || props.audioMore) && (
+        <div className="player__menu-col">
+          <h3>{t('Audio')}</h3>
+          {props.audio.map((track) => (
+            <button key={track.index} className={`player__opt${track.index === props.audioIndex ? ' is-on' : ''}`} onClick={() => props.chooseAudio(track.index)}>
+              <Check size={16} className="player__tick" />
+              {track.label}
+              {track.note && <span className="muted small"> · {track.note}</span>}
+            </button>
+          ))}
+          {props.audioMore}
+        </div>
+      )}
+      <div className="player__menu-col">
+        <h3>{t('Subtitles')}</h3>
+        <button className={`player__opt${props.subtitleIndex === undefined ? ' is-on' : ''}`} onClick={() => props.chooseSubtitle(undefined)}>
+          <Check size={16} className="player__tick" />
+          {t('Off')}
+        </button>
+        {props.subtitles.map((track) => (
+          <button key={track.index} className={`player__opt${props.subtitleIndex === track.index ? ' is-on' : ''}`} onClick={() => props.chooseSubtitle(track.index)}>
+            <Check size={16} className="player__tick" />
+            {track.label}
+            {track.note && <span className="muted small"> · {track.note}</span>}
+          </button>
+        ))}
+        {props.subtitlesMore}
+      </div>
     </div>
   );
 }
@@ -491,36 +536,16 @@ export function PlayerView(props: PlayerViewProps) {
                 <Captions size={24} />
               </button>
               {menu && props.tracksKnown !== false && (
-                <div className="player__menu">
-                  {(props.audio.length > 0 || props.audioMore) && (
-                    <div className="player__menu-col">
-                      <h3>{t('Audio')}</h3>
-                      {props.audio.map((track) => (
-                        <button key={track.index} className={`player__opt${track.index === props.audioIndex ? ' is-on' : ''}`} onClick={() => choose(() => props.chooseAudio(track.index))}>
-                          <Check size={16} className="player__tick" />
-                          {track.label}
-                          {track.note && <span className="muted small"> · {track.note}</span>}
-                        </button>
-                      ))}
-                      {props.audioMore}
-                    </div>
-                  )}
-                  <div className="player__menu-col">
-                    <h3>{t('Subtitles')}</h3>
-                    <button className={`player__opt${props.subtitleIndex === undefined ? ' is-on' : ''}`} onClick={() => choose(() => props.chooseSubtitle(undefined))}>
-                      <Check size={16} className="player__tick" />
-                      {t('Off')}
-                    </button>
-                    {props.subtitles.map((track) => (
-                      <button key={track.index} className={`player__opt${props.subtitleIndex === track.index ? ' is-on' : ''}`} onClick={() => choose(() => props.chooseSubtitle(track.index))}>
-                        <Check size={16} className="player__tick" />
-                        {track.label}
-                        {track.note && <span className="muted small"> · {track.note}</span>}
-                      </button>
-                    ))}
-                    {props.subtitlesMore}
-                  </div>
-                </div>
+                <TrackMenu
+                  audio={props.audio}
+                  audioIndex={props.audioIndex}
+                  chooseAudio={(index) => choose(() => props.chooseAudio(index))}
+                  subtitles={props.subtitles}
+                  subtitleIndex={props.subtitleIndex}
+                  chooseSubtitle={(index) => choose(() => props.chooseSubtitle(index))}
+                  audioMore={props.audioMore}
+                  subtitlesMore={props.subtitlesMore}
+                />
               )}
             </div>
           )}

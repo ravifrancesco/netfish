@@ -27,6 +27,8 @@ import { ProfilePicker, useProfiles, wasPicked } from './components/ProfilePicke
 // The player pulls in hls.js; only load it when someone presses play.
 const Watch = lazy(() => import('./pages/Watch'));
 const Remote = lazy(() => import('./pages/Remote'));
+const ChannelsPage = lazy(() => import('./pages/Channels'));
+const ChannelPlayer = lazy(() => import('./pages/ChannelPlayer'));
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -40,7 +42,10 @@ function ScrollToTop() {
 function TvFocus() {
   const location = useLocation();
   // The player starts with nothing focused, so the remote's arrows skip and Select pauses.
-  useEffect(() => (isTV() && !location.pathname.startsWith('/watch/') ? manageFocus(location.key) : undefined), [location.key, location.pathname]);
+  useEffect(
+    () => (isTV() && !location.pathname.startsWith('/watch/') && !location.pathname.startsWith('/channels/') ? manageFocus(location.key) : undefined),
+    [location.key, location.pathname],
+  );
   return null;
 }
 
@@ -59,8 +64,8 @@ function Shell({ user }: { user: NonNullable<ReturnType<typeof useMe>['data']> }
   const { pathname } = useLocation();
   useReadyNotifications(user.id);
   useTogetherNotifications(user.id);
-  // The player and the profile picker fill the screen without the menu bar.
-  const watching = pathname.startsWith('/watch/') || pathname.startsWith('/profiles');
+  // The players (a film, a channel) and the profile picker fill the screen without the menu bar.
+  const watching = pathname.startsWith('/watch/') || pathname.startsWith('/channels/') || pathname.startsWith('/profiles');
   // Open as long as Netfish is: rooms, screens, and films sent here from another device.
   useLive();
   // The apps: downloads watched offline reach the server, and a lost server means offline mode.
@@ -84,6 +89,8 @@ function Shell({ user }: { user: NonNullable<ReturnType<typeof useMe>['data']> }
             <Route path="/watch/:itemId" element={<Watch />} />
             <Route path="/together/:id" element={<JoinRoom />} />
             <Route path="/remote/:id" element={<Remote />} />
+            <Route path="/channels" element={<ChannelsPage />} />
+            <Route path="/channels/:number" element={<ChannelPlayer />} />
             <Route path="/profiles" element={<SwitchProfile />} />
             <Route path="/profiles/add" element={<AddProfile />} />
             <Route path="*" element={<Navigate to="/" replace />} />

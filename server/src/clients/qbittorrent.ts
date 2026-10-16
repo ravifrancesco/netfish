@@ -59,7 +59,42 @@ async function get<T>(path: string, retry = true): Promise<T> {
   }
 }
 
+async function post(path: string, form: Record<string, string>, retry = true): Promise<Response> {
+  if (!has.qbittorrent()) throw new UpstreamError('qBittorrent', 503, 'qBittorrent is not configured');
+  if (!cookie && config.qbittorrent.username) await login();
+  let res: Response;
+  try {
+    res = await fetch(`${config.qbittorrent.url}${path}`, {
+      method: 'POST',
+      headers: cookie ? { cookie } : {},
+      body: new URLSearchParams(form),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch (err) {
+    throw new UpstreamError('qBittorrent', 502, `qBittorrent is unreachable (${(err as Error).message})`);
+  }
+  if (res.status === 403 && retry && config.qbittorrent.username) {
+    cookie = undefined;
+    return post(path, form, false);
+  }
+  return res;
+}
+
+/** qBittorrent 5 says stop/start; 4 said pause/resume. */
+async function either(paths: [string, string], form: Record<string, string>) {
+  const res = await post(paths[0], form);
+  if (res.status === 404) return post(paths[1], form);
+  return res;
+}
+
 export const qbittorrent = {
   version: () => get<string>('/api/v2/app/version'),
   torrents: () => get<Torrent[]>('/api/v2/torrents/info?filter=all'),
+  stop: (hashes: string[]) => either(['/api/v2/torrents/stop', '/api/v2/torrents/pause'], { hashes: hashes.join('|') }),
+  start: (hashes: string[]) => either(['/api/v2/torrents/start', '/api/v2/torrents/resume'], { hashes: hashes.join('|') }),
+  /** Bytes a second, each (0: no limit). */
+  limit: (hashes: string[], bytesPerSecond: number) =>
+    post('/api/v2/torrents/setDownloadLimit', { hashes: hashes.join('|'), limit: String(Math.max(0, Math.round(bytesPerSecond))) }),
+  /** To the back of the queue (when qBittorrent queues downloads). */
+  last: (hashes: string[]) => post('/api/v2/torrents/bottomPrio', { hashes: hashes.join('|') }),
 };

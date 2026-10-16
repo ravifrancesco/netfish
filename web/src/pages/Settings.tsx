@@ -8,6 +8,7 @@ import { Connections } from '../components/Connections';
 import { Storage } from '../components/Storage';
 import { AppUpdate, InstallExpiry } from '../components/AppUpdate';
 import { Devices } from '../components/Devices';
+import { ChannelSettings } from '../components/ChannelSettings';
 import { notifySupport } from '../lib/notify';
 import { DeviceProfiles } from '../components/DeviceProfiles';
 import { LanguageSelect } from '../components/LanguageSelect';
@@ -292,6 +293,13 @@ export default function Settings() {
           {desktop()?.update && <AppUpdate />}
           <InstallExpiry />
           {desktop()?.openOffline && <OfflineStorage />}
+        </section>
+      )}
+
+      {me?.isAdmin && (
+        <section className="panel" id="channels">
+          <h2>{t('Channels')}</h2>
+          <ChannelSettings />
         </section>
       )}
 

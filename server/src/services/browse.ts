@@ -9,7 +9,7 @@ import { HttpError } from '../lib/upstream';
 import { jfToCard, seerrCards } from './cards';
 import { catalog } from './catalog';
 import { allDownloads, progressByTitle } from './downloads';
-import { libraryIndex } from './library';
+import { hiddenIds, libraryIndex } from './library';
 import { searchPeople } from './people';
 import { t } from '../lib/i18n';
 
@@ -24,6 +24,7 @@ const EMPTY_PAGE: SeerrPage = { page: 1, totalPages: 0, totalResults: 0, results
 export async function search(user: SessionUser, query: string): Promise<SearchResponse> {
   const q = query.trim();
   if (!q) return { items: [], people: [] };
+  const excludeItemIds = await hiddenIds(user);
   const [index, local, remote, downloads] = await Promise.all([
     libraryIndex(user),
     settle(
@@ -33,6 +34,7 @@ export async function search(user: SessionUser, query: string): Promise<SearchRe
         includeItemTypes: 'Movie,Series',
         recursive: true,
         limit: 30,
+        excludeItemIds,
         fields: CARD_FIELDS,
       }),
       EMPTY,
@@ -62,6 +64,7 @@ const ASCENDING = new Set(['name', 'shortest']);
 
 export async function libraryPage(user: SessionUser, mediaType: MediaType, sort: string, start: number, limit: number) {
   const sortBy = SORTS[sort] ?? SORTS.added;
+  const excludeItemIds = await hiddenIds(user);
   const [index, res] = await Promise.all([
     libraryIndex(user),
     jellyfin.items(user.token, {
@@ -72,6 +75,7 @@ export async function libraryPage(user: SessionUser, mediaType: MediaType, sort:
       sortOrder: ASCENDING.has(sort) ? 'Ascending' : 'Descending',
       startIndex: start,
       limit,
+      excludeItemIds,
       fields: CARD_FIELDS,
       enableImageTypes: 'Primary,Backdrop,Thumb',
     }),

@@ -172,6 +172,9 @@ export interface MockDownload {
   startedAt: number;
   durationMs: number;
   stalledAt?: number;
+  /** Stopped in qBittorrent (progress held at stalledAt); a speed limit (bytes/s, 0 none). */
+  stopped?: boolean;
+  limit?: number;
   size: number;
   release: string;
   quality: string;

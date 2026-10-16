@@ -121,21 +121,26 @@ export function FishGlyph({ size = 40, stranded, className = '' }: { size?: numb
   );
 }
 
-/** Two small fish swimming side by side: Watch together. */
-export function FishPair({ size = 30 }: { size?: number }) {
+/** Two fish swimming together, one a little behind the other: Watch together. */
+export function FishPair({ size = 34 }: { size?: number }) {
+  const shape = (className: string, tail: number, body: number) => (
+    <g className={className} strokeLinejoin="round">
+      <path className="fish-pair__tail" d={TAIL} strokeWidth={tail} />
+      <path d={BODY} strokeWidth={body} />
+    </g>
+  );
   return (
-    <svg viewBox="0 0 76 44" width={size} height={(size * 44) / 76} className="fish-pair" aria-hidden="true">
-      {[
-        { x: 0, y: -4, s: 0.58 },
-        { x: 26, y: 18, s: 0.5 },
-      ].map(({ x, y, s }, i) => (
-        <g key={i} transform={`translate(${x} ${y}) scale(${s})`}>
-          <g className="fish-pair__fish" fill="currentColor" stroke="currentColor" strokeLinejoin="round">
-            <path className="fish-pair__tail" d={TAIL} strokeWidth={4} />
-            <path d={BODY} strokeWidth={6} />
-          </g>
+    <svg viewBox="0 0 64 52" width={size} height={(size * 52) / 64} className="fish-pair" aria-hidden="true">
+      {/* Behind: a little larger and dimmer. In front: a halo in the page's colour, so the two read apart. */}
+      <g transform="translate(-2 -6) scale(0.82)">
+        <g className="fish-pair__swim">{shape('fish-pair__fish is-back', 4, 6)}</g>
+      </g>
+      <g transform="translate(20 12) scale(0.72)">
+        <g className="fish-pair__swim is-front">
+          {shape('fish-pair__halo', 12, 14)}
+          {shape('fish-pair__fish', 4, 6)}
         </g>
-      ))}
+      </g>
     </svg>
   );
 }

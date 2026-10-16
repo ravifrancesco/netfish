@@ -1,6 +1,10 @@
 import type {
   AppConfig,
   Card,
+  ChannelAdmin,
+  FreshStatus,
+  ChannelSettings,
+  ChannelsResponse,
   CleanupSuggestion,
   ProfilesResponse,
   ConnectionTest,
@@ -142,6 +146,22 @@ export const api = {
   offline: (itemId: string, target: 'desktop' | 'apple' | 'mp4' | 'original' = 'desktop') => call<OfflineDescriptor>(`/play/${enc(itemId)}/offline?target=${target}`),
   playSession: (itemId: string, body: PlaybackRequest) => call<PlaybackSession>(`/play/${enc(itemId)}/session`, { body }),
   progress: (report: ProgressReport, keepalive = false) => call<void>('/play/progress', { body: report, keepalive }),
+  /** A channel's programme is over: the server's work on it stops, without saying where anyone got to. */
+  endPlayback: (playSessionId: string, deviceId: string) => call<void>('/play/end', { body: { playSessionId, deviceId }, keepalive: true }),
+
+  // Channels
+  /** `from`: the guide looking ahead (up to three days). */
+  channels: (hours = 4, from?: number) => call<ChannelsResponse>(`/channels?hours=${hours}${from ? `&from=${Math.round(from)}` : ''}`),
+  channelWatching: (id: string, clientId: string) => call<{ ok: true }>(`/channels/${enc(id)}/watching`, { body: { clientId } }),
+  channelAdmin: () => call<ChannelAdmin>('/admin/channels'),
+  saveChannels: (patch: Partial<ChannelSettings>) => call<ChannelAdmin>('/admin/channels', { method: 'PUT', body: patch }),
+  resetChannels: () => call<ChannelAdmin>('/admin/channels/reset', { method: 'POST' }),
+  /** A new title on a channel: keep it (it joins the library). */
+  keepChannelTitle: (itemId: string) => call<{ ok: true }>('/channels/keep', { body: { itemId } }),
+  freshStatus: () => call<FreshStatus>('/admin/channels/fresh'),
+  freshRun: () => call<FreshStatus>('/admin/channels/fresh/run', { method: 'POST' }),
+  freshKeep: (key: string) => call<FreshStatus>('/admin/channels/fresh/keep', { body: { key } }),
+  freshRemove: (key: string) => call<FreshStatus>('/admin/channels/fresh/remove', { body: { key } }),
 
   setWatched: (itemId: string, watched: boolean) => call<{ ok: true }>(`/items/${enc(itemId)}/watched`, { body: { watched } }),
   hideFromContinue: (itemId: string) => call<{ ok: true }>(`/items/${enc(itemId)}/hide`, { method: 'POST' }),

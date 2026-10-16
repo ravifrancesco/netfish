@@ -183,6 +183,9 @@ export const jellyfin = {
     const path = { start: '/Sessions/Playing', progress: '/Sessions/Playing/Progress', stop: '/Sessions/Playing/Stopped' }[event];
     return jfRequest<void>(token, path, { method: 'POST', body });
   },
+  /** Stops the server's work on a play session (a transcode) without saying anything about where someone got to. */
+  endEncoding: (token: string, deviceId: string, playSessionId: string) =>
+    jfRequest<void>(token, '/Videos/ActiveEncodings', { method: 'DELETE', query: { deviceId, playSessionId } }),
   /** Watched / not watched. A show or season marks every episode in it. */
   setPlayed: async (token: string, userId: string, itemId: string, played: boolean) => {
     const method = played ? 'POST' : 'DELETE';
