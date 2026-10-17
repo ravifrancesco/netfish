@@ -167,7 +167,7 @@ p {
   min-height: 60px;
 }
 
-/* ---------- Images & skeletons ---------- */
+/* ---------- Images ---------- */
 
 .img {
   opacity: 0;
@@ -184,29 +184,6 @@ p {
   font-weight: 700;
   text-align: center;
   padding: 10px;
-}
-.skeleton {
-  background: linear-gradient(100deg, var(--surface) 30%, var(--surface-2) 50%, var(--surface) 70%);
-  background-size: 300% 100%;
-  animation: shimmer 1.4s ease infinite;
-  border-radius: var(--radius-sm);
-}
-.skeleton--text {
-  width: 180px;
-  height: 18px;
-}
-.skeleton--poster {
-  flex: 0 0 var(--card-w);
-  aspect-ratio: 2 / 3;
-}
-.skeleton--wide {
-  flex: 0 0 var(--wide-w);
-  aspect-ratio: 16 / 9;
-}
-@keyframes shimmer {
-  to {
-    background-position: -150% 0;
-  }
 }
 
 /* ---------- Buttons ---------- */
@@ -576,10 +553,14 @@ p {
 .swimming-fish--player svg {
   filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.55));
 }
+/* A page loading: the fish in the middle of the screen (below the top bar, above a phone's tab bar). */
 .page-loader {
+  position: fixed;
+  inset: var(--nav-h) 0 0 0;
+  z-index: 1;
   display: grid;
   place-items: center;
-  padding: 72px 16px;
+  pointer-events: none;
   /* Quick loads never show it: it fades in after a moment. */
   animation: fish-appear 0.4s ease-out 0.25s both;
 }
@@ -883,9 +864,6 @@ p {
   /* At the bottom: room for the rows, which slide up over the hero (.rows' margin), plus a gap. */
   padding: calc(var(--nav-h) + 24px) var(--gutter) calc(clamp(60px, 12vw, 150px) + clamp(36px, 8vh, 70px));
   overflow: hidden;
-}
-.hero--skeleton {
-  background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
 }
 .hero--empty {
   height: calc(var(--nav-h) + 40px);
@@ -3537,6 +3515,9 @@ html.is-tv ::-webkit-scrollbar {
   .wordmark {
     font-size: 1.25rem;
   }
+  .page-loader {
+    bottom: calc(64px + env(safe-area-inset-bottom));
+  }
   .tabbar {
     position: fixed;
     inset: auto 0 0 0;
@@ -3663,14 +3644,8 @@ html.is-tv ::-webkit-scrollbar {
     width: 100%;
     height: 100%;
   }
-  .skeleton--poster {
-    height: calc(var(--card-w) * 1.5);
-  }
-  .skeleton--wide {
-    height: calc(var(--wide-w) * 9 / 16);
-  }
   .trailer__frame {
-    height: calc(min(1280px, 100vw - 48px, (100vh - 120px) * 16 / 9) * 9 / 16);
+    height: calc(min(1280px, 100vw - 48px, (100vh - 170px) * 16 / 9) * 9 / 16);
   }
   .item__poster {
     height: 96px;
@@ -4419,36 +4394,24 @@ html.is-tv .round-btn[data-tip]:focus::after {
   --chan: 210px;
   --row: 66px;
 }
-/* The times along the top stay put while the page scrolls; they follow the guide sideways. */
+/* The times along the top: a row of the guide like the channels' (it scrolls with them, in step). */
 .guide__times {
-  position: sticky;
-  top: var(--nav-h);
-  z-index: 4;
-  overflow: hidden;
-  padding: 6px 0;
-  background: var(--bg);
-}
-.guide__times-track {
   display: flex;
-  will-change: transform;
-}
-.guide__spacer {
-  flex: none;
-  width: var(--chan);
 }
 .guide__corner {
-  position: absolute;
-  inset: 0 auto 0 0;
-  z-index: 1;
+  position: sticky;
+  left: 0;
+  z-index: 7;
+  flex: none;
   width: var(--chan);
   background: var(--bg);
 }
 .guide__times .guide__line {
-  height: 20px;
+  height: 32px;
 }
 .guide__tick {
   position: absolute;
-  top: 0;
+  top: 6px;
   padding-left: 6px;
   border-left: 1px solid var(--line-2);
   color: var(--text-3);
@@ -4460,14 +4423,10 @@ html.is-tv .round-btn[data-tip]:focus::after {
   font-weight: 700;
   text-transform: capitalize;
 }
-/* Now: its line runs the header's height, and on down the rows below in one. */
+/* Now: the label; its line is the guide's own (.guide__nowline), from here down every channel. */
 .guide__tick.is-now {
-  top: -6px;
-  bottom: -6px;
-  margin-left: -1px;
-  padding-top: 6px;
-  border-left-width: 2px;
-  border-color: var(--accent);
+  padding-left: 8px;
+  border-left: 0;
   color: var(--accent);
   font-weight: 700;
 }
@@ -4481,21 +4440,24 @@ html.is-tv .round-btn[data-tip]:focus::after {
 html.is-tv .guide__scroller {
   scrollbar-width: none;
 }
+/* The rows touch (their spacing is inside them), so the channels' column is one unbroken strip:
+   whatever scrolls under it (the line, an opened card) goes behind it. */
 .guide__rows {
   display: grid;
-  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 .guide__row {
   display: flex;
-  padding: 4px 0;
+}
+.guide__row .guide__line {
+  margin: 7px 0;
 }
 .guide__chan {
   position: sticky;
   left: 0;
-  z-index: 3;
+  z-index: 7;
   flex: none;
   display: flex;
   align-items: center;

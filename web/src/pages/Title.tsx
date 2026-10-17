@@ -15,8 +15,7 @@ import { RatingsStrip, TrailerPlayer } from '../components/Extras';
 import { RequestButton } from '../components/RequestButton';
 import { SubtitlesSheet } from '../components/SubtitlesSheet';
 import { VersionsSheet } from '../components/VersionsSheet';
-import { ErrorState, Img, Progress, Spinner, StatusChip, useToast } from '../components/ui';
-import { SwimmingFish } from '../components/Logo';
+import { ErrorState, Img, PageLoader, Progress, Spinner, StatusChip, useToast } from '../components/ui';
 import { AVAILABILITY_LABEL, DOWNLOAD_LABEL, ago, bytes, decimal, duration, percent } from '../lib/format';
 import { t, tn, locale } from '../i18n';
 import { useConfig, useMe, useRefreshTitle } from '../lib/hooks';
@@ -362,16 +361,7 @@ export default function Title() {
   }, [d]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (q.isError) return <div className="page container"><ErrorState error={q.error} retry={() => void q.refetch()} /></div>;
-  if (!d) {
-    return (
-      <div className="tp">
-        <div className="tp__backdrop skeleton" />
-        <div className="tp__head container">
-          <SwimmingFish />
-        </div>
-      </div>
-    );
-  }
+  if (!d) return <PageLoader />;
 
   const meta = [
     d.year,

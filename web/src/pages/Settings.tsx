@@ -348,17 +348,17 @@ export default function Settings() {
       )}
 
       {me?.isAdmin && (
-        <section className="panel" id="channels">
-          <h2>{t('Channels')}</h2>
-          <ChannelSettings />
-        </section>
-      )}
-
-      {me?.isAdmin && (
         <section className="panel" id="devices">
           <h2>{t('Devices')}</h2>
           <p className="muted small">{t('Where Netfish is open right now, and whether its app should be updated.')}</p>
           <Devices />
+        </section>
+      )}
+
+      {me?.isAdmin && (
+        <section className="panel" id="channels">
+          <h2>{t('Channels')}</h2>
+          <ChannelSettings />
         </section>
       )}
 

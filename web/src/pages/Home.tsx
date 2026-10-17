@@ -4,8 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Info, Play, Plug, Plus, Star, X } from 'lucide-react';
 import type { HomeResponse } from '@netfish/shared';
 import { api } from '../api';
-import { Row, RowSkeleton } from '../components/Cards';
-import { Empty, ErrorState, Img, StatusChip } from '../components/ui';
+import { Row } from '../components/Cards';
+import { Empty, ErrorState, Img, PageLoader, StatusChip } from '../components/ui';
 import { decimal, titleHref } from '../lib/format';
 import { t } from '../i18n';
 import { useConfig, useMe } from '../lib/hooks';
@@ -124,18 +124,7 @@ export default function Home() {
   }, [home.data, me?.name]);
 
   if (home.isError) return <div className="page container"><ErrorState error={home.error} retry={() => void home.refetch()} /></div>;
-  if (!home.data) {
-    return (
-      <div className="home">
-        <div className="hero hero--skeleton" />
-        <div className="rows">
-          <RowSkeleton wide />
-          <RowSkeleton />
-          <RowSkeleton />
-        </div>
-      </div>
-    );
-  }
+  if (!home.data) return <PageLoader />;
 
   const { hero, rows } = home.data;
   return (

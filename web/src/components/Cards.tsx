@@ -134,17 +134,3 @@ export function Grid({ cards, showLength }: { cards: Card[]; showLength?: boolea
   );
 }
 
-export function RowSkeleton({ wide }: { wide?: boolean }) {
-  return (
-    <section className={`row row--${wide ? 'wide' : 'poster'}`} aria-hidden="true">
-      <div className="row__head">
-        <div className="skeleton skeleton--text" />
-      </div>
-      <div className="row__track">
-        {Array.from({ length: 8 }, (_, i) => (
-          <div key={i} className={`skeleton ${wide ? 'skeleton--wide' : 'skeleton--poster'}`} />
-        ))}
-      </div>
-    </section>
-  );
-}

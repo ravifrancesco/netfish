@@ -86,13 +86,15 @@ function Block({
   const short = width < 40 && !onNowBlock ? ' is-tiny' : width < 110 ? ' is-narrow' : '';
   // Only its title shows; hovered (or with the remote on it) it opens out over its neighbours, at
   // least as wide as it is and as far as the guide's edge allows, with its time and episode.
-  const openOut = () => {
+  const openOut = (byMouse = false) => {
     const el = ref.current;
     if (!el) return;
     const edge = el.closest('.guide__scroller')?.getBoundingClientRect().right ?? window.innerWidth;
     el.style.setProperty('--w', `${el.offsetWidth}px`);
     el.style.setProperty('--room', `${Math.max(140, edge - el.getBoundingClientRect().left - 8)}px`);
     setOpen(true);
+    // Opened by the mouse: the guide scrolling takes it away from under it, so it closes.
+    if (byMouse) el.closest('.guide__scroller')?.addEventListener('scroll', () => setOpen(false), { once: true, passive: true });
   };
   const className = `guide__prog${onNowBlock ? ' is-now' : ''}${past ? ' is-past' : ''}${short}${open ? ' is-open' : ''}`;
   const style = { left, width };
@@ -111,9 +113,9 @@ function Block({
     </>
   );
   const events = {
-    onMouseEnter: () => canHover() && openOut(),
+    onMouseEnter: () => canHover() && openOut(true),
     onMouseLeave: () => setOpen(false),
-    onFocus: openOut,
+    onFocus: () => openOut(),
     onBlur: () => setOpen(false),
   };
   if (past) {
@@ -216,13 +218,11 @@ export default function ChannelsPage() {
   const x = (at: number) => (at - origin) * px;
 
   // What's in view: the time at its left edge, every ten minutes of scrolling (what's drawn and
-  // fetched follows it). The times along the top follow every pixel.
+  // fetched follows it).
   const [viewStart, setViewStart] = useState(origin);
-  const times = useRef<HTMLDivElement>(null);
   const frame = useRef(0);
   const onScroll = () => {
     if (!scroller || !px) return;
-    if (times.current) times.current.style.transform = `translateX(${-scroller.scrollLeft}px)`;
     cancelAnimationFrame(frame.current);
     frame.current = requestAnimationFrame(() => {
       const at = origin + Math.round(scroller.scrollLeft / px / (10 * MINUTE)) * 10 * MINUTE;
@@ -325,27 +325,24 @@ export default function ChannelsPage() {
               </span>
             )}
           </div>
-          {/* The times stay at the top while the page scrolls; they follow the guide sideways. */}
-          <div className="guide__times" aria-hidden="true">
-            <span className="guide__corner" />
-            <div className="guide__times-track" ref={times} style={{ width }}>
-              <span className="guide__spacer" />
-              <span className="guide__line">
-                {now >= origin && (
-                  <span className="guide__tick is-now" style={{ left: x(now) }}>
-                    {t('Now')}
-                  </span>
-                )}
-                {ticks.map((at) => (
-                  <span key={at} className={`guide__tick${new Date(at).getHours() === 0 && new Date(at).getMinutes() === 0 ? ' is-day' : ''}`} style={{ left: x(at) }}>
-                    {new Date(at).getHours() === 0 && new Date(at).getMinutes() === 0 ? weekday(at) : clockTime(at)}
-                  </span>
-                ))}
-              </span>
-            </div>
-          </div>
           <div className="guide__scroller" ref={setScroller} onScroll={onScroll} data-reveal="far" data-reveal-inset={box.chan}>
             <div className="guide__body" style={{ width }}>
+              {/* The times, scrolling with the guide; the line at "Now" runs on down every channel. */}
+              <div className="guide__times" aria-hidden="true">
+                <span className="guide__corner" />
+                <span className="guide__line">
+                  {now >= origin && (
+                    <span className="guide__tick is-now" style={{ left: x(now) }}>
+                      {t('Now')}
+                    </span>
+                  )}
+                  {ticks.map((at) => (
+                    <span key={at} className={`guide__tick${new Date(at).getHours() === 0 && new Date(at).getMinutes() === 0 ? ' is-day' : ''}`} style={{ left: x(at) }}>
+                      {new Date(at).getHours() === 0 && new Date(at).getMinutes() === 0 ? weekday(at) : clockTime(at)}
+                    </span>
+                  ))}
+                </span>
+              </div>
               <ul className="guide__rows">
                 {channels.map((channel) => {
                   const list = (programs.get(channel.id) ?? []).filter((p) => programEnd(p) > Math.max(origin, shownFrom) && p.start < shownUntil);
@@ -372,7 +369,7 @@ export default function ChannelsPage() {
                   );
                 })}
               </ul>
-              {/* The minute it is, one line down through every channel (from the "Now" at the top). */}
+              {/* The minute it is: one line from the times at the top down through every channel. */}
               {px > 0 && now >= origin && <span className="guide__nowline" style={{ left: box.chan + x(now) }} aria-hidden="true" />}
             </div>
           </div>
