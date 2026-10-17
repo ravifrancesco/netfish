@@ -131,7 +131,7 @@ The apps show the interface from your server, so most new features arrive by upd
 
 **1. Portainer → Stacks → Add stack**, name it `netfish`, paste [`docker-compose.yml`](docker-compose.yml), and **Deploy**. No variables are needed: Portainer pulls the ready-made image `ghcr.io/ravifrancesco/netfish:latest` (built by GitHub for Raspberry Pi and PCs).
 
-**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.7.6`.
+**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.7.7`.
 
 <details>
 <summary>Or build the image on the Pi yourself</summary>

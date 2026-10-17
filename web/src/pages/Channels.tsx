@@ -60,6 +60,7 @@ function Block({
   program,
   channel,
   origin,
+  until,
   px,
   now,
   onAbout,
@@ -67,6 +68,8 @@ function Block({
   program: ChannelProgram;
   channel: Channel;
   origin: number;
+  /** Where the guide ends: what runs on past it stops there, with the rest. */
+  until: number;
   px: number;
   now: number;
   onAbout: (program: ChannelProgram, channel: Channel) => void;
@@ -79,7 +82,8 @@ function Block({
   const past = end <= now;
   const from = Math.max(program.start, origin);
   const left = (from - origin) * px;
-  const width = Math.max(2, (end - from) * px - GAP);
+  // One reaching the guide's end goes right up to it (no gap after): every channel ends on one line.
+  const width = end >= until ? Math.max(1, (until - from) * px) : Math.max(2, (end - from) * px - GAP);
   const sub = episodeLine(program);
   const minutesLeft = Math.max(0, Math.ceil((end - now) / MINUTE));
   // Too thin for a word: blank until it opens. Short: a smaller title, no time.
@@ -297,12 +301,18 @@ export default function ChannelsPage() {
     viewStart < origin + HOUR ? 'now' : day === 0 ? (tonight && middle >= tonight - 2 * HOUR ? 'tonight' : 'now') : day === 1 ? 'tomorrow' : day === 2 ? 'after' : undefined;
   const go = (at: number) => scroller?.scrollTo({ left: Math.max(0, x(at)), behavior: 'smooth' });
 
+  // Where the guide ends: three days on or, once its last twelve hours are in, sooner if a
+  // channel's schedule stops before: every channel reaches the end, one straight edge.
+  const lastIn = fetched[pieces.indexOf(Math.floor((AHEAD - 1) / CHUNK))]?.data;
+  const ends = [...programs.values()].filter((list) => list.length).map((list) => programEnd(list[list.length - 1]));
+  const limit = lastIn && ends.length ? Math.min(end, ...ends) : end;
+
   // Half-hour marks along the top (the day's name at midnight), not right next to "Now".
   const ticks: number[] = [];
-  for (let at = Math.ceil(Math.max(origin, shownFrom) / HALF_HOUR) * HALF_HOUR; at < Math.min(end, shownUntil); at += HALF_HOUR) {
+  for (let at = Math.ceil(Math.max(origin, shownFrom) / HALF_HOUR) * HALF_HOUR; at < Math.min(limit, shownUntil); at += HALF_HOUR) {
     if (Math.abs(at - now) > span * 0.06) ticks.push(at);
   }
-  const width = box.chan + x(end);
+  const width = box.chan + x(limit);
 
   return (
     <div className="page container guide">
@@ -345,7 +355,7 @@ export default function ChannelsPage() {
               </div>
               <ul className="guide__rows">
                 {channels.map((channel) => {
-                  const list = (programs.get(channel.id) ?? []).filter((p) => programEnd(p) > Math.max(origin, shownFrom) && p.start < shownUntil);
+                  const list = (programs.get(channel.id) ?? []).filter((p) => programEnd(p) > Math.max(origin, shownFrom) && p.start < Math.min(shownUntil, limit));
                   return (
                     <li key={channel.id} className="guide__row">
                       <Link to={`/channels/${channel.number}`} className="guide__chan" aria-label={`${channel.number} ${channel.name}`}>
@@ -358,7 +368,7 @@ export default function ChannelsPage() {
                       <span className="guide__line">
                         {px > 0 &&
                           (list.length ? (
-                            list.map((p) => <Block key={`${p.itemId}${p.start}`} program={p} channel={channel} origin={origin} px={px} now={now} onAbout={openAbout} />)
+                            list.map((p) => <Block key={`${p.itemId}${p.start}`} program={p} channel={channel} origin={origin} until={limit} px={px} now={now} onAbout={openAbout} />)
                           ) : (
                             <span className="guide__empty muted small" style={{ left: x(Math.max(now, viewStart)) }}>
                               {t('Nothing to play yet')}

@@ -143,8 +143,8 @@ function ProfileMenu({ user }: { user: User }) {
 
 const LINKS = [
   { to: '/', label: t('Home'), icon: House, end: true },
-  { to: '/shows', label: t('Shows'), icon: Tv },
   { to: '/movies', label: t('Movies'), icon: Film },
+  { to: '/shows', label: t('Shows'), icon: Tv },
   { to: '/activity', label: t('Activity'), icon: Activity },
 ];
 const CHANNELS = { to: '/channels', label: t('Channels'), icon: RadioTower, end: false };
@@ -152,9 +152,9 @@ const CHANNELS = { to: '/channels', label: t('Channels'), icon: RadioTower, end:
 export function Nav({ user }: { user: User }) {
   const [scrolled, setScrolled] = useState(false);
   const active = useActiveDownloads();
-  // Channels, when an admin has turned them on: in the top bar (phones find them on Home).
+  // Channels, when an admin has turned them on: in the top bar, right after Home (phones find them on Home).
   const channels = Boolean(useConfig().data?.features.channels);
-  const links = channels ? [...LINKS.slice(0, 3), CHANNELS, LINKS[3]] : LINKS;
+  const links = channels ? [LINKS[0], CHANNELS, ...LINKS.slice(1)] : LINKS;
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
     onScroll();
