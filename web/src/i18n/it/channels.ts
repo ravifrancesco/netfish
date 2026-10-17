@@ -3,8 +3,6 @@ export default {
   // The guide and Home
   Channels: 'Canali',
   'On now': 'In onda ora',
-  'Your library as TV: everyone on a channel sees the same thing at the same time. No pausing; change channel with ↑ and ↓.':
-    'La tua libreria come la TV: chi è sullo stesso canale vede la stessa cosa nello stesso momento. Niente pausa; cambi canale con ↑ e ↓.',
   'No channels yet. Add some in Settings → Channels.': 'Ancora nessun canale. Aggiungine in Impostazioni → Canali.',
   'No channels yet.': 'Ancora nessun canale.',
   'Nothing to play yet': 'Ancora niente in programma',

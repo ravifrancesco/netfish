@@ -108,11 +108,6 @@ function Block({
           {sub ? ` · ${sub}` : ''}
         </span>
       </span>
-      {onNowBlock && (
-        <span className="guide__prog-bar" aria-hidden="true">
-          <span style={{ width: `${((now - program.start) / (program.seconds * 1000)) * 100}%` }} />
-        </span>
-      )}
     </>
   );
   const events = {
@@ -312,7 +307,6 @@ export default function ChannelsPage() {
   return (
     <div className="page container guide">
       <h1 className="page__title">{t('Channels')}</h1>
-      <p className="muted guide__intro">{t('Your library as TV: everyone on a channel sees the same thing at the same time. No pausing; change channel with ↑ and ↓.')}</p>
       {channels.length === 0 ? (
         <Empty>{me?.isAdmin ? t('No channels yet. Add some in Settings → Channels.') : t('No channels yet.')}</Empty>
       ) : (
@@ -351,33 +345,36 @@ export default function ChannelsPage() {
             </div>
           </div>
           <div className="guide__scroller" ref={setScroller} onScroll={onScroll} data-reveal="far" data-reveal-inset={box.chan}>
-            <ul className="guide__rows" style={{ width }}>
-              {channels.map((channel) => {
-                const list = (programs.get(channel.id) ?? []).filter((p) => programEnd(p) > Math.max(origin, shownFrom) && p.start < shownUntil);
-                return (
-                  <li key={channel.id} className="guide__row">
-                    <Link to={`/channels/${channel.number}`} className="guide__chan" aria-label={`${channel.number} ${channel.name}`}>
-                      <span className="guide__num">{channel.number}</span>
-                      <span className="guide__name">
-                        <span className="guide__name-text">{channel.name}</span>
-                        {channel.watching > 0 && <span className="guide__watching">{tn(channel.watching, '{n} viewer', '{n} viewers')}</span>}
+            <div className="guide__body" style={{ width }}>
+              <ul className="guide__rows">
+                {channels.map((channel) => {
+                  const list = (programs.get(channel.id) ?? []).filter((p) => programEnd(p) > Math.max(origin, shownFrom) && p.start < shownUntil);
+                  return (
+                    <li key={channel.id} className="guide__row">
+                      <Link to={`/channels/${channel.number}`} className="guide__chan" aria-label={`${channel.number} ${channel.name}`}>
+                        <span className="guide__num">{channel.number}</span>
+                        <span className="guide__name">
+                          <span className="guide__name-text">{channel.name}</span>
+                          {channel.watching > 0 && <span className="guide__watching">{tn(channel.watching, '{n} viewer', '{n} viewers')}</span>}
+                        </span>
+                      </Link>
+                      <span className="guide__line">
+                        {px > 0 &&
+                          (list.length ? (
+                            list.map((p) => <Block key={`${p.itemId}${p.start}`} program={p} channel={channel} origin={origin} px={px} now={now} onAbout={openAbout} />)
+                          ) : (
+                            <span className="guide__empty muted small" style={{ left: x(Math.max(now, viewStart)) }}>
+                              {t('Nothing to play yet')}
+                            </span>
+                          ))}
                       </span>
-                    </Link>
-                    <span className="guide__line">
-                      {px > 0 &&
-                        (list.length ? (
-                          list.map((p) => <Block key={`${p.itemId}${p.start}`} program={p} channel={channel} origin={origin} px={px} now={now} onAbout={openAbout} />)
-                        ) : (
-                          <span className="guide__empty muted small" style={{ left: x(Math.max(now, viewStart)) }}>
-                            {t('Nothing to play yet')}
-                          </span>
-                        ))}
-                      {px > 0 && now >= origin && <span className="guide__nowline" style={{ left: x(now) }} aria-hidden="true" />}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
+                    </li>
+                  );
+                })}
+              </ul>
+              {/* The minute it is, one line down through every channel (from the "Now" at the top). */}
+              {px > 0 && now >= origin && <span className="guide__nowline" style={{ left: box.chan + x(now) }} aria-hidden="true" />}
+            </div>
           </div>
         </>
       )}

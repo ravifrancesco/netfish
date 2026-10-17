@@ -4419,10 +4419,6 @@ html.is-tv .round-btn[data-tip]:focus::after {
   --chan: 210px;
   --row: 66px;
 }
-.guide__intro {
-  margin: -8px 0 22px;
-  max-width: 720px;
-}
 /* The times along the top stay put while the page scrolls; they follow the guide sideways. */
 .guide__times {
   position: sticky;
@@ -4464,7 +4460,13 @@ html.is-tv .round-btn[data-tip]:focus::after {
   font-weight: 700;
   text-transform: capitalize;
 }
+/* Now: its line runs the header's height, and on down the rows below in one. */
 .guide__tick.is-now {
+  top: -6px;
+  bottom: -6px;
+  margin-left: -1px;
+  padding-top: 6px;
+  border-left-width: 2px;
   border-color: var(--accent);
   color: var(--accent);
   font-weight: 700;
@@ -4663,24 +4665,14 @@ html.is-tv .guide__prog:focus {
 .guide__prog.is-open .guide__prog-inner {
   position: static;
 }
-.guide__prog-bar {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.08);
+/* The minute it is now, one line down every channel (under the channels' column when scrolled past). */
+.guide__body {
+  position: relative;
 }
-.guide__prog-bar > span {
-  display: block;
-  height: 100%;
-  background: var(--accent);
-}
-/* The minute it is now, across the row. */
 .guide__nowline {
   position: absolute;
-  top: -3px;
-  bottom: -3px;
+  top: 0;
+  bottom: 0;
   z-index: 2;
   width: 2px;
   margin-left: -1px;
