@@ -75,6 +75,8 @@ function Block({
   const ref = useRef<HTMLElement>(null);
   const end = programEnd(program);
   const onNowBlock = program.start <= now && now < end;
+  // Already over (between where the guide starts and now): there, greyed, nothing to do with it.
+  const past = end <= now;
   const from = Math.max(program.start, origin);
   const left = (from - origin) * px;
   const width = Math.max(2, (end - from) * px - GAP);
@@ -82,21 +84,17 @@ function Block({
   const minutesLeft = Math.max(0, Math.ceil((end - now) / MINUTE));
   // Too thin for a word: blank until it opens. Short: a smaller title, no time.
   const short = width < 40 && !onNowBlock ? ' is-tiny' : width < 110 ? ' is-narrow' : '';
-  // Its title or line doesn't fit (titles stay on one line): it opens out over its neighbours, at
-  // least as wide as it is, as far as the guide's edge allows, to read it all.
-  const cutShort = () => {
-    const el = ref.current;
-    return Boolean(el && (short || [...el.querySelectorAll('.guide__prog-title, .guide__prog-meta')].some((c) => c.scrollWidth > c.clientWidth + 1)));
-  };
+  // Only its title shows; hovered (or with the remote on it) it opens out over its neighbours, at
+  // least as wide as it is and as far as the guide's edge allows, with its time and episode.
   const openOut = () => {
     const el = ref.current;
-    if (!el || !cutShort()) return;
+    if (!el) return;
     const edge = el.closest('.guide__scroller')?.getBoundingClientRect().right ?? window.innerWidth;
     el.style.setProperty('--w', `${el.offsetWidth}px`);
     el.style.setProperty('--room', `${Math.max(140, edge - el.getBoundingClientRect().left - 8)}px`);
     setOpen(true);
   };
-  const className = `guide__prog${onNowBlock ? ' is-now' : ''}${short}${open ? ' is-open' : ''}`;
+  const className = `guide__prog${onNowBlock ? ' is-now' : ''}${past ? ' is-past' : ''}${short}${open ? ' is-open' : ''}`;
   const style = { left, width };
   const content = (
     <>
@@ -123,6 +121,15 @@ function Block({
     onFocus: openOut,
     onBlur: () => setOpen(false),
   };
+  if (past) {
+    return (
+      <span className={className} style={style} aria-hidden="true">
+        <span className="guide__prog-inner">
+          <span className="guide__prog-title">{programTitle(program)}</span>
+        </span>
+      </span>
+    );
+  }
   // On now: tune in. Still to come: what it is.
   return onNowBlock ? (
     <Link
@@ -346,7 +353,7 @@ export default function ChannelsPage() {
           <div className="guide__scroller" ref={setScroller} onScroll={onScroll} data-reveal="far" data-reveal-inset={box.chan}>
             <ul className="guide__rows" style={{ width }}>
               {channels.map((channel) => {
-                const list = (programs.get(channel.id) ?? []).filter((p) => programEnd(p) > Math.max(now, shownFrom) && p.start < shownUntil);
+                const list = (programs.get(channel.id) ?? []).filter((p) => programEnd(p) > Math.max(origin, shownFrom) && p.start < shownUntil);
                 return (
                   <li key={channel.id} className="guide__row">
                     <Link to={`/channels/${channel.number}`} className="guide__chan" aria-label={`${channel.number} ${channel.name}`}>

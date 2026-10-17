@@ -82,6 +82,8 @@ function ProfileMenu({ user }: { user: User }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  // Admins: a newer Netfish than this server (the container to update) shows as a dot here.
+  const update = useQuery({ queryKey: ['server-update'], queryFn: api.serverUpdate, enabled: user.isAdmin, staleTime: 30 * 60_000 });
   const logout = useMutation({
     mutationFn: api.logout,
     onSettled: () => {
@@ -103,9 +105,15 @@ function ProfileMenu({ user }: { user: User }) {
 
   return (
     <div className="profile" ref={ref}>
-      <button className="avatar" onClick={() => setOpen((o) => !o)} aria-label={t('Account menu')} aria-expanded={open}>
+      <button
+        className="avatar"
+        onClick={() => setOpen((o) => !o)}
+        aria-label={update.data?.newer ? `${t('Account menu')} · ${t('A newer Netfish is out')}` : t('Account menu')}
+        aria-expanded={open}
+      >
         {user.avatar ? <img src={user.avatar} alt="" /> : <span>{user.name[0]?.toUpperCase()}</span>}
       </button>
+      {update.data?.newer && <span className="profile__dot" aria-hidden="true" />}
       {open && (
         <div className="menu" role="menu">
           <div className="menu__head">
@@ -122,6 +130,7 @@ function ProfileMenu({ user }: { user: User }) {
           </Link>
           <Link to="/settings" className="menu__item" onClick={() => setOpen(false)} role="menuitem">
             <Settings size={16} /> {t('Settings')}
+            {update.data?.newer && <span className="badge menu__note">{t('Update')}</span>}
           </Link>
           <button className="menu__item" onClick={() => logout.mutate()} role="menuitem">
             <LogOut size={16} /> {t('Sign out')}

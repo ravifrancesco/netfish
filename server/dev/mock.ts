@@ -1154,6 +1154,14 @@ void app.register(
 // qBittorrent
 // ======================================================================
 
+// qBittorrent's queue: torrents in the order they were added, then those sent to the back (in
+// the order they were sent).
+const qbitQueue: string[] = [];
+const queuePosition = (hash: string) => {
+  const unmoved = downloads.map((d) => d.downloadId.toLowerCase()).filter((h) => !qbitQueue.includes(h));
+  const at = qbitQueue.indexOf(hash);
+  return at >= 0 ? unmoved.length + at + 1 : unmoved.indexOf(hash) + 1;
+};
 void app.register(
   async (q) => {
     q.post('/auth/login', async (_req, reply) => reply.header('set-cookie', 'SID=mock; HttpOnly; path=/').send('Ok.'));
@@ -1167,6 +1175,7 @@ void app.register(
           dlspeed: stalled || progress >= 1 ? 0 : Math.round((d.size / (d.durationMs / 1000)) * (0.85 + Math.random() * 0.3)),
           eta: stalled ? 8_640_000 : Math.max(0, Math.round(((1 - progress) * d.durationMs) / 1000)),
           state: d.stopped ? 'stoppedDL' : stalled ? 'stalledDL' : progress >= 1 ? 'uploading' : 'downloading',
+          seq_dl: Boolean(d.seq), priority: queuePosition(d.downloadId.toLowerCase()),
         };
       }),
     );
@@ -1192,7 +1201,21 @@ void app.register(
       for (const d of downloads) if (hashes.has(d.downloadId.toLowerCase())) d.limit = limit;
       return 'Ok.';
     });
-    q.post('/torrents/bottomPrio', async () => 'Ok.');
+    // To the back of the queue, in the order given.
+    q.post('/torrents/bottomPrio', async (req) => {
+      const given = String(formOf(req.body).get('hashes') ?? '').toLowerCase().split('|').filter(Boolean);
+      for (const hash of given) {
+        const at = qbitQueue.indexOf(hash);
+        if (at >= 0) qbitQueue.splice(at, 1);
+        qbitQueue.push(hash);
+      }
+      return 'Ok.';
+    });
+    q.post('/torrents/toggleSequentialDownload', async (req) => {
+      const hashes = hashesOf(req.body);
+      for (const d of downloads) if (hashes.has(d.downloadId.toLowerCase())) d.seq = !d.seq;
+      return 'Ok.';
+    });
   },
   { prefix: '/qbit/api/v2' },
 );
@@ -1353,6 +1376,11 @@ void app.register(
   },
   { prefix: '/trakt' },
 );
+// GitHub's latest Netfish release (the server's "a newer one is out" check).
+app.get('/github/repos/ravifrancesco/netfish/releases/latest', async () => ({
+  tag_name: 'v0.7.4', html_url: 'https://github.com/ravifrancesco/netfish/releases/tag/v0.7.4', draft: false, prerelease: false,
+}));
+
 // What reached the mock Trakt, for checking scrobbles by hand.
 app.get('/trakt-state', async () => ({ ...traktState, codes: undefined, access: undefined, refresh: undefined, movies: [...traktState.movies], episodes: [...traktState.episodes] }));
 

@@ -586,7 +586,15 @@ async function step(now: number) {
   const hours = inHours(s, now, settings.timeZone);
   const go = hours && !lowDisk;
   if (has.qbittorrent()) {
-    const hashes = stored.titles.filter((f) => f.state === 'downloading').flatMap((f) => queueOf(f).flatMap((q) => (q.downloadId ? [q.downloadId.toLowerCase()] : [])));
+    // In the order they'll be on: the title that airs first, and a show's episodes from the first.
+    const hashes = stored.titles
+      .filter((f) => f.state === 'downloading')
+      .sort((a, b) => (a.airAt ?? Infinity) - (b.airAt ?? Infinity))
+      .flatMap((f) =>
+        [...queueOf(f)]
+          .sort((a, b) => (a.seasonNumber ?? 0) - (b.seasonNumber ?? 0) || (a.episode?.episodeNumber ?? 0) - (b.episode?.episodeNumber ?? 0))
+          .flatMap((q) => (q.downloadId ? [q.downloadId.toLowerCase()] : [])),
+      );
     const unique = [...new Set(hashes)];
     if (!go && unique.length) {
       const fresh = unique.filter((h) => !stored.stopped.includes(h));
@@ -598,7 +606,10 @@ async function step(now: number) {
     }
     if (unique.length) {
       await settle(qbittorrent.limit(unique, s.maxSpeed > 0 ? (s.maxSpeed * MB) / unique.length : 0), undefined);
-      await settle(qbittorrent.last(unique), undefined);
+      // Behind everyone's own, one after another: the first to air at the front of them.
+      for (const hash of unique) await settle(qbittorrent.last([hash]), undefined);
+      // A whole season in one download comes front to back, so its first episodes are ready first.
+      await settle(qbittorrent.inOrder(unique), undefined);
     }
   }
 

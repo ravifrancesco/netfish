@@ -15,6 +15,7 @@ import type {
   TogetherControl,
   TogetherTracks,
   ProgramAbout,
+  ServerUpdate,
   SuggestArrStatus,
   TraktStatus,
   User,
@@ -60,6 +61,7 @@ import { createRequest, listRequests, myRequestKeys } from './services/requests'
 import { scrobble, setScrobble, startImport, startLink, traktStatus, unlink } from './services/trakt';
 import { runSuggestarr, suggestarrStatus } from './services/suggestarr';
 import { trailersFor } from './services/trailers';
+import { serverUpdate } from './services/serverUpdate';
 import { jellyfinDetail, jellyfinSeason, movieDetail, seasonDetail, tvDetail } from './services/titles';
 import { t } from './lib/i18n';
 
@@ -481,6 +483,7 @@ export async function apiRoutes(app: FastifyInstance) {
 
     // Admin settings, stored on the server.
     api.get('/admin/settings', { preHandler: requireAdmin }, async () => getSettings());
+    api.get('/admin/update', { preHandler: requireAdmin }, async (): Promise<ServerUpdate> => serverUpdate());
     api.put<{ Body: Partial<ServerSettings> }>('/admin/settings', { preHandler: requireAdmin }, async (req) => updateSettings(req.body ?? {}));
   });
 }

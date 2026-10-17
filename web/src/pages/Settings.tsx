@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { LogOut, MonitorCog } from 'lucide-react';
+import { CircleArrowUp, LogOut, MonitorCog } from 'lucide-react';
 import { useLocation } from 'react-router';
 import type { DownloadDetail, ServerSettings } from '@netfish/shared';
 import { api } from '../api';
@@ -185,6 +185,29 @@ function DownloadRules() {
   );
 }
 
+/** Admins: a newer Netfish than this server runs, and how to update the container. */
+function ServerUpdateNotice() {
+  const q = useQuery({ queryKey: ['server-update'], queryFn: api.serverUpdate, staleTime: 30 * 60_000 });
+  const u = q.data;
+  if (!u?.newer || !u.latest) return null;
+  return (
+    <div className="server-update" role="status">
+      <CircleArrowUp size={22} />
+      <div className="server-update__text">
+        <strong>{t('Netfish {version} is out', { version: u.latest })}</strong>
+        <span>
+          {t('This server runs {current}. To update it, in Portainer: Stacks → netfish → Update the stack, with Re-pull image on. Settings and channels are kept.', { current: u.current })}
+        </span>
+        {u.url && (
+          <a href={u.url} target="_blank" rel="noreferrer">
+            {t("What's new")}
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Settings() {
   const prefs = usePrefs();
   const { hash } = useLocation();
@@ -206,6 +229,7 @@ export default function Settings() {
     <div className="page container page--narrow">
       <h1 className="page__title">{t('Settings')}</h1>
       {me?.isAdmin && <StorageWarning problem={config?.storageProblem} />}
+      {me?.isAdmin && <ServerUpdateNotice />}
 
       <section className="panel">
         <h2>{t('Account')}</h2>

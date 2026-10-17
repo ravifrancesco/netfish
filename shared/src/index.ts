@@ -658,6 +658,15 @@ export interface TrailerChoices {
   chosen?: string;
 }
 
+/** Settings (admins): this server's version, and a newer one when there is (the container to update). */
+export interface ServerUpdate {
+  current: string;
+  latest?: string;
+  /** The newer one's release page. */
+  url?: string;
+  newer: boolean;
+}
+
 /** Settings → Connections → SuggestArr (admins): whose key it is, and its jobs. */
 export interface SuggestArrStatus {
   user?: { name: string; admin: boolean };

@@ -32,7 +32,7 @@ function resolvePublicDir(): string | undefined {
 }
 
 export const config = {
-  version: typeof __NETFISH_VERSION__ === 'string' ? __NETFISH_VERSION__ : 'dev',
+  version: typeof __NETFISH_VERSION__ === 'string' ? __NETFISH_VERSION__ : (env('NETFISH_VERSION') ?? 'dev'),
   port: Number(env('NETFISH_PORT') ?? env('PORT') ?? 7777),
   host: env('NETFISH_HOST') ?? '0.0.0.0',
   publicDir: resolvePublicDir(),

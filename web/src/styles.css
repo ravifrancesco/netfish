@@ -2586,6 +2586,51 @@ html.is-tv .switch:focus {
   flex: none;
   margin-top: 2px;
 }
+/* Admins: a newer Netfish is out. */
+.server-update {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border-radius: var(--radius);
+  border: 1px solid rgba(54, 226, 198, 0.35);
+  background: rgba(54, 226, 198, 0.08);
+  color: var(--accent);
+}
+.server-update > svg {
+  flex: none;
+  margin-top: 1px;
+}
+.server-update__text {
+  display: grid;
+  gap: 4px;
+  color: var(--text-2);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+.server-update__text strong {
+  color: var(--text);
+}
+.server-update__text a {
+  justify-self: start;
+  color: var(--accent);
+  font-weight: 600;
+}
+.profile__dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  background: var(--accent);
+  pointer-events: none;
+}
+.menu__note {
+  margin-left: auto;
+}
 
 /* ---------- Connections (admin) ---------- */
 
@@ -4538,10 +4583,19 @@ html.is-tv .guide__chan:focus .guide__num {
 html.is-tv .guide__prog:focus {
   border-color: var(--accent);
 }
+/* A tint over the solid colour: what it opens out over never shows through. */
 .guide__prog.is-now:hover,
 .guide__prog.is-now:focus-visible,
 html.is-tv .guide__prog.is-now:focus {
-  background: rgba(54, 226, 198, 0.12);
+  background: linear-gradient(rgba(54, 226, 198, 0.12), rgba(54, 226, 198, 0.12)), var(--surface-2);
+}
+/* Already over: there to fill the line up to now, greyed, nothing to do with it. */
+.guide__prog.is-past {
+  border-left-width: 1px;
+  background: var(--surface);
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
 }
 .guide__prog:focus-visible,
 html.is-tv .guide__prog:focus {
@@ -4559,7 +4613,7 @@ html.is-tv .guide__prog:focus {
   min-width: 0;
   max-width: 100%;
 }
-/* One line each: what doesn't fit opens out on hover (or with the remote's focus). */
+/* One line each: all of it shows when it opens out on hover (or with the remote on it). */
 .guide__prog-title,
 .guide__prog-meta {
   overflow: hidden;
@@ -4582,7 +4636,8 @@ html.is-tv .guide__prog:focus {
 .guide__prog.is-narrow:not(.is-open) .guide__prog-title {
   font-size: 0.8rem;
 }
-.guide__prog.is-narrow:not(.is-now, .is-open) .guide__prog-meta {
+/* Only the title, until it opens (hovered, or the remote on it): then its time and episode too. */
+.guide__prog:not(.is-open) .guide__prog-meta {
   display: none;
 }
 /* Too thin for a word: blank until it opens. */

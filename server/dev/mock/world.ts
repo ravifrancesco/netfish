@@ -177,6 +177,8 @@ export interface MockDownload {
   /** Picked by hand (Interactive Search): like Radarr/Sonarr, not searched for again when blocklisted. */
   interactive?: boolean;
   limit?: number;
+  /** qBittorrent's "download in sequential order". */
+  seq?: boolean;
   size: number;
   release: string;
   quality: string;

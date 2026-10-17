@@ -16,6 +16,8 @@ export interface Torrent {
   eta: number;
   state: string;
   num_seeds: number;
+  /** Downloading front to back. */
+  seq_dl?: boolean;
 }
 
 let cookie: string | undefined;
@@ -97,4 +99,10 @@ export const qbittorrent = {
     post('/api/v2/torrents/setDownloadLimit', { hashes: hashes.join('|'), limit: String(Math.max(0, Math.round(bytesPerSecond))) }),
   /** To the back of the queue (when qBittorrent queues downloads). */
   last: (hashes: string[]) => post('/api/v2/torrents/bottomPrio', { hashes: hashes.join('|') }),
+  /** Front to back (a whole season in one download: its episodes in order), for those not already. */
+  inOrder: async (hashes: string[]) => {
+    const want = new Set(hashes);
+    const off = (await get<Torrent[]>('/api/v2/torrents/info?filter=all')).filter((x) => want.has(x.hash.toLowerCase()) && !x.seq_dl).map((x) => x.hash);
+    if (off.length) await post('/api/v2/torrents/toggleSequentialDownload', { hashes: off.join('|') });
+  },
 };

@@ -13,6 +13,10 @@ export default {
 
   // Download rules
   'Download rules saved.': 'Regole di download salvate.',
+  'A newer Netfish is out': 'È uscita una versione più recente di Netfish',
+  'Netfish {version} is out': 'È uscito Netfish {version}',
+  'This server runs {current}. To update it, in Portainer: Stacks → netfish → Update the stack, with Re-pull image on. Settings and channels are kept.':
+    'Questo server ha la {current}. Per aggiornarlo, in Portainer: Stacks → netfish → Update the stack, con Re-pull image attivo. Impostazioni e canali restano.',
   'Not run yet': 'Non ancora avviato',
   'Last run {when} failed: {problem}': 'Ultimo avvio {when} non riuscito: {problem}',
   'Last run {when} was skipped': 'Ultimo avvio {when} saltato',

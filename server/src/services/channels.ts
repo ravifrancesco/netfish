@@ -1090,7 +1090,10 @@ export async function listChannels(user: SessionUser, hours = 4, now = Date.now(
   for (const def of visible) changed = extend(def, real, now, timeZone()) || changed;
   if (changed) save();
   const lib = withPlans(real);
-  const start = from && Number.isFinite(from) ? Math.min(Math.max(from, now), now + GUIDE_AHEAD) : now;
+  // The guide may look a little back too: it starts at the half hour 20 to 50 minutes ago, and
+  // whatever is on from then comes (however long before it began), to fill the line up to now.
+  // Three hours back at most (as far as schedules keep what's been on).
+  const start = from && Number.isFinite(from) ? Math.min(Math.max(from, now - KEEP_BEHIND), now + GUIDE_AHEAD) : now;
   const until = start + Math.min(7 * 24, Math.max(1, hours)) * 3600_000;
   const owners = new Map(freshPlans().map((p) => [p.key, p.channelId]));
   const channels: Channel[] = visible.map((def) => {
