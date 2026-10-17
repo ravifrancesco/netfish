@@ -1001,6 +1001,13 @@ export interface ChannelProgram {
   isNew?: boolean;
 }
 
+/** A programme in the guide, opened: what it's about, and the page of its film or show. */
+export interface ProgramAbout {
+  overview?: string;
+  /** The Jellyfin id of the film, or of the show an episode is from. */
+  pageId: string;
+}
+
 export interface Channel {
   id: string;
   number: number;

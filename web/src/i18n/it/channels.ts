@@ -133,8 +133,8 @@ export default {
   'Kept (requested)': 'Tenuto (richiesto)',
   Tonight: 'Stasera',
   Tomorrow: 'Domani',
-  Earlier: 'Prima',
-  Later: 'Dopo',
+  Today: 'Oggi',
+  'Watch channel {n} now': 'Guarda ora il canale {n}',
   When: 'Quando',
   'always channel 1': 'sempre il canale 1',
 } as Record<string, string>;

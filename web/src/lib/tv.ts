@@ -131,16 +131,23 @@ export function focusEl(el: HTMLElement, dir?: Direction) {
   else if (!onScreen) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
-/** Scroll a sideways row just enough to show the focused card with a little room. */
+/**
+ * Scroll a sideways row just enough to show the focused card with a little room. A guide
+ * (data-reveal="far") moves on a good way instead, so the next few programmes come into view;
+ * data-reveal-inset is what its fixed column covers on the left.
+ */
 function revealSideways(el: HTMLElement) {
   for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
     const overflow = getComputedStyle(p).overflowX;
     if ((overflow === 'auto' || overflow === 'scroll') && p.scrollWidth > p.clientWidth) {
       const pr = p.getBoundingClientRect();
       const r = el.getBoundingClientRect();
+      const far = p.dataset.reveal === 'far';
+      const left = pr.left + (Number(p.dataset.revealInset) || 0);
+      const width = pr.right - left;
       const room = 48;
-      if (r.left < pr.left + room) p.scrollBy({ left: r.left - pr.left - room, behavior: 'smooth' });
-      else if (r.right > pr.right - room) p.scrollBy({ left: r.right - pr.right + room, behavior: 'smooth' });
+      if (r.left < left + room) p.scrollBy({ left: far ? Math.min(r.left - left - room, r.right - (left + width * 0.75)) : r.left - left - room, behavior: 'smooth' });
+      else if (r.right > pr.right - room) p.scrollBy({ left: far ? r.left - (left + width * 0.25) : r.right - pr.right + room, behavior: 'smooth' });
       return;
     }
   }

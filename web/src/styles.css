@@ -4369,26 +4369,40 @@ html.is-tv .round-btn[data-tip]:focus::after {
    ========================================================================== */
 
 /* ---------- The guide ---------- */
+/* One line of time that scrolls sideways under a fixed column of channels (--chan wide). */
+.guide {
+  --chan: 210px;
+  --row: 66px;
+}
 .guide__intro {
   margin: -8px 0 22px;
   max-width: 720px;
 }
-.guide__times,
-.guide__row {
-  display: grid;
-  grid-template-columns: minmax(150px, 220px) 1fr;
-  gap: 12px;
-  align-items: stretch;
-}
+/* The times along the top stay put while the page scrolls; they follow the guide sideways. */
 .guide__times {
   position: sticky;
   top: var(--nav-h);
-  z-index: 2;
+  z-index: 4;
+  overflow: hidden;
   padding: 6px 0;
   background: var(--bg);
 }
+.guide__times-track {
+  display: flex;
+  will-change: transform;
+}
+.guide__spacer {
+  flex: none;
+  width: var(--chan);
+}
+.guide__corner {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 1;
+  width: var(--chan);
+  background: var(--bg);
+}
 .guide__times .guide__line {
-  position: relative;
   height: 20px;
 }
 .guide__tick {
@@ -4400,10 +4414,25 @@ html.is-tv .round-btn[data-tip]:focus::after {
   font-size: 0.75rem;
   white-space: nowrap;
 }
+.guide__tick.is-day {
+  color: var(--text);
+  font-weight: 700;
+  text-transform: capitalize;
+}
 .guide__tick.is-now {
   border-color: var(--accent);
   color: var(--accent);
   font-weight: 700;
+}
+.guide__scroller {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+html.is-tv .guide__scroller {
+  scrollbar-width: none;
 }
 .guide__rows {
   display: grid;
@@ -4413,14 +4442,23 @@ html.is-tv .round-btn[data-tip]:focus::after {
   list-style: none;
 }
 .guide__row {
+  display: flex;
   padding: 4px 0;
-  border-radius: var(--radius);
 }
 .guide__chan {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  flex: none;
   display: flex;
   align-items: center;
   gap: 12px;
+  width: var(--chan);
   min-width: 0;
+  padding-right: 12px;
+  background: var(--bg);
+  color: inherit;
+  text-decoration: none;
 }
 .guide__num {
   flex: none;
@@ -4435,11 +4473,22 @@ html.is-tv .round-btn[data-tip]:focus::after {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
+.guide__chan:hover .guide__num,
+.guide__chan:focus-visible .guide__num,
+html.is-tv .guide__chan:focus .guide__num {
+  background: var(--accent);
+  color: var(--accent-ink, #04201b);
+}
 .guide__name {
   display: grid;
   min-width: 0;
   font-weight: 700;
   line-height: 1.2;
+}
+.guide__name-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .guide__watching {
   color: var(--accent);
@@ -4448,7 +4497,14 @@ html.is-tv .round-btn[data-tip]:focus::after {
 }
 .guide__line {
   position: relative;
-  height: 66px;
+  flex: 1;
+  height: var(--row);
+}
+.guide__empty {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
 }
 .guide__prog {
   position: absolute;
@@ -4456,114 +4512,101 @@ html.is-tv .round-btn[data-tip]:focus::after {
   bottom: 0;
   display: grid;
   align-content: center;
-  gap: 2px;
   min-width: 0;
+  margin: 0;
   padding: 8px 12px;
   border-radius: 8px;
   border: 1px solid var(--line);
   border-left-width: 3px;
   background: var(--surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
   overflow: hidden;
+  /* clip, where there is: the title can then stay in view while a long one scrolls past. */
+  overflow: clip;
   transition: border-color 0.15s ease, background 0.15s ease;
-}
-.guide__prog + .guide__prog {
-  margin-left: 4px;
 }
 .guide__prog.is-now {
   background: var(--surface-2);
   border-left-color: var(--accent);
 }
-.guide__row:hover .guide__prog.is-now,
-.guide__row:focus-visible .guide__prog.is-now,
-html.is-tv .guide__row:focus .guide__prog.is-now {
+.guide__prog:hover,
+.guide__prog:focus-visible,
+html.is-tv .guide__prog:focus {
   border-color: var(--accent);
+}
+.guide__prog.is-now:hover,
+.guide__prog.is-now:focus-visible,
+html.is-tv .guide__prog.is-now:focus {
   background: rgba(54, 226, 198, 0.12);
 }
-.guide__row:focus-visible,
-html.is-tv .guide__row:focus {
+.guide__prog:focus-visible,
+html.is-tv .guide__prog:focus {
+  z-index: 4;
   outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline-offset: 1px;
 }
+/* What a programme says stays at the guide's left edge while it scrolls past (a long film). */
+.guide__prog-inner {
+  position: sticky;
+  left: calc(var(--chan) + 10px);
+  justify-self: start;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  max-width: 100%;
+}
+/* One line each: what doesn't fit opens out on hover (or with the remote's focus). */
+.guide__prog-title,
 .guide__prog-meta {
+  overflow: hidden;
   white-space: nowrap;
-  overflow: hidden;
   text-overflow: ellipsis;
-}
-/* Titles go onto two lines rather than being cut short. */
-.guide__prog-title {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  line-height: 1.15;
-}
-/* A short slot: the title is what matters (its time is where it sits). */
-.guide__prog.is-narrow {
-  padding: 6px 8px;
-}
-.guide__prog.is-narrow .guide__prog-title {
-  font-size: 0.8rem;
-}
-.guide__prog.is-narrow:not(.is-now) .guide__prog-meta {
-  display: none;
-}
-/* A short slot, hovered (or tapped where there's no hover): opened out over its neighbours to read it all. */
-.guide__prog.is-narrow:hover,
-.guide__prog.is-tiny:hover,
-.guide__prog.is-open {
-  z-index: 3;
-  width: max-content !important;
-  min-width: 140px;
-  max-width: 300px;
-  padding: 8px 12px;
-  border-width: 1px 1px 1px 3px;
-  background: var(--surface-2);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
-}
-.guide__prog.is-end:is(.is-narrow:hover, .is-tiny:hover, .is-open) {
-  left: auto !important;
-  right: var(--right);
-}
-.guide__prog:is(.is-narrow:hover, .is-tiny:hover, .is-open) > * {
-  display: block;
-}
-.guide__prog:is(.is-narrow:hover, .is-tiny:hover, .is-open) .guide__prog-title {
-  display: -webkit-box;
-  font-size: 0.92rem;
-}
-.guide__prog:is(.is-narrow:hover, .is-tiny:hover, .is-open) .guide__prog-meta {
-  display: block;
-}
-.guide__prog:is(.is-narrow:hover, .is-tiny:hover, .is-open) .guide__prog-bar {
-  display: block;
-}
-/* The minute it is now, across the row. */
-.guide__nowline {
-  position: absolute;
-  top: -3px;
-  bottom: -3px;
-  z-index: 1;
-  width: 2px;
-  margin-left: -1px;
-  border-radius: 2px;
-  background: var(--accent);
-  pointer-events: none;
 }
 .guide__prog-title {
   font-weight: 700;
   font-size: 0.92rem;
+  line-height: 1.2;
 }
 .guide__prog-meta {
   color: var(--text-3);
   font-size: 0.78rem;
 }
-.guide__prog.is-tiny {
+/* A short slot: the title is what matters (its time is where it sits). */
+.guide__prog.is-narrow:not(.is-open) {
+  padding: 6px 8px;
+}
+.guide__prog.is-narrow:not(.is-open) .guide__prog-title {
+  font-size: 0.8rem;
+}
+.guide__prog.is-narrow:not(.is-now, .is-open) .guide__prog-meta {
+  display: none;
+}
+/* Too thin for a word: blank until it opens. */
+.guide__prog.is-tiny:not(.is-open) {
   padding: 0;
   border-left-width: 1px;
 }
-.guide__prog.is-tiny > * {
+.guide__prog.is-tiny:not(.is-open) > * {
   display: none;
+}
+/* Cut short and hovered (or focused): opened out over its neighbours, never narrower than it
+   was, as far as the guide's edge, on one line. */
+.guide__prog.is-open {
+  z-index: 5;
+  width: max-content !important;
+  min-width: max(140px, var(--w, 0px));
+  max-width: max(var(--w, 0px), min(720px, var(--room, 720px)));
+  padding: 8px 12px;
+  border-width: 1px 1px 1px 3px;
+  background: var(--surface-2);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+}
+.guide__prog.is-open .guide__prog-inner {
+  position: static;
 }
 .guide__prog-bar {
   position: absolute;
@@ -4578,12 +4621,19 @@ html.is-tv .guide__row:focus {
   height: 100%;
   background: var(--accent);
 }
-.guide__empty {
-  display: flex;
-  align-items: center;
-  height: 100%;
+/* The minute it is now, across the row. */
+.guide__nowline {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  z-index: 2;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: var(--accent);
+  pointer-events: none;
 }
-/* Looking ahead: earlier, later, straight to an evening. */
+/* Straight to an evening; what's in view. */
 .guide__when {
   display: flex;
   align-items: center;
@@ -4598,60 +4648,50 @@ html.is-tv .guide__row:focus {
   margin-left: 4px;
   text-transform: capitalize;
 }
-.guide__rows.is-loading {
-  opacity: 0.6;
-  transition: opacity 0.2s ease;
+/* A programme still to come, opened. */
+.about {
+  display: grid;
+  gap: 8px;
 }
-/* Phones: what's on now, and next. */
+.about p {
+  margin: 0;
+}
+.about__image {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.about__when {
+  color: var(--accent);
+  font-weight: 700;
+}
+.about__episode {
+  font-weight: 600;
+}
+.about__overview {
+  color: var(--text-2);
+  line-height: 1.5;
+}
+/* Phones: a narrower column of channels (the number, the name under it) and an hour and a half across. */
 @media (max-width: 640px) {
-  .guide__times {
-    display: none;
+  .guide {
+    --chan: 78px;
+    --row: 60px;
   }
-  .guide__row {
-    grid-template-columns: 1fr;
-    gap: 8px;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--line);
+  .guide__chan {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 4px;
+    padding-right: 8px;
   }
-  .guide__line {
-    display: flex;
-    gap: 6px;
-    height: auto;
+  .guide__name {
+    width: 100%;
+    font-size: 0.72rem;
   }
-  .guide__prog {
-    position: static;
-    flex: 1 1 0;
-    width: auto !important;
-    min-height: 58px;
-  }
-  .guide__prog + .guide__prog {
-    margin-left: 0;
-  }
-  .guide__prog.is-now {
-    flex-grow: 1.8;
-  }
-  .guide__prog.is-later {
-    display: none;
-  }
-  /* A short one next is as wide as any other here. */
-  .guide__prog.is-tiny {
-    padding: 8px 12px;
-    border-left-width: 3px;
-  }
-  .guide__prog.is-tiny > * {
-    display: block;
-  }
-  /* Here every slot is wide: all of it shows, and there's no time line to draw. */
-  .guide__prog.is-narrow {
-    padding: 8px 12px;
-  }
-  .guide__prog.is-narrow .guide__prog-title {
-    font-size: 0.92rem;
-  }
-  .guide__prog.is-narrow:not(.is-now) .guide__prog-meta {
-    display: block;
-  }
-  .guide__nowline {
+  .guide__watching {
     display: none;
   }
 }

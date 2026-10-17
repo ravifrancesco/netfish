@@ -29,6 +29,16 @@ export class OverlayVideo extends EventTarget {
     this.dispatchEvent(new Event(type));
   }
 
+  /**
+   * Another file is on its way into the same player (a channel's next programme): until it has
+   * loaded, nothing says "playing" (the last one's picture may still be up), and its time starts over.
+   */
+  loadingNext() {
+    this.loaded = false;
+    this.buffering = true;
+    this.time = 0;
+  }
+
   private apply(state: Record<string, unknown>) {
     const num = (key: string) => (typeof state[key] === 'number' ? (state[key] as number) : undefined);
     const flag = (key: string) => (typeof state[key] === 'boolean' ? (state[key] as boolean) : undefined);

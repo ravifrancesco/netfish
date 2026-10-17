@@ -14,6 +14,7 @@ import type {
   SubtitleRequest,
   TogetherControl,
   TogetherTracks,
+  ProgramAbout,
   SuggestArrStatus,
   TraktStatus,
   User,
@@ -431,6 +432,12 @@ export async function apiRoutes(app: FastifyInstance) {
     api.post<{ Params: { id: string }; Body: { clientId?: string; leaving?: boolean } }>('/channels/:id/watching', async (req) => {
       watching(clean(req.params.id, 40), clean(req.body?.clientId, 64), req.body?.leaving === true);
       return { ok: true };
+    });
+    // A programme opened in the guide: what it's about, and where its page is.
+    api.get<{ Params: { itemId: string } }>('/channels/about/:itemId', async (req): Promise<ProgramAbout> => {
+      const user = userOf(req);
+      const item = await jellyfin.item(user.token, user.id, clean(req.params.itemId, 64));
+      return { overview: item.Overview, pageId: item.SeriesId ?? item.Id };
     });
     // A new title on a channel: anyone can keep it (it joins the library).
     api.post<{ Body: { itemId?: string } }>('/channels/keep', async (req) => {

@@ -58,6 +58,10 @@ export default function ChannelPlayer() {
   const programRef = useRef<ChannelProgram | undefined>(undefined);
   const [session, setSession] = useState<PlaybackSession>();
   const [status, setStatus] = useState<'loading' | 'playing' | 'ended' | 'failed' | 'tap'>('loading');
+  const statusRef = useRef(status);
+  statusRef.current = status;
+  /** Where in its programme the latest stream was asked to start (seconds). */
+  const startedAt = useRef(0);
   const [subtitle, setSubtitle] = useState<StreamTrack>();
   const [audioIndex, setAudioIndex] = useState<number>();
   /** Subtitles chosen on this channel carry on to the next programme: a language, or off (null). */
@@ -131,7 +135,19 @@ export default function ChannelPlayer() {
 
   const handlers = useRef<Record<string, () => void>>({});
   handlers.current = {
-    onPlaying: () => setStatus('playing'),
+    // From static (a new channel or programme), the picture shows once the new one is really
+    // moving: the apps' players can say "playing" with the last channel's picture still up.
+    onPlaying: () => {
+      if (statusRef.current !== 'loading') return setStatus('playing');
+      const began = Date.now();
+      const check = () => {
+        if (statusRef.current !== 'loading') return;
+        const t = video.current?.currentTime ?? 0;
+        if ((t >= startedAt.current + 0.2 && t < startedAt.current + 60) || Date.now() - began > 2500) setStatus('playing');
+        else setTimeout(check, 80);
+      };
+      check();
+    },
     onLoaded: () => {},
     onEnded: () => setStatus('ended'),
     onError: () => {
@@ -147,6 +163,7 @@ export default function ChannelPlayer() {
   };
 
   const attach = (s: PlaybackSession, start: number, sub: StreamTrack | undefined, p: ChannelProgram) => {
+    startedAt.current = start;
     if (useOverlay && overlay) {
       // One for the whole time on the channels: each programme loads into it.
       let ov = overlayVideo.current;
@@ -156,6 +173,7 @@ export default function ChannelPlayer() {
         const map: Record<string, string> = { playing: 'onPlaying', loadedmetadata: 'onLoaded', ended: 'onEnded', error: 'onError', volumechange: 'onVolumeChange' };
         for (const [event, name] of Object.entries(map)) ov.addEventListener(event, () => handlers.current[name]?.());
       }
+      ov.loadingNext();
       video.current = ov as unknown as HTMLVideoElement;
       const positions = trackPositions(s);
       void overlay
