@@ -110,13 +110,13 @@ final class MainWindow: NSWindowController, NSWindowDelegate, WKNavigationDelega
     }
 
     /// Opening: the fish swims while the server is checked (a few seconds at most), then
-    /// Netfish, or offline mode (the downloads) when it doesn't answer.
+    /// Netfish, or offline mode when it doesn't answer: the downloads (or that there are none),
+    /// trying again by itself, and a way to change the server if it has moved.
     private func start(_ server: URL) {
         web.load(URLRequest(url: LocalScheme.url("loading.html", query: [:])))
         Task { @MainActor in
             if await Server.reachable(server) { return open(server) }
-            if store.hasDownloads { return showOffline(["offline": true]) }
-            showSetup(error: L("Couldn't reach {server} ({error}). Is it on?", ["server": server.absoluteString, "error": L("nothing answered")]))
+            showOffline(["offline": true])
         }
     }
 
@@ -235,11 +235,8 @@ final class MainWindow: NSWindowController, NSWindowDelegate, WKNavigationDelega
         let err = error as NSError
         guard err.code != NSURLErrorCancelled, err.code != 102 else { return }
         if (err.userInfo[NSURLErrorFailingURLErrorKey] as? URL)?.scheme == LocalScheme.scheme { return }
-        // Away from home with films downloaded: straight to them.
-        if store.hasDownloads { return showOffline(["offline": true]) }
-        showSetup(error: L("Couldn't reach {server} ({error}). Is it on?", [
-            "server": Server.url?.absoluteString ?? L("the server"), "error": err.localizedDescription,
-        ]))
+        // The server stopped answering (offline, or away from home): offline mode.
+        showOffline(["offline": true])
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {

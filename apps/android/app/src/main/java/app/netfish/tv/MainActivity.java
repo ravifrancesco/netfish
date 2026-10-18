@@ -166,8 +166,9 @@ public class MainActivity extends Activity {
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 String url = request.getUrl().toString();
                 if (!request.isForMainFrame() || url.startsWith("file:") || url.startsWith(OfflineStore.ORIGIN)) return;
-                // Away from home with films downloaded: straight to them.
-                if (offline != null && offline.hasDownloads()) showOffline(offlineMode());
+                // The server stopped answering (offline, or away from home): offline mode. TVs have
+                // no downloads, so there it's the server's address again.
+                if (offline != null) showOffline(offlineMode());
                 else showSetup(getString(R.string.error_server_unreachable, server(), error.getDescription()));
             }
         });
@@ -193,7 +194,7 @@ public class MainActivity extends Activity {
                 if (isDestroyed()) return;
                 forgetHistory = true; // back never lands on the fish
                 if (up) web.loadUrl(page);
-                else if (offline != null && offline.hasDownloads()) showOffline(offlineMode());
+                else if (offline != null) showOffline(offlineMode());
                 else showSetup(getString(R.string.error_server_unreachable, server, getString(R.string.nothing_answered)));
             });
         }, "netfish-start").start();

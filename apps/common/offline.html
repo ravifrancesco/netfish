@@ -87,7 +87,9 @@
       @keyframes wag { from { transform: rotate(-9deg); } to { transform: rotate(9deg); } }
       @keyframes rise { 0% { opacity: 0; transform: translate(0, 0) scale(0.6); } 20% { opacity: 0.9; } 100% { opacity: 0; transform: translate(5px, -18px) scale(1.1); } }
       @media (prefers-reduced-motion: reduce) { .offline__fish * { animation: none !important; } }
-      .offline__text { flex: 1; display: grid; gap: 2px; }
+      .offline__text { flex: 1 1 240px; min-width: 0; display: grid; gap: 2px; }
+      /* Try again and Change server: beside the words, or under them where there's no room. */
+      .offline__actions { display: flex; align-items: center; gap: 16px; }
       .offline__text span { color: var(--text-2); font-size: 14px; }
       .snap-head { margin-top: 40px; }
       .snap h3 { margin: 18px 0 10px; font-size: 15px; color: var(--text-2); }
@@ -100,6 +102,7 @@
       .snap__badge { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #03221c; font-size: 12px; }
       @media (max-width: 640px) {
         .offline { flex-wrap: wrap; }
+        .offline__actions { width: 100%; padding-left: 46px; }
         .bar { gap: 10px; }
         .bar h1, .usage { display: none; }
         .grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 16px; }
@@ -129,7 +132,10 @@
           <strong id="offline-title" data-t>You're offline</strong>
           <span id="offline-text" data-t>Netfish can't reach your server. What's downloaded on this device still plays.</span>
         </div>
-        <button class="btn btn--accent" id="retry" data-t>Try again</button>
+        <div class="offline__actions">
+          <button class="btn btn--accent" id="retry" data-t>Try again</button>
+          <button class="link" id="change-server" hidden data-t>Change server…</button>
+        </div>
       </div>
       <p class="note" id="note" data-t>These play without a connection to your server. Download more from any movie or episode page.</p>
       <div id="view"></div>
@@ -185,9 +191,11 @@
         'needs your server': 'serve il tuo server',
         'Checking…': 'Controllo…',
         "Still can't reach your server. Netfish keeps trying and will tell you when it's back.": 'Il server non risponde ancora. Netfish continua a provare e ti avvisa quando torna.',
+        "Netfish can't reach your server. It keeps trying and will tell you when it's back.": 'Netfish non raggiunge il tuo server. Continua a provare e ti avvisa quando torna.',
         'Your server is back': 'Il tuo server è tornato',
         'Reconnect to get all of Netfish back.': 'Riconnettiti per riavere tutto Netfish.',
         'Reconnect': 'Riconnetti',
+        'Change server…': 'Cambia server…',
       };
       /** t('Play {title}', { title }) → the Italian (or the English) with {placeholders} filled in. */
       const t = (text, values) =>
@@ -223,6 +231,12 @@
         document.getElementById('offline').hidden = false;
         document.getElementById('note').hidden = true;
         document.getElementById('home').hidden = true;
+        // The server might have moved (a new address): set it again from here.
+        const change = document.getElementById('change-server');
+        if (desktop.changeServer) {
+          change.hidden = false;
+          change.onclick = () => desktop.changeServer();
+        }
         watchForServer();
       }
 
@@ -414,7 +428,13 @@
         }
       };
       let launchedToPlay = false;
-      desktop.offlineList().then(update);
+      desktop.offlineList().then((list) => {
+        update(list);
+        // Offline with nothing downloaded: no promise of something to watch, just that it keeps trying.
+        if (offlineMode && !list.some((i) => i.state === 'done')) {
+          document.getElementById('offline-text').textContent = t("Netfish can't reach your server. It keeps trying and will tell you when it's back.");
+        }
+      });
       desktop.onOfflineChange(update);
 
       view.addEventListener('click', async (e) => {

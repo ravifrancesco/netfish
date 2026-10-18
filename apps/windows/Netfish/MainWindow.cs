@@ -152,14 +152,14 @@ sealed class MainWindow : Form
 
     /// <summary>
     /// Opening: the fish swims while the server is checked (a few seconds at most), then
-    /// Netfish, or offline mode (the downloads) when it doesn't answer.
+    /// Netfish, or offline mode when it doesn't answer: the downloads (or that there are none),
+    /// trying again by itself, and a way to change the server if it has moved.
     /// </summary>
     async Task Start(Uri server)
     {
         Navigate(LocalPages.Page("loading.html"));
         if (await Server.Reachable(server)) Navigate(server);
-        else if (store.HasDownloads) ShowOffline(new JsonObject { ["offline"] = true });
-        else ShowSetup(L("Couldn't reach {server} ({why}). Is it on?", ("server", server.GetLeftPart(UriPartial.Authority)), ("why", L("nothing answered"))));
+        else ShowOffline(new JsonObject { ["offline"] = true });
     }
 
     /// <summary>Edge's engine went away (crashed or updated): start it again where the page was.</summary>
@@ -262,21 +262,8 @@ sealed class MainWindow : Form
         // Only a server that didn't answer at all counts (an error page from it is still the server).
         if (e.IsSuccess || e.HttpStatusCode != 0 || e.WebErrorStatus == CoreWebView2WebErrorStatus.OperationCanceled) return;
         if (url == null || !Server.Owns(url)) return;
-        // Away from home with films downloaded: straight to them.
-        if (store.HasDownloads)
-        {
-            ShowOffline(new JsonObject { ["offline"] = true });
-            return;
-        }
-        var why = e.WebErrorStatus switch
-        {
-            CoreWebView2WebErrorStatus.HostNameNotResolved => L("address not found"),
-            CoreWebView2WebErrorStatus.CannotConnect or CoreWebView2WebErrorStatus.ServerUnreachable => L("nothing answered"),
-            CoreWebView2WebErrorStatus.Timeout => L("it took too long"),
-            CoreWebView2WebErrorStatus.Disconnected => L("this computer is offline"),
-            var other => other.ToString(),
-        };
-        ShowSetup(L("Couldn't reach {server} ({why}). Is it on?", ("server", Server.Url?.GetLeftPart(UriPartial.Authority) ?? L("the server")), ("why", why)));
+        // The server stopped answering (offline, or away from home): offline mode.
+        ShowOffline(new JsonObject { ["offline"] = true });
     }
 
     // confirm() / alert() from the pages.

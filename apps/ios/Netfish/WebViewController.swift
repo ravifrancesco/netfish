@@ -62,10 +62,7 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         web.load(URLRequest(url: LocalScheme.url("loading.html", query: [:])))
         Task { @MainActor in
             if await Server.reachable(server) { return open(server) }
-            if store.hasDownloads { return showOffline(["offline": true]) }
-            showSetup(error: L("Couldn't reach {server} ({error}). Is it on, and are you on your home network?", [
-                "server": server.absoluteString, "error": L("nothing answered"),
-            ]))
+            showOffline(["offline": true])
         }
     }
 
@@ -150,11 +147,8 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         guard err.code != NSURLErrorCancelled, err.code != 102 /* frame load interrupted */ else { return }
         let failed = err.userInfo[NSURLErrorFailingURLErrorKey] as? URL
         if failed?.scheme == LocalScheme.scheme { return }
-        // Away from home with films downloaded: straight to them, like Netflix.
-        if store.hasDownloads { return showOffline(["offline": true]) }
-        showSetup(error: L("Couldn't reach {server} ({error}). Is it on, and are you on your home network?", [
-            "server": Server.url?.absoluteString ?? L("the server"), "error": err.localizedDescription,
-        ]))
+        // The server stopped answering (offline, or away from home): offline mode, like Netflix.
+        showOffline(["offline": true])
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {

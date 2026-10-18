@@ -63,12 +63,6 @@ static class Strings
         ["mpv didn't start"] = "mpv non si è avviato",
 
         // The server
-        ["Couldn't reach {server} ({why}). Is it on?"] = "Impossibile raggiungere {server} ({why}). È acceso?",
-        ["the server"] = "il server",
-        ["address not found"] = "indirizzo non trovato",
-        ["nothing answered"] = "nessuna risposta",
-        ["it took too long"] = "tempo scaduto",
-        ["this computer is offline"] = "questo computer è offline",
         ["Enter the address of your Netfish server"] = "Inserisci l'indirizzo del tuo server Netfish",
         ["That doesn't look like an address"] = "Non sembra un indirizzo",
         ["Can't reach {server} ({why})"] = "Impossibile raggiungere {server} ({why})",
