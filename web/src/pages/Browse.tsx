@@ -34,7 +34,12 @@ const SORTS = [
   { value: 'longest', label: t('Longest first') },
 ];
 
-function Library({ mediaType, sort }: { mediaType: MediaType; sort: string }) {
+/**
+ * The library, then what was deleted from disk to save space: after everything on disk, apart,
+ * greyed out, in the same order. Open one to see when it went, and to get it back.
+ */
+function Library({ mediaType, sort, jump }: { mediaType: MediaType; sort: string; jump?: boolean }) {
+  const { data: config } = useConfig();
   const q = useInfiniteQuery({
     queryKey: ['library', mediaType, sort],
     queryFn: ({ pageParam }) => api.library(mediaType, sort, pageParam),
@@ -45,29 +50,43 @@ function Library({ mediaType, sort }: { mediaType: MediaType; sort: string }) {
     },
   });
   const sentinel = useAutoLoad(() => void q.fetchNextPage(), Boolean(q.hasNextPage && !q.isFetchingNextPage));
+  // Only once the library's last page is in: they come after all of it.
+  const removed = useQuery({
+    queryKey: ['removed', mediaType, sort],
+    queryFn: () => api.removed(mediaType, sort),
+    enabled: Boolean(config?.features.downloads && q.data && !q.hasNextPage),
+  });
+  // Straight to them (from Settings → Storage): the whole library in, then down to them.
+  const goneSection = useRef<HTMLElement>(null);
+  const jumped = useRef(false);
+  useEffect(() => {
+    if (jump && q.hasNextPage && !q.isFetchingNextPage) void q.fetchNextPage();
+  }, [jump, q.hasNextPage, q.isFetchingNextPage]); // eslint-disable-line react-hooks/exhaustive-deps
+  const goneCount = q.hasNextPage ? 0 : (removed.data?.items.length ?? 0);
+  useEffect(() => {
+    if (!jump || jumped.current || !goneCount || !goneSection.current) return;
+    jumped.current = true;
+    goneSection.current.scrollIntoView({ block: 'start' });
+  }, [jump, goneCount]);
   if (q.isError) return <ErrorState error={q.error} retry={() => void q.refetch()} />;
   if (!q.data) return <PageLoader />;
   const cards = q.data.pages.flatMap((p) => p.items);
-  if (!cards.length) return <Empty>{t('Nothing here yet.')}</Empty>;
+  const gone = q.hasNextPage ? [] : (removed.data?.items ?? []);
+  if (!cards.length && !gone.length) return removed.isLoading && config?.features.downloads ? <PageLoader /> : <Empty>{t('Nothing here yet.')}</Empty>;
+  const showLength = sort === 'shortest' || sort === 'longest';
   return (
     <>
       <p className="muted small">{tn(q.data.pages[0].total, '{n} title', '{n} titles')}</p>
-      <Grid cards={cards} showLength={sort === 'shortest' || sort === 'longest'} />
+      {cards.length > 0 && <Grid cards={cards} showLength={showLength} />}
       <div ref={sentinel} className="sentinel">{q.isFetchingNextPage && <Spinner />}</div>
-    </>
-  );
-}
-
-/** Deleted from disk to save space, still part of the library. */
-function NotOnDisk({ mediaType }: { mediaType: MediaType }) {
-  const q = useQuery({ queryKey: ['removed', mediaType], queryFn: () => api.removed(mediaType) });
-  if (q.isError) return <ErrorState error={q.error} retry={() => void q.refetch()} />;
-  if (!q.data) return <PageLoader />;
-  if (!q.data.items.length) return <Empty>{t('Everything in your library is on disk.')}</Empty>;
-  return (
-    <>
-      <p className="muted small">{t('Deleted from disk to save space. Open one to download it again.')}</p>
-      <Grid cards={q.data.items} />
+      {gone.length > 0 && (
+        <section ref={goneSection} className="library__gone" aria-label={t('Not on disk')}>
+          <p className="library__gone-head muted small">
+            <strong>{t('Not on disk')}</strong> · {t('Deleted from disk to save space. Open one to download it again.')}
+          </p>
+          <Grid cards={gone} showLength={showLength} />
+        </section>
+      )}
     </>
   );
 }
@@ -239,12 +258,11 @@ function Offline({ mediaType }: { mediaType: MediaType }) {
 export default function Browse({ mediaType }: { mediaType: MediaType }) {
   const { data: config } = useConfig();
   const [params, setParams] = useSearchParams();
-  const tab = params.get('tab') ?? 'library';
+  // (What was "Not on disk" is at the end of the library now.)
+  const asked = params.get('tab') ?? 'library';
+  const tab = asked === 'removed' ? 'library' : asked;
   const sort = params.get('sort') ?? 'added';
   const set = (patch: Record<string, string>) => setParams({ tab, sort, ...patch }, { replace: true });
-  // Only shown once something was deleted from disk.
-  const removed = useQuery({ queryKey: ['removed', mediaType], queryFn: () => api.removed(mediaType), enabled: Boolean(config?.features.downloads) });
-  const removedCount = removed.data?.items.length ?? 0;
   const discoverTabs =
     mediaType === 'movie'
       ? [
@@ -266,11 +284,6 @@ export default function Browse({ mediaType }: { mediaType: MediaType }) {
           <button role="tab" aria-selected={tab === 'library'} className={`tab${tab === 'library' ? ' is-active' : ''}`} onClick={() => set({ tab: 'library' })}>
             {t('Your library')}
           </button>
-          {(removedCount > 0 || tab === 'removed') && (
-            <button role="tab" aria-selected={tab === 'removed'} className={`tab${tab === 'removed' ? ' is-active' : ''}`} onClick={() => set({ tab: 'removed' })}>
-              {t('Not on disk')} <span className="tab__count">{removedCount}</span>
-            </button>
-          )}
           {canDownloadHere() && (
             <button role="tab" aria-selected={tab === 'offline'} className={`tab${tab === 'offline' ? ' is-active' : ''}`} onClick={() => set({ tab: 'offline' })}>
               {t('Offline')}
@@ -294,9 +307,7 @@ export default function Browse({ mediaType }: { mediaType: MediaType }) {
         )}
       </div>
       {tab === 'library' ? (
-        <Library mediaType={mediaType} sort={sort} />
-      ) : tab === 'removed' ? (
-        <NotOnDisk mediaType={mediaType} />
+        <Library mediaType={mediaType} sort={sort} jump={params.get('gone') === '1'} />
       ) : tab === 'offline' ? (
         <Offline mediaType={mediaType} />
       ) : (

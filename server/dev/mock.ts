@@ -97,6 +97,9 @@ function audioOf(t: Title) {
   return audio.get(`${t.type}-${t.tmdbId}`) ?? [t.lang === 'fr' ? 'fre' : 'eng'];
 }
 
+/** Radarr's and Sonarr's history of deleted files, newest first. */
+const fileHistory: { radarr: Array<{ movieId?: number } & Record<string, unknown>>; sonarr: Array<{ seriesId?: number } & Record<string, unknown>> } = { radarr: [], sonarr: [] };
+
 const containerOf = (item: Item) => (item.kind === 'movie' && item.title.n === 4 ? 'mkv' : 'mp4');
 
 function streamsFor(item: Item) {
@@ -936,8 +939,15 @@ void app.register(
       const t = TITLES.find((x) => x.type === 'movie' && x.n === Math.floor(Number(req.params.id) / 100));
       if (!t || !library.delete(`movie-${t.tmdbId}`)) return reply.code(404).send({ message: 'Movie file not found' });
       arrKnown.add(`movie-${t.tmdbId}`);
+      fileHistory.radarr.unshift({ id: newId(), movieId: t.n, eventType: 'movieFileDeleted', date: new Date().toISOString(), data: { reason: 'Manual', size: String(fileSize(t)) } });
       return {};
     });
+    // History: here only deleted files (eventType 6), newest first, as Radarr pages it.
+    r.get<{ Querystring: Q }>('/history', async (req) => {
+      const records = fileHistory.radarr.filter(() => !req.query.eventType || Number(req.query.eventType) === 6);
+      return { page: 1, pageSize: Number(req.query.pageSize ?? 10), totalRecords: records.length, records };
+    });
+    r.get<{ Querystring: Q }>('/history/movie', async (req) => fileHistory.radarr.filter((h) => h.movieId === Number(req.query.movieId)));
     r.post<{ Body: { name: string; movieIds?: number[] } }>('/command', async (req, reply) => {
       for (const n of req.body.movieIds ?? []) {
         const t = TITLES.find((x) => x.type === 'movie' && x.n === n);
@@ -1054,9 +1064,16 @@ void app.register(
         if (!t) continue;
         library.delete(`tv-${t.tmdbId}-${id % 100}`);
         arrKnown.add(`tv-${t.tmdbId}`);
+        fileHistory.sonarr.unshift({ id: newId(), seriesId: t.n, eventType: 'episodeFileDeleted', date: new Date().toISOString(), data: { reason: 'Manual' } });
       }
       return {};
     });
+    // History: here only deleted files (eventType 5), newest first, as Sonarr pages it.
+    r.get<{ Querystring: Q }>('/history', async (req) => {
+      const records = fileHistory.sonarr.filter(() => !req.query.eventType || Number(req.query.eventType) === 5);
+      return { page: 1, pageSize: Number(req.query.pageSize ?? 10), totalRecords: records.length, records };
+    });
+    r.get<{ Querystring: Q }>('/history/series', async (req) => fileHistory.sonarr.filter((h) => h.seriesId === Number(req.query.seriesId)));
     r.post<{ Body: { name: string; seriesId?: number; seasonNumber?: number; episodeIds?: number[] } }>('/command', async (req, reply) => {
       // EpisodeSearch: the episodes' season (ids are series·10000 + season·100 + episode).
       const first = req.body.episodeIds?.[0];

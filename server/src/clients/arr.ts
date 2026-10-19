@@ -172,7 +172,27 @@ function arrRequest<T>(service: 'radarr' | 'sonarr', path: string, opts: Request
 // Interactive searches fan out to every indexer through Prowlarr; give them time.
 const SEARCH_TIMEOUT = 180_000;
 
+/** A history event: here, a file deleted (by hand or another tool, missing from disk, or "Upgrade": replaced by a better one). */
+export interface ArrHistoryRecord {
+  movieId?: number;
+  seriesId?: number;
+  episodeId?: number;
+  eventType: string;
+  date: string;
+  data?: { reason?: string; size?: string | number };
+}
+const DELETIONS = { pageSize: 1000, sortKey: 'date', sortDirection: 'descending' };
+
 export const radarr = {
+  /** Movie files deleted, newest first (Radarr's MovieFileDeleted). */
+  fileDeletions: () =>
+    arrRequest<{ records: ArrHistoryRecord[] }>('radarr', '/history', { query: { ...DELETIONS, eventType: 6 }, timeoutMs: 30_000 }).then((r) =>
+      (r.records ?? []).filter((h) => h.eventType === 'movieFileDeleted'),
+    ),
+  movieFileDeletions: (movieId: number) =>
+    arrRequest<ArrHistoryRecord[]>('radarr', '/history/movie', { query: { movieId, eventType: 6 } }).then((r) =>
+      (r ?? []).filter((h) => h.eventType === 'movieFileDeleted').sort((a, b) => b.date.localeCompare(a.date)),
+    ),
   status: () => arrRequest<{ version: string }>('radarr', '/system/status', { timeoutMs: 5000 }),
   queue: () =>
     arrRequest<{ records: ArrQueueRecord[] }>('radarr', '/queue', {
@@ -205,6 +225,15 @@ export const radarr = {
 };
 
 export const sonarr = {
+  /** Episode files deleted, newest first (Sonarr's EpisodeFileDeleted). */
+  fileDeletions: () =>
+    arrRequest<{ records: ArrHistoryRecord[] }>('sonarr', '/history', { query: { ...DELETIONS, eventType: 5 }, timeoutMs: 30_000 }).then((r) =>
+      (r.records ?? []).filter((h) => h.eventType === 'episodeFileDeleted'),
+    ),
+  seriesFileDeletions: (seriesId: number) =>
+    arrRequest<ArrHistoryRecord[]>('sonarr', '/history/series', { query: { seriesId, eventType: 5 } }).then((r) =>
+      (r ?? []).filter((h) => h.eventType === 'episodeFileDeleted').sort((a, b) => b.date.localeCompare(a.date)),
+    ),
   status: () => arrRequest<{ version: string }>('sonarr', '/system/status', { timeoutMs: 5000 }),
   queue: () =>
     arrRequest<{ records: ArrQueueRecord[] }>('sonarr', '/queue', {

@@ -145,7 +145,7 @@ export async function movieDetail(user: SessionUser, tmdbId: number): Promise<Ti
     settle(catalog.recommendations('movie', tmdbId), EMPTY_PAGE),
     settle(radarrMovie(tmdbId), null),
   ]);
-  const removed = removedInfo('movie', tmdbId);
+  const removed = await removedInfo('movie', tmdbId);
   // Deleted from disk through Netfish: not available, whatever Seerr still says.
   const status = removed && !entry ? 'none' : resolveAvailability(movie.mediaInfo, Boolean(entry));
   const certification = movie.releases?.results
@@ -231,7 +231,7 @@ export async function tvDetail(user: SessionUser, tmdbId: number): Promise<Title
       jellyfinId: jfByNumber.get(s.seasonNumber)?.Id,
     }));
   // Seasons deleted from disk through Netfish: Seerr keeps calling them available until its next sync.
-  const removed = removedInfo('tv', tmdbId);
+  const removed = await removedInfo('tv', tmdbId);
   for (const s of seasons) {
     if (removed && (!removed.seasons || removed.seasons.includes(s.seasonNumber)) && !jfByNumber.has(s.seasonNumber) && s.status === 'available') s.status = 'none';
   }

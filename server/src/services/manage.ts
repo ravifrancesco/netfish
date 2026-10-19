@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Card, DiskInfo, MediaType, RemovedInfo, StopMode, StorageInfo } from '@netfish/shared';
 import type { SessionUser } from '../auth';
 import { config, has } from '../config';
-import { posterOf, radarr, sonarr, type ArrDisk, type ArrRootFolder, type RadarrMovie, type SonarrSeries } from '../clients/arr';
+import { posterOf, radarr, sonarr, type ArrDisk, type ArrHistoryRecord, type ArrRootFolder, type RadarrMovie, type SonarrSeries } from '../clients/arr';
 import { jellyfin } from '../clients/jellyfin';
 import { seerr } from '../clients/seerr';
 import { settle } from '../lib/async';
@@ -11,7 +11,7 @@ import { MINUTE, TTLCache } from '../lib/cache';
 import { t } from '../lib/i18n';
 import { writeJson } from '../lib/storage';
 import { HttpError } from '../lib/upstream';
-import { forgetRadarrMovie, forgetSonarrSeries, radarrMovie } from './arrLookup';
+import { forgetRadarrMovie, forgetSonarrSeries, radarrMovie, sonarrSeries } from './arrLookup';
 import { catalog } from './catalog';
 import { allDownloads, forgetDownloads } from './downloads';
 import { invalidateLibrary } from './library';
@@ -28,6 +28,8 @@ import { forgetCleanup } from './cleanup';
 interface Removed extends RemovedInfo {
   mediaType: MediaType;
   tmdbId: number;
+  /** A show's, to find it in Sonarr (deletions from 0.7.12 on; older ones look it up). */
+  tvdbId?: number;
   title: string;
   year?: number;
 }
@@ -72,6 +74,7 @@ function forget(mediaType: MediaType, tmdbId: number, tvdbId?: number) {
   invalidateLibrary();
   forgetDownloads();
   storageCache.clear();
+  goneCache.clear();
   forgetCleanup();
 }
 
@@ -228,6 +231,7 @@ export async function deleteFromDisk(user: SessionUser, mediaType: MediaType, tm
     removed[key] = {
       mediaType,
       tmdbId,
+      tvdbId,
       title: series.title,
       year: series.year,
       size: (before?.size ?? 0) + freed,
@@ -274,33 +278,128 @@ export async function downloadAgain(user: SessionUser, mediaType: MediaType, tmd
   return { ok: true };
 }
 
-export function removedInfo(mediaType: MediaType, tmdbId?: number): RemovedInfo | undefined {
-  const entry = tmdbId ? removed[keyOf(mediaType, tmdbId)] : undefined;
-  return entry && { at: entry.at, size: entry.size, seasons: entry.seasons, by: entry.by };
+// ---------- Not on disk ----------
+
+/**
+ * Not on disk, as Radarr and Sonarr have it: a title they still have, unmonitored (so it isn't
+ * coming back by itself), without files, and with a file deleted in their history: by Netfish,
+ * on their own pages or by another tool (not one replaced by a better one). A show: all of it.
+ * What Netfish deleted itself it also remembers (who, when, the space freed; a show's seasons).
+ */
+interface Gone {
+  mediaType: MediaType;
+  tmdbId: number;
+  title: string;
+  year?: number;
+  /** When its last file was deleted. */
+  at: string;
+}
+const kept = (h: ArrHistoryRecord) => h.data?.reason !== 'Upgrade';
+const goneCache = new TTLCache<Map<string, Gone>>(2);
+
+/** Everything Radarr (movies) or Sonarr (shows) has off the disk, for the lists. */
+function arrGone(mediaType: MediaType): Promise<Map<string, Gone>> {
+  return goneCache.wrap(mediaType, 2 * MINUTE, async () => {
+    const out = new Map<string, Gone>();
+    const latest = (records: ArrHistoryRecord[], id: (h: ArrHistoryRecord) => number | undefined) => {
+      const at = new Map<number, string>();
+      for (const h of records) {
+        const n = id(h);
+        if (n !== undefined && kept(h) && (!at.has(n) || h.date > at.get(n)!)) at.set(n, h.date);
+      }
+      return at;
+    };
+    if (mediaType === 'movie') {
+      if (!has.radarr()) return out;
+      const [movies, deletions] = await Promise.all([radarr.movies(), radarr.fileDeletions()]);
+      const at = latest(deletions, (h) => h.movieId);
+      for (const m of movies) {
+        const when = at.get(m.id);
+        if (when && !m.hasFile && !m.monitored && m.tmdbId) out.set(keyOf('movie', m.tmdbId), { mediaType, tmdbId: m.tmdbId, title: m.title, year: m.year, at: when });
+      }
+    } else {
+      if (!has.sonarr()) return out;
+      const [series, deletions] = await Promise.all([sonarr.allSeries(), sonarr.fileDeletions()]);
+      const at = latest(deletions, (h) => h.seriesId);
+      for (const x of series) {
+        const when = at.get(x.id);
+        if (when && !x.monitored && !(x.statistics?.episodeFileCount ?? 0) && x.tmdbId) out.set(keyOf('tv', x.tmdbId), { mediaType, tmdbId: x.tmdbId, title: x.title, year: x.year, at: when });
+      }
+    }
+    return out;
+  });
 }
 
-/** "Not on disk": titles deleted to save space, newest first. Ones that came back by other means drop off. */
-export async function removedTitles(mediaType: MediaType): Promise<Card[]> {
-  let changed = false;
+const tvdbOf = async (tmdbId: number, known?: number) =>
+  known ?? (has.seerr() ? (await settle(catalog.tv(tmdbId), undefined))?.externalIds?.tvdbId : undefined);
+
+/**
+ * Whether what Netfish remembers deleting is still off the disk (Radarr/Sonarr unreachable: as it
+ * was). Back on disk, monitored again (on its way back), or gone from Radarr/Sonarr: it isn't.
+ * A show with seasons deleted is kept as it is (the rest of it is in the library).
+ */
+async function stillGone(e: Removed): Promise<boolean> {
+  if (e.mediaType === 'movie') {
+    const movie = await settle(radarrMovie(e.tmdbId), undefined);
+    return movie === undefined || Boolean(movie && !movie.hasFile && !movie.monitored);
+  }
+  if (e.seasons?.length || !has.sonarr()) return true;
+  const tvdbId = await tvdbOf(e.tmdbId, e.tvdbId);
+  const series = tvdbId ? await settle(sonarrSeries(tvdbId), undefined) : undefined;
+  return series === undefined || Boolean(series && !(series.statistics?.episodeFileCount ?? 0) && !series.monitored);
+}
+
+/** For a title's page: off the disk, and since when (and, if Netfish did it, who and how much it freed). */
+export async function removedInfo(mediaType: MediaType, tmdbId?: number): Promise<RemovedInfo | undefined> {
+  if (!tmdbId) return undefined;
+  const entry = removed[keyOf(mediaType, tmdbId)];
+  if (entry) return (await stillGone(entry)) ? { at: entry.at, size: entry.size, seasons: entry.seasons, by: entry.by } : undefined;
+  // Deleted somewhere else: Radarr's or Sonarr's own word for it.
+  if (mediaType === 'movie') {
+    const movie = await settle(radarrMovie(tmdbId), undefined);
+    if (!movie || movie.hasFile || movie.monitored) return undefined;
+    const deletion = (await settle(radarr.movieFileDeletions(movie.id), [])).find(kept);
+    return deletion && { at: deletion.date };
+  }
+  const tvdbId = await tvdbOf(tmdbId);
+  const series = tvdbId ? await settle(sonarrSeries(tvdbId), undefined) : undefined;
+  if (!series || series.monitored || (series.statistics?.episodeFileCount ?? 0) > 0) return undefined;
+  const deletion = (await settle(sonarr.seriesFileDeletions(series.id), [])).find(kept);
+  return deletion && { at: deletion.date };
+}
+
+/**
+ * "Not on disk": titles deleted to save space (the whole of them: a show with a season or two
+ * left is still in the library), shown after the library in the same order it's sorted by
+ * ("Recently added": the most recently deleted first).
+ */
+export async function removedTitles(mediaType: MediaType, sort = 'added'): Promise<Card[]> {
   const entries = Object.entries(removed).filter(([, e]) => e.mediaType === mediaType);
-  const kept = await Promise.all(
-    entries.map(async ([key, e]) => {
-      if (e.mediaType === 'movie') {
-        const movie = await settle(radarrMovie(e.tmdbId), undefined);
-        if (movie?.hasFile || movie === null) {
-          delete removed[key];
-          changed = true;
-          return undefined;
-        }
-      }
-      return e;
-    }),
-  );
-  if (changed) save();
-  const list = kept.filter((e): e is Removed => Boolean(e)).sort((a, b) => b.at.localeCompare(a.at));
-  return Promise.all(
+  const [checked, fromArr] = await Promise.all([
+    Promise.all(entries.map(async ([key, e]) => ((await stillGone(e)) ? e : key))),
+    settle(arrGone(mediaType), new Map<string, Gone>()),
+  ]);
+  // What came back (or left Radarr/Sonarr) is forgotten.
+  const back = checked.filter((x): x is string => typeof x === 'string');
+  if (back.length) {
+    for (const key of back) delete removed[key];
+    save();
+  }
+  const ours = checked.filter((x): x is Removed => typeof x !== 'string' && !x.seasons?.length);
+  const known = new Set(ours.map((e) => keyOf(e.mediaType, e.tmdbId)));
+  const list: Gone[] = [...ours, ...[...fromArr.values()].filter((g) => !known.has(keyOf(g.mediaType, g.tmdbId)))].sort((a, b) => b.at.localeCompare(a.at));
+  const cards = await Promise.all(
     list.map(async (e): Promise<Card> => {
-      const basics = has.seerr() ? await settle(catalog.basics(e.mediaType, e.tmdbId), undefined) : undefined;
+      const [basics, details] = has.seerr()
+        ? await Promise.all([
+            settle(catalog.basics(e.mediaType, e.tmdbId), undefined),
+            settle<{ voteAverage?: number; runtime?: number; episodeRunTime?: number[] } | undefined>(
+              e.mediaType === 'movie' ? catalog.movie(e.tmdbId) : catalog.tv(e.tmdbId),
+              undefined,
+            ),
+          ])
+        : [undefined, undefined];
+      const runtime = details?.runtime || details?.episodeRunTime?.[0];
       return {
         key: keyOf(e.mediaType, e.tmdbId),
         mediaType: e.mediaType,
@@ -309,10 +408,38 @@ export async function removedTitles(mediaType: MediaType): Promise<Card[]> {
         year: basics?.year ?? e.year,
         poster: basics?.poster,
         backdrop: basics?.backdrop,
+        rating: details?.voteAverage || undefined,
+        runtimeMinutes: runtime || undefined,
         status: 'none',
       };
     }),
   );
+  return sortRemoved(cards, sort);
+}
+
+/** The library's orders, for titles that aren't in Jellyfin: unknowns last, then by name. */
+function sortRemoved(cards: Card[], sort: string): Card[] {
+  const byName = (a: Card, b: Card) => a.title.localeCompare(b.title);
+  const by = (value: (c: Card) => number | undefined, ascending = false) => (a: Card, b: Card) => {
+    const x = value(a);
+    const y = value(b);
+    if (x === undefined || y === undefined) return x === y ? byName(a, b) : x === undefined ? 1 : -1;
+    return (ascending ? x - y : y - x) || byName(a, b);
+  };
+  switch (sort) {
+    case 'name':
+      return [...cards].sort(byName);
+    case 'year':
+      return [...cards].sort(by((c) => c.year));
+    case 'rating':
+      return [...cards].sort(by((c) => c.rating));
+    case 'shortest':
+      return [...cards].sort(by((c) => c.runtimeMinutes, true));
+    case 'longest':
+      return [...cards].sort(by((c) => c.runtimeMinutes));
+    default:
+      return cards; // most recently deleted first
+  }
 }
 
 /** For the title page (admins): the file(s) Radarr/Sonarr have for it. */
@@ -402,7 +529,10 @@ export function storage(): Promise<StorageInfo> {
       movies: movies ? { count: movieSizes.length, size: sum(movieSizes.map((m) => m.sizeOnDisk)) } : undefined,
       shows: series ? { count: showSizes.length, size: sum(showSizes.map((s) => s.statistics?.sizeOnDisk)) } : undefined,
       biggest,
-      removed: Object.keys(removed).length,
+      removed: {
+        movies: (await settle(removedTitles('movie'), [])).length,
+        shows: (await settle(removedTitles('tv'), [])).length,
+      },
     };
   });
 }

@@ -215,9 +215,14 @@ export function Storage() {
       )}
       <p className="muted small">
         {t('Deleting frees the space but keeps the title in your library as Not on disk, ready to download again.')}{' '}
-        {s.removed > 0 && (
-          <Link to="/movies?tab=removed" className="name-link">
-            {tn(s.removed, '{n} title is not on disk.', '{n} titles are not on disk.')}
+        {s.removed.movies > 0 && (
+          <Link to="/movies?gone=1" className="name-link">
+            {tn(s.removed.movies, '{n} film is not on disk.', '{n} films are not on disk.')}
+          </Link>
+        )}{' '}
+        {s.removed.shows > 0 && (
+          <Link to="/shows?gone=1" className="name-link">
+            {tn(s.removed.shows, '{n} show is not on disk.', '{n} shows are not on disk.')}
           </Link>
         )}
       </p>

@@ -33,7 +33,6 @@ export default {
   'Not on disk': 'Non sul disco',
   'Request it to download it again.': 'Richiedilo per scaricarlo di nuovo.',
   'An admin can download it again.': 'Un amministratore può scaricarlo di nuovo.',
-  'Everything in your library is on disk.': 'Tutto quello che c’è nella tua libreria è sul disco.',
   'Deleted from disk to save space. Open one to download it again.': 'Eliminati dal disco per fare spazio. Aprine uno per scaricarlo di nuovo.',
 
   // Settings → Storage
@@ -46,8 +45,10 @@ export default {
   'Biggest on disk': 'I più grandi sul disco',
   'Deleting frees the space but keeps the title in your library as Not on disk, ready to download again.':
     'Eliminare libera spazio ma tiene il titolo nella tua libreria come Non sul disco, pronto da riscaricare.',
-  '{n} title is not on disk.': '{n} titolo non è sul disco.',
-  '{n} titles are not on disk.': '{n} titoli non sono sul disco.',
+  '{n} film is not on disk.': '{n} film non è sul disco.',
+  '{n} films are not on disk.': '{n} film non sono sul disco.',
+  '{n} show is not on disk.': '{n} serie non è sul disco.',
+  '{n} shows are not on disk.': '{n} serie non sono sul disco.',
 
   // Clean-up suggestions
   'Everyone finished it · last watched a month ago': 'Finito da tutti · visto l’ultima volta un mese fa',

@@ -381,7 +381,8 @@ export interface StorageInfo {
   shows?: { count: number; size: number };
   biggest: Array<{ key: string; mediaType: MediaType; tmdbId?: number; title: string; year?: number; poster?: string; size: number }>;
   /** Titles deleted from disk and kept in the library. */
-  removed: number;
+  /** Not on disk (deleted to save space), films and shows. */
+  removed: { movies: number; shows: number };
 }
 
 /** Settings → Storage: something that could go to free space, and why. */

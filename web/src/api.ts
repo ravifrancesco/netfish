@@ -205,7 +205,8 @@ export const api = {
     call<{ freed: number }>(`/title/${type}/${tmdbId}/delete`, { body: { seasons } }),
   downloadAgain: (type: MediaType, tmdbId: number, seasons?: number[]) =>
     call<{ ok: true }>(`/title/${type}/${tmdbId}/redownload`, { body: { seasons } }),
-  removed: (type: MediaType) => call<{ items: Card[] }>(`/library/removed?type=${type}`),
+  /** Deleted from disk to save space (whole titles), in the library's `sort` order. */
+  removed: (type: MediaType, sort = 'added') => call<{ items: Card[] }>(`/library/removed?type=${type}&sort=${encodeURIComponent(sort)}`),
   storage: () => call<StorageInfo>('/admin/storage'),
   cleanup: () => call<{ items: CleanupSuggestion[] }>('/admin/cleanup'),
   keepForGood: (key: string) => call<{ ok: true }>('/admin/cleanup/keep', { body: { key } }),

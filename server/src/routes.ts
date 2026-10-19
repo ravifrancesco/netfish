@@ -322,8 +322,8 @@ export async function apiRoutes(app: FastifyInstance) {
       const { mediaType, tmdbId } = mediaTitle(req);
       return downloadAgain(userOf(req), mediaType, tmdbId, seasonsOf(req.body));
     });
-    api.get<{ Querystring: { type?: string } }>('/library/removed', async (req) => ({
-      items: await removedTitles(req.query.type === 'tv' ? 'tv' : 'movie'),
+    api.get<{ Querystring: { type?: string; sort?: string } }>('/library/removed', async (req) => ({
+      items: await removedTitles(req.query.type === 'tv' ? 'tv' : 'movie', clean(req.query.sort, 20) || 'added'),
     }));
     api.get('/admin/storage', { preHandler: requireAdmin }, async () => storage());
     api.get('/admin/cleanup', { preHandler: requireAdmin }, async (req) => ({ items: await cleanupSuggestions(userOf(req)) }));
