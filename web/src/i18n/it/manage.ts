@@ -33,7 +33,6 @@ export default {
   'Not on disk': 'Non sul disco',
   'Request it to download it again.': 'Richiedilo per scaricarlo di nuovo.',
   'An admin can download it again.': 'Un amministratore può scaricarlo di nuovo.',
-  'Deleted from disk to save space. Open one to download it again.': 'Eliminati dal disco per fare spazio. Aprine uno per scaricarlo di nuovo.',
 
   // Settings → Storage
   Storage: 'Spazio su disco',

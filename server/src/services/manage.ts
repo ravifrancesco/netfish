@@ -14,7 +14,8 @@ import { HttpError } from '../lib/upstream';
 import { forgetRadarrMovie, forgetSonarrSeries, radarrMovie, sonarrSeries } from './arrLookup';
 import { catalog } from './catalog';
 import { allDownloads, forgetDownloads } from './downloads';
-import { invalidateLibrary } from './library';
+import { findInLibrary, invalidateLibrary, libraryIndex } from './library';
+import { noteWatchedBeforeDelete } from './watched';
 import { grabbedKeys, seriesFor } from './releases';
 import { myRequestKeys } from './requests';
 import { forgetCleanup } from './cleanup';
@@ -199,9 +200,13 @@ export async function deleteFromDisk(user: SessionUser, mediaType: MediaType, tm
   const key = keyOf(mediaType, tmdbId);
   let freed = 0;
   let tvdbId: number | undefined;
+  // Jellyfin forgets a title once its files are gone (and who had watched it): noted first.
+  const entry = findInLibrary(await libraryIndex(user), mediaType, tmdbId);
+  const noteWatched = () => (entry ? settle(noteWatchedBeforeDelete(user, key, entry.id), undefined) : Promise.resolve(undefined));
   if (mediaType === 'movie') {
     const movie = await freshMovie(tmdbId);
     if (!movie.movieFile) throw new HttpError(404, t("There's no file to delete"));
+    await noteWatched();
     freed = movie.movieFile.size ?? movie.sizeOnDisk ?? 0;
     await radarr.deleteFile(movie.movieFile.id);
     // Unmonitored, so Radarr doesn't simply download it again.
@@ -214,6 +219,7 @@ export async function deleteFromDisk(user: SessionUser, mediaType: MediaType, tm
     const files = await sonarr.episodeFiles(series.id);
     const chosen = seasons?.length ? files.filter((f) => seasons.includes(f.seasonNumber ?? -1)) : files;
     if (!chosen.length) throw new HttpError(404, t("There's no file to delete"));
+    if (chosen.length === files.length) await noteWatched();
     freed = sum(chosen.map((f) => f.size));
     await sonarr.deleteFiles(chosen.map((f) => f.id));
     const gone = [...new Set(chosen.map((f) => f.seasonNumber ?? -1))];

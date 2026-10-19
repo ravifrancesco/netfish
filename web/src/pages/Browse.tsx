@@ -82,7 +82,7 @@ function Library({ mediaType, sort, jump }: { mediaType: MediaType; sort: string
       {gone.length > 0 && (
         <section ref={goneSection} className="library__gone" aria-label={t('Not on disk')}>
           <p className="library__gone-head muted small">
-            <strong>{t('Not on disk')}</strong> · {t('Deleted from disk to save space. Open one to download it again.')}
+            <strong>{t('Not on disk')}</strong>
           </p>
           <Grid cards={gone} showLength={showLength} />
         </section>

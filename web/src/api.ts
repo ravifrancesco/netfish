@@ -177,6 +177,8 @@ export const api = {
   freshRemove: (key: string) => call<FreshStatus>('/admin/channels/fresh/remove', { body: { key } }),
 
   setWatched: (itemId: string, watched: boolean) => call<{ ok: true }>(`/items/${enc(itemId)}/watched`, { body: { watched } }),
+  /** From a title's page, by its TMDB id (one Jellyfin has no item for too: deleted from disk). */
+  setTitleWatched: (type: MediaType, tmdbId: number, watched: boolean) => call<{ ok: true }>(`/title/${type}/${tmdbId}/watched`, { body: { watched } }),
   hideFromContinue: (itemId: string) => call<{ ok: true }>(`/items/${enc(itemId)}/hide`, { method: 'POST' }),
   /** Take a request back before anything is on disk. */
   cancelRequest: (mediaType: MediaType, tmdbId: number) => call<{ ok: true }>(`/title/${mediaType}/${tmdbId}/request`, { method: 'DELETE' }),

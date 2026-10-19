@@ -24,6 +24,7 @@ import { availabilityFromSeerr, episodeLabel, resolveAvailability, seerrCards } 
 import { catalog } from './catalog';
 import { allDownloads, detailsFor, downloadsFor, progressByTitle } from './downloads';
 import { findInLibrary, libraryIndex } from './library';
+import { handOverWatched, markOffDisk, offDiskWatched } from './watched';
 import { toSummary } from './requests';
 import { maybeSeerrUserId } from './seerrUsers';
 import { t } from '../lib/i18n';
@@ -146,6 +147,8 @@ export async function movieDetail(user: SessionUser, tmdbId: number): Promise<Ti
     settle(radarrMovie(tmdbId), null),
   ]);
   const removed = await removedInfo('movie', tmdbId);
+  // Back on disk: a watched mark made while it wasn't goes to Jellyfin.
+  const handed = item ? await settle(handOverWatched(user, `movie-${tmdbId}`, item.Id), undefined) : undefined;
   // Deleted from disk through Netfish: not available, whatever Seerr still says.
   const status = removed && !entry ? 'none' : resolveAvailability(movie.mediaInfo, Boolean(entry));
   const certification = movie.releases?.results
@@ -174,7 +177,7 @@ export async function movieDetail(user: SessionUser, tmdbId: number): Promise<Ti
     crew: crewFromTmdb(movie.credits),
     trailerYoutubeKey: trailerOf(movie.relatedVideos),
     play: playOf(item),
-    watched: item ? Boolean(item.UserData?.Played) : undefined,
+    watched: item ? (handed ?? Boolean(item.UserData?.Played)) : removed ? (offDiskWatched(user.id, `movie-${tmdbId}`) ?? false) : undefined,
     ...tracksFrom(streamsOf(item)),
     requests: requestsOf(movie.mediaInfo, mySeerrId),
     downloads: downloadsFor(downloads, 'movie', tmdbId).map((d) => detailsFor(user.isAdmin, d)),
@@ -232,6 +235,7 @@ export async function tvDetail(user: SessionUser, tmdbId: number): Promise<Title
     }));
   // Seasons deleted from disk through Netfish: Seerr keeps calling them available until its next sync.
   const removed = await removedInfo('tv', tmdbId);
+  const handed = series ? await settle(handOverWatched(user, `tv-${tmdbId}`, series.Id), undefined) : undefined;
   for (const s of seasons) {
     if (removed && (!removed.seasons || removed.seasons.includes(s.seasonNumber)) && !jfByNumber.has(s.seasonNumber) && s.status === 'available') s.status = 'none';
   }
@@ -260,7 +264,7 @@ export async function tvDetail(user: SessionUser, tmdbId: number): Promise<Title
     crew: (tv.createdBy ?? []).map((c) => ({ id: c.id ? String(c.id) : undefined, name: c.name, role: 'Creator' })),
     trailerYoutubeKey: trailerOf(tv.relatedVideos),
     play: playOf(playItem),
-    watched: series ? Boolean(series.UserData?.Played) : undefined,
+    watched: series ? (handed ?? Boolean(series.UserData?.Played)) : removed && !removed.seasons ? (offDiskWatched(user.id, `tv-${tmdbId}`) ?? false) : undefined,
     ...tracksFrom(streamsOf(playItem)),
     requests: requestsOf(tv.mediaInfo, mySeerrId),
     downloads: downloadsFor(downloads, 'tv', tmdbId, tvdbId).map((d) => detailsFor(user.isAdmin, d)),
@@ -410,4 +414,15 @@ export async function jellyfinSeason(user: SessionUser, seriesId: string, season
     seasonNumber,
     episodes: [...local].sort(([a], [b]) => a - b).map(([n, ep]) => jfEpisode(ep, seasonNumber, n)),
   };
+}
+
+/**
+ * Watched or not from a title's page, when Jellyfin has no item for it (deleted from disk): Netfish
+ * keeps it until the title is back. In Jellyfin: Jellyfin's own flag, as ever.
+ */
+export async function setTitleWatched(user: SessionUser, mediaType: MediaType, tmdbId: number, watched: boolean) {
+  const entry = findInLibrary(await libraryIndex(user), mediaType, tmdbId);
+  if (entry) await jellyfin.setPlayed(user.token, user.id, entry.id, watched);
+  else markOffDisk(user.id, `${mediaType}-${tmdbId}`, watched);
+  return { ok: true };
 }

@@ -59,3 +59,48 @@ export function isHidden(userId: string, group: string, item: JfItem) {
   const played = Date.parse(item.UserData?.LastPlayedDate ?? '') || 0;
   return played <= at;
 }
+
+// ---------- Titles not on disk ----------
+
+/**
+ * Watched or not, for titles that aren't in Jellyfin (deleted from disk: Jellyfin forgets a film
+ * once its file is gone). Kept per person by their TMDB key ("movie-603"), noted when Netfish
+ * deletes one (whoever had watched it), set from its page, and handed to Jellyfin once it's back.
+ */
+const OFF_FILE = path.join(config.dataDir, 'watched-off-disk.json');
+/** userId → "movie-603" / "tv-1399" → watched. */
+let offDisk: Record<string, Record<string, boolean>> = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(OFF_FILE, 'utf8'));
+  } catch {
+    return {};
+  }
+})();
+
+export const offDiskWatched = (userId: string, key: string): boolean | undefined => offDisk[userId]?.[key];
+
+export function markOffDisk(userId: string, key: string, watched: boolean) {
+  offDisk = { ...offDisk, [userId]: { ...offDisk[userId], [key]: watched } };
+  writeJson(OFF_FILE, offDisk);
+}
+
+/** It's back in Jellyfin: what was marked meanwhile goes there (once). The mark, if there was one. */
+export async function handOverWatched(user: SessionUser, key: string, itemId: string): Promise<boolean | undefined> {
+  const mark = offDisk[user.id]?.[key];
+  if (mark === undefined) return undefined;
+  await jellyfin.setPlayed(user.token, user.id, itemId, mark);
+  const { [key]: _, ...rest } = offDisk[user.id];
+  offDisk = { ...offDisk, [user.id]: rest };
+  writeJson(OFF_FILE, offDisk);
+  return mark;
+}
+
+/** Before Netfish deletes a title's files: who had watched it, so it still shows as watched. */
+export async function noteWatchedBeforeDelete(admin: SessionUser, key: string, itemId: string) {
+  const token = config.jellyfin.apiKey ?? admin.token;
+  const users = await jellyfin.users(token);
+  const seen = await Promise.all(
+    users.map(async (u) => ((await jellyfin.item(token, u.Id, itemId).catch(() => undefined))?.UserData?.Played ? u.Id : undefined)),
+  );
+  for (const id of seen) if (id) markOffDisk(id, key, true);
+}

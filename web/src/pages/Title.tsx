@@ -24,12 +24,16 @@ type Sheet =
   | { kind: 'versions'; language?: string; seasonNumber?: number; episodeNumber?: number }
   | { kind: 'subtitles'; seasonNumber?: number };
 
-/** Watched / not watched in Jellyfin; for a show, every episode. */
+/**
+ * Watched / not watched in Jellyfin; for a show, every episode. A title that's not on disk (no
+ * Jellyfin item) by its TMDB id: Netfish keeps it until it's back.
+ */
 function useSetWatched() {
   const qc = useQueryClient();
   const toast = useToast();
   return useMutation({
-    mutationFn: ({ itemId, watched }: { itemId: string; watched: boolean }) => api.setWatched(itemId, watched),
+    mutationFn: ({ itemId, title, watched }: { itemId?: string; title?: TitleDetail; watched: boolean }) =>
+      itemId ? api.setWatched(itemId, watched) : api.setTitleWatched(title!.mediaType, title!.tmdbId!, watched),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['title'] });
       void qc.invalidateQueries({ queryKey: ['season'] });
@@ -41,7 +45,7 @@ function useSetWatched() {
 
 function WatchedButton({ d }: { d: TitleDetail }) {
   const set = useSetWatched();
-  if (!d.jellyfinId || d.watched === undefined) return null;
+  if (d.watched === undefined || (!d.jellyfinId && !d.tmdbId)) return null;
   const label = d.watched ? t('Watched · mark as unwatched') : t('Mark as watched');
   return (
     <button
@@ -50,7 +54,7 @@ function WatchedButton({ d }: { d: TitleDetail }) {
       aria-label={label}
       aria-pressed={d.watched}
       disabled={set.isPending}
-      onClick={() => set.mutate({ itemId: d.jellyfinId!, watched: !d.watched })}
+      onClick={() => set.mutate({ itemId: d.jellyfinId, title: d, watched: !d.watched })}
     >
       {d.watched ? <Check size={20} /> : <CircleCheck size={20} />}
     </button>

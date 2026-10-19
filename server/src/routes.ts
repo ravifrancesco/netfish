@@ -63,7 +63,7 @@ import { scrobble, setScrobble, startImport, startLink, traktStatus, unlink } fr
 import { runSuggestarr, suggestarrStatus } from './services/suggestarr';
 import { trailersFor } from './services/trailers';
 import { serverUpdate } from './services/serverUpdate';
-import { jellyfinDetail, jellyfinSeason, movieDetail, seasonDetail, tvDetail } from './services/titles';
+import { jellyfinDetail, jellyfinSeason, movieDetail, seasonDetail, setTitleWatched, tvDetail } from './services/titles';
 import { t } from './lib/i18n';
 
 const publicUser = ({ token: _token, canDownload: _canDownload, ...user }: SessionUser): User => user;
@@ -312,6 +312,11 @@ export async function apiRoutes(app: FastifyInstance) {
     api.post<{ Params: TitleParams; Body: { seasons?: number[] } }>('/title/:type/:id/delete', { preHandler: requireAdmin }, async (req) => {
       const { mediaType, tmdbId } = mediaTitle(req);
       return deleteFromDisk(userOf(req), mediaType, tmdbId, seasonsOf(req.body));
+    });
+    // Watched or not from a title's page (one that isn't in Jellyfin too: deleted from disk).
+    api.post<{ Params: TitleParams; Body: { watched?: boolean } }>('/title/:type/:id/watched', async (req) => {
+      const { mediaType, tmdbId } = mediaTitle(req);
+      return setTitleWatched(userOf(req), mediaType, tmdbId, req.body?.watched !== false);
     });
     // Cancel a request before anything is on disk: whoever asked for it, or an admin.
     api.delete<{ Params: TitleParams }>('/title/:type/:id/request', async (req) => {
