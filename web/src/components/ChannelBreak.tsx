@@ -115,52 +115,67 @@ export function ChannelBreak({ channel, next, breakStart, now, scene, filler, fa
   return (
     <div className={`cbreak cbreak--${filler ? 'filler' : scene}`} style={style} aria-live="polite">
       <div className="cbreak__sea" />
-      <svg className="cbreak__art" viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-        <defs>
-          <FishGradient id={id} />
-        </defs>
-        {(scene === 'net' && !filler) && (
+      {/* The net draws itself, for the first seconds only. */}
+      {scene === 'net' && !filler && (
+        <svg className="cbreak__art" viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
           <g className="cbreak__net">
             {NET.map(([x1, y1, x2, y2], i) => (
               <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} pathLength={1} style={{ '--i': i } as CSSProperties} />
             ))}
           </g>
-        )}
+        </svg>
+      )}
+      {/*
+        What keeps moving, each in a layer of its own that the GPU moves (one picture of all of
+        it, redrawn every frame, cost a good part of a core). Placed on the net's grid: 160 by 90,
+        filling the screen the same way.
+      */}
+      <div className="cbreak__stage" aria-hidden="true">
         {/* Bubbles drift up in every break; in the bubbles one they're the show. */}
-        <g className={`cbreak__bubbles${scene === 'bubbles' || filler ? ' is-many' : ''}`}>
+        <div className={`cbreak__bubbles${scene === 'bubbles' || filler ? ' is-many' : ''}`}>
           {BUBBLES.map((b, i) => (
-            <circle key={i} cx={b.x} cy={96} r={b.r} style={{ '--dur': `${b.dur}s`, '--d': `${b.delay}s` } as CSSProperties} />
+            <span key={i} className="cbreak__bubble" style={{ '--x': b.x, '--r': b.r, '--dur': `${b.dur}s`, '--d': `${b.delay}s` } as CSSProperties} />
           ))}
-        </g>
+        </div>
         {scene === 'shoal' && !filler ? (
-          <g className="cbreak__shoal">
+          <div className="cbreak__shoal">
             {SHOAL.map(([dx, dy, size], i) => (
-              <g key={i} transform={`translate(${dx} ${dy})`}>
-                <g className="cbreak__swimmer" style={{ '--d': `${-i * 0.37}s` } as CSSProperties}>
-                  <g transform={`scale(${size * 0.32}) translate(-32 -32)`}>
-                    {i === 0 ? (
+              <div key={i} className="cbreak__swimmer" style={{ '--x': dx, '--y': dy, '--size': size, '--d': `${-i * 0.37}s` } as CSSProperties}>
+                <svg viewBox="0 0 64 64">
+                  {i === 0 ? (
+                    <>
+                      <defs>
+                        <FishGradient id={id} />
+                      </defs>
                       <Fish gradient={id} />
-                    ) : (
-                      <g fill="#36e2c6" stroke="#36e2c6" strokeLinejoin="round" opacity={0.75}>
-                        <path d={TAIL} strokeWidth={4} />
-                        <path d={BODY} strokeWidth={6} />
-                      </g>
-                    )}
-                  </g>
-                </g>
-              </g>
+                    </>
+                  ) : (
+                    <g fill="#36e2c6" stroke="#36e2c6" strokeLinejoin="round" opacity={0.75}>
+                      <path d={TAIL} strokeWidth={4} />
+                      <path d={BODY} strokeWidth={6} />
+                    </g>
+                  )}
+                </svg>
+              </div>
             ))}
-          </g>
+          </div>
         ) : (
-          <g className="cbreak__fish">
-            <g transform="scale(0.42) translate(-32 -32)">
-              <path className="cbreak__tail" d={TAIL} fill={`url(#${id})`} stroke={`url(#${id})`} strokeWidth={4} strokeLinejoin="round" />
+          <div className="cbreak__fish">
+            <div className="cbreak__tail">
+              <svg viewBox="0 0 64 64">
+                <defs>
+                  <FishGradient id={id} />
+                </defs>
+                <path d={TAIL} fill={`url(#${id})`} stroke={`url(#${id})`} strokeWidth={4} strokeLinejoin="round" />
+              </svg>
+            </div>
+            <svg viewBox="0 0 64 64">
               <path d={BODY} fill={`url(#${id})`} stroke={`url(#${id})`} strokeWidth={6} strokeLinejoin="round" />
               <circle {...EYE} fill="#03140f" />
-            </g>
-          </g>
+            </svg>
+          </div>
         )}
-      </svg>
+      </div>
 
       {!filler && (
         <div className="cbreak__ident" aria-hidden="true">

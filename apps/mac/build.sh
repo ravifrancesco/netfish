@@ -18,7 +18,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$BUILD/iconset.iconset
 swiftc -O -swift-version 5 -target arm64-apple-macos15.0 \
   -import-objc-header Netfish/Netfish-Bridging-Header.h \
   -I "$BREW/include" -L "$BREW/lib" -lmpv \
-  -framework AppKit -framework WebKit -framework OpenGL \
+  -framework AppKit -framework WebKit -framework OpenGL -framework CoreAudio -framework AudioToolbox \
   Netfish/*.swift ../ios/Netfish/Server.swift ../ios/Netfish/OfflineStore.swift ../ios/Netfish/LocalScheme.swift \
   ../ios/Netfish/Strings.swift \
   -o "$APP/Contents/MacOS/Netfish" 2> >(grep -v "deprecated\|^\s*|\|^\s*$\|note:\|^\s*[0-9]* |" >&2)

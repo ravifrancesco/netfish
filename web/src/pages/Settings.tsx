@@ -285,7 +285,10 @@ export default function Settings() {
         </label>
         <label className="check">
           <input type="checkbox" checked={prefs.subtitlesByDefault} onChange={(e) => setPrefs({ subtitlesByDefault: e.target.checked })} />
-          <span>{t('Turn subtitles on automatically')}</span>
+          <span>
+            {t('Turn subtitles on automatically')}
+            <small className="muted check__note">{t('Follows what you last chose while watching, films and channels alike.')}</small>
+          </span>
         </label>
         <label className="field">
           <span>{t('Subtitle language')}</span>

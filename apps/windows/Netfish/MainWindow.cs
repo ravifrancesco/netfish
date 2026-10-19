@@ -18,6 +18,8 @@ sealed class MainWindow : Form
     public static readonly string Version = typeof(MainWindow).Assembly.GetName().Version is { } v ? $"{v.Major}.{v.Minor}.{v.Build}" : "0";
 
     public MpvPlayer Player { get; private set; } = null!;
+    /// <summary>Windows' volume: the player's slider follows it and sets it.</summary>
+    public readonly SystemVolume Volume = new();
     public CoreWebView2? Web => controller?.CoreWebView2;
 
     readonly Panel video;
@@ -50,6 +52,15 @@ sealed class MainWindow : Form
         PlaceWindow(scale);
         bridge = new Bridge(this, store);
         store.Changed += list => bridge.Push("offline", list);
+        Volume.Changed += output =>
+        {
+            if (!IsHandleCreated) return;
+            BeginInvoke(() =>
+            {
+                if (output) Volume.Follow();
+                bridge.Push("volume", Volume.Json());
+            });
+        };
     }
 
     /// <summary>Where the window was last time, if that's still on a screen; otherwise centred.</summary>
@@ -432,6 +443,7 @@ sealed class MainWindow : Form
         KeepAwake(false);
         Hide(); // gone at once, while mpv winds down
         Player?.Dispose();
+        Volume.Dispose();
         try { controller?.Close(); } catch { }
         controller = null;
         AutoUpdate.Closing(); // a waiting update installs now

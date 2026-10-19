@@ -57,11 +57,30 @@ export interface UpdateStatus {
   autoProblem?: string;
 }
 
+/** The computer's output volume, as the Mac and Windows apps report it. */
+export interface SystemVolumeState {
+  /** False: this output's volume can't be set (some HDMI and digital outputs). */
+  available: boolean;
+  /** 0 to 1. */
+  volume?: number;
+  muted?: boolean;
+}
+
 export interface DesktopBridge {
   /** darwin / win32 / linux (desktop), ios, or firetv. */
   platform: string;
   version: string;
   changeServer: () => void;
+  /**
+   * The computer's own volume (the volume keys', the menu bar's or the taskbar's): the player's
+   * slider follows it and sets it. Mac and Windows apps from 0.7.11 on.
+   */
+  systemVolume?: {
+    get: () => Promise<SystemVolumeState>;
+    set: (volume: number) => void;
+    setMuted: (muted: boolean) => void;
+    onChange: (cb: (state: SystemVolumeState) => void) => () => void;
+  };
   /** TV: keep the screen from dimming while a film plays. */
   keepAwake?: (on: boolean) => void;
   videoOverlay?: VideoOverlay;
@@ -280,6 +299,16 @@ function androidBridge(): DesktopBridge | undefined {
 
 /** The app around this page, if any (desktop, iPhone/iPad or Fire TV). */
 export const desktop = (): DesktopBridge | undefined => window.netfishDesktop ?? androidBridge();
+
+/**
+ * Marks `el` with is-fullscreen while the app's window is full screen (the window's own, not
+ * the page's): the Mac's window buttons are hidden then, so nothing needs to leave room for them.
+ */
+export function markFullscreen(el: HTMLElement) {
+  desktop()?.videoOverlay?.onState((state) => {
+    if (typeof state.fullscreen === 'boolean') el.classList.toggle('is-fullscreen', state.fullscreen);
+  });
+}
 
 /** How to call this app in the interface. */
 export function appKind(): { name: string; device: string } {

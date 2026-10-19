@@ -5,6 +5,7 @@ import { SwimmingFish } from '../components/Logo';
 import { clock } from '../lib/format';
 import { getPrefs, setPrefs } from '../lib/prefs';
 import { desktop } from '../lib/desktop';
+import { setSystemMuted, setSystemVolume, systemVolume, useSystemVolume } from '../lib/systemVolume';
 import { isTV } from '../lib/tv';
 import { parseVtt, type Cue } from './vtt';
 import { t } from '../i18n';
@@ -88,16 +89,31 @@ export interface Volume {
   muted: boolean;
   setVol: (value: number) => void;
   toggleMute: () => void;
+  /** The speaker button: silent, or back to a level you can hear (the computer's own mute when it's the computer's volume). */
+  pressMute: () => void;
   /** <video>'s volumechange (muted some other way). */
   onVolumeChange: () => void;
 }
 
-/** Volume and mute, remembered between films. */
+/**
+ * Volume and mute, remembered between films. In the Mac and Windows apps they're the computer's
+ * own (the volume keys move the slider, the slider moves the computer's), with the film at full volume.
+ */
 export function useVolume(video: RefObject<HTMLVideoElement | null>): Volume {
+  const system = useSystemVolume();
   const [volume, setVolume] = useState(() => getPrefs().volume);
   const [muted, setMuted] = useState(false);
+  const following = Boolean(system);
+  useEffect(() => {
+    const v = video.current;
+    if (following && v && (v.volume !== 1 || v.muted)) {
+      v.volume = 1;
+      v.muted = false;
+    }
+  }, [following, video]);
   const setVol = useCallback(
     (value: number) => {
+      if (systemVolume()) return setSystemVolume(value);
       const v = video.current;
       if (v) {
         v.volume = value;
@@ -110,13 +126,24 @@ export function useVolume(video: RefObject<HTMLVideoElement | null>): Volume {
     [video],
   );
   const toggleMute = useCallback(() => {
+    const s = systemVolume();
+    if (s) return setSystemMuted(!s.muted);
     const v = video.current;
     if (!v) return;
     v.muted = !v.muted;
     setMuted(v.muted);
   }, [video]);
-  const onVolumeChange = useCallback(() => setMuted(video.current?.muted ?? false), [video]);
-  return { volume, muted, setVol, toggleMute, onVolumeChange };
+  const onVolumeChange = useCallback(() => {
+    if (!systemVolume()) setMuted(video.current?.muted ?? false);
+  }, [video]);
+  const pressMute = useCallback(() => {
+    const s = systemVolume();
+    if (s) return s.volume === 0 ? setSystemVolume(0.5) : setSystemMuted(!s.muted);
+    setVol(muted || volume === 0 ? Math.max(volume, 0.5) : 0);
+  }, [muted, volume, setVol]);
+  return system
+    ? { volume: system.volume, muted: system.muted, setVol, toggleMute, pressMute, onVolumeChange }
+    : { volume, muted, setVol, toggleMute, pressMute, onVolumeChange };
 }
 
 /** Subtitles drawn by the page over the film, for players that can't draw them (Apple's, downloads in the page). */
@@ -505,7 +532,7 @@ export function PlayerView(props: PlayerViewProps) {
           <div className="volume">
             <button
               className="icon-btn"
-              onClick={() => volume.setVol(volume.muted || volume.volume === 0 ? Math.max(volume.volume, 0.5) : 0)}
+              onClick={volume.pressMute}
               aria-label={volume.muted ? t('Unmute') : t('Mute')}
             >
               {volume.muted || volume.volume === 0 ? <VolumeX size={24} /> : <Volume2 size={24} />}

@@ -7,8 +7,9 @@ import type { PlaybackSession, ProgressReport, StreamTrack, TogetherCommand } fr
 import { api } from '../api';
 import { useToast } from '../components/ui';
 import { SwimmingFish } from '../components/Logo';
-import { getPrefs, setPrefs, usePrefs } from '../lib/prefs';
+import { getPrefs, rememberSubtitle, usePrefs } from '../lib/prefs';
 import { desktop } from '../lib/desktop';
+import { startVolume } from '../lib/systemVolume';
 import { buildDeviceProfile } from '../player/profile';
 import { OverlayVideo, trackPositions } from '../player/overlay';
 import { PlayerView, useVolume } from '../player/PlayerView';
@@ -235,7 +236,7 @@ function Player() {
           segments: [],
         })
         .catch((e: Error) => setError(e.message));
-      ov.volume = getPrefs().volume;
+      ov.volume = startVolume();
       return;
     }
     const v = video.current!;
@@ -589,7 +590,7 @@ function Player() {
   const chooseSubtitle = (track?: StreamTrack) => {
     const wasBurned = subtitle?.burnIn;
     setSubtitle(track);
-    if (track) setPrefs({ subtitleLanguage: track.code ?? getPrefs().subtitleLanguage });
+    rememberSubtitle(track);
     if (overlayActive.current && appDrawsSubtitles) return; // the app's player draws every kind itself
     if (track?.burnIn || wasBurned) {
       void load({ start: video.current?.currentTime ?? 0, audio: audioIndex, subtitle: track?.burnIn ? track.index : undefined, allowDirectPlay: !track?.burnIn });

@@ -63,6 +63,7 @@ export default {
   'Preferred audio language': 'Lingua audio preferita',
   'Original / file default': 'Originale / predefinita del file',
   'Turn subtitles on automatically': 'Attiva i sottotitoli automaticamente',
+  'Follows what you last chose while watching, films and channels alike.': 'Segue quello che hai scelto l’ultima volta guardando, film e canali.',
   'Subtitle language': 'Lingua dei sottotitoli',
   'Play the next episode automatically': 'Riproduci automaticamente il prossimo episodio',
   'Change server…': 'Cambia server…',

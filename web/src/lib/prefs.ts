@@ -38,6 +38,15 @@ function read(): Prefs {
 let current = read();
 const listeners = new Set<() => void>();
 
+/**
+ * Subtitles chosen while watching (or turned off): from then on the default, for films and
+ * channels alike (Settings shows the same switch). Forced ones (signs, foreign lines) don't
+ * count as turning them on.
+ */
+export function rememberSubtitle(track: { code?: string; forced?: boolean } | undefined) {
+  setPrefs(track ? { subtitlesByDefault: !track.forced, ...(track.code ? { subtitleLanguage: track.code } : {}) } : { subtitlesByDefault: false });
+}
+
 export function setPrefs(patch: Partial<Prefs>) {
   current = { ...current, ...patch };
   try {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { desktop, type OfflineItem } from '../lib/desktop';
-import { getPrefs, setPrefs } from '../lib/prefs';
+import { getPrefs, rememberSubtitle } from '../lib/prefs';
+import { startVolume } from '../lib/systemVolume';
 import { OverlayVideo } from './overlay';
 import { PlayerView, useVolume, type MenuTrack } from './PlayerView';
 import { locale, t } from '../i18n';
@@ -179,7 +180,7 @@ export function DownloadPlayer({ item, start = 0, onPosition, onClose, next, bac
         if (typeof state.aid === 'number') setAudioIndex(state.aid);
         if ('sid' in state) setSubtitleIndex(typeof state.sid === 'number' ? state.sid : undefined);
       });
-      ov.volume = getPrefs().volume;
+      ov.volume = startVolume();
       overlay
         .load({
           url: item.video,
@@ -203,7 +204,7 @@ export function DownloadPlayer({ item, start = 0, onPosition, onClose, next, bac
     }
     const v = video.current;
     if (!v) return;
-    v.volume = getPrefs().volume;
+    v.volume = startVolume();
     v.src = item.video;
     if (start > 0) v.addEventListener('loadedmetadata', () => (v.currentTime = start), { once: true });
     v.play().catch(() => setPlaying(false));
@@ -246,9 +247,12 @@ export function DownloadPlayer({ item, start = 0, onPosition, onClose, next, bac
   };
   const chooseSubtitle = (index?: number) => {
     setSubtitleIndex(index);
-    if (overlay) return overlay.command('subtitle', index ?? null);
-    const chosen = index === undefined ? undefined : item.subtitles[index];
-    if (chosen?.code) setPrefs({ subtitleLanguage: chosen.code });
+    if (overlay) {
+      // The app's player lists the file's own tracks (no language here): on or off is what's kept.
+      rememberSubtitle(index === undefined ? undefined : {});
+      return overlay.command('subtitle', index ?? null);
+    }
+    rememberSubtitle(index === undefined ? undefined : item.subtitles[index]);
   };
   const subtitles = overlay ? engineSubs : item.subtitles.map((s, index) => ({ index, label: s.label }));
   // mpv lifts its subtitles above the controls while they show.

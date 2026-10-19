@@ -11,7 +11,8 @@ import { isStandIn, NewBadge } from '../components/NewBadge';
 import { useToast } from '../components/ui';
 import { clockTime, episodeLine, onNow, programEnd, programTitle, serverNow, useChannels, useServerNow } from '../lib/channels';
 import { desktop } from '../lib/desktop';
-import { deviceId, getPrefs, setPrefs } from '../lib/prefs';
+import { deviceId, getPrefs, rememberSubtitle } from '../lib/prefs';
+import { startVolume } from '../lib/systemVolume';
 import { screenId } from '../lib/screens';
 import { buildDeviceProfile } from '../player/profile';
 import { OverlayVideo, trackPositions } from '../player/overlay';
@@ -70,6 +71,10 @@ export default function ChannelPlayer() {
   /** The channel on screen (its programme or its break). */
   const shownChannel = useRef<string>(undefined);
   const [subtitle, setSubtitle] = useState<StreamTrack>();
+  const subtitleRef = useRef<StreamTrack | undefined>(undefined);
+  subtitleRef.current = subtitle;
+  /** The app's player has the programme open (until then, its tracks aren't there to switch). */
+  const overlayLoaded = useRef(false);
   const [audioIndex, setAudioIndex] = useState<number>();
   /** Subtitles chosen on this channel carry on to the next programme: a language, or off (null). */
   const wantSubs = useRef<string | null | undefined>(undefined);
@@ -155,7 +160,12 @@ export default function ChannelPlayer() {
       };
       check();
     },
-    onLoaded: () => {},
+    onLoaded: () => {
+      overlayLoaded.current = true;
+      // The app's player has the file's tracks now: the subtitles chosen for it, for certain.
+      const s = sessionRef.current;
+      if (overlayVideo.current && appDrawsSubtitles && s) overlay?.command('subtitle', trackPositions(s).subtitle(subtitleRef.current) ?? null);
+    },
     onEnded: () => setStatus('ended'),
     onError: () => {
       if (overlayVideo.current) {
@@ -181,6 +191,7 @@ export default function ChannelPlayer() {
         for (const [event, name] of Object.entries(map)) ov.addEventListener(event, () => handlers.current[name]?.());
       }
       ov.loadingNext();
+      overlayLoaded.current = false;
       video.current = ov as unknown as HTMLVideoElement;
       const positions = trackPositions(s);
       void overlay
@@ -197,12 +208,12 @@ export default function ChannelPlayer() {
           segments: [],
         })
         .catch(fail);
-      ov.volume = getPrefs().volume;
+      ov.volume = startVolume();
       return;
     }
     const v = video.current;
     if (!v) return;
-    v.volume = getPrefs().volume;
+    v.volume = startVolume();
     if (s.isHls && Hls.isSupported()) {
       const h = new Hls({ startPosition: start, maxBufferLength: 40, backBufferLength: 30 });
       h.on(Hls.Events.ERROR, (_e, data) => data.fatal && fail());
@@ -292,7 +303,7 @@ export default function ChannelPlayer() {
   useEffect(() => {
     if (!session) return;
     if (useOverlay) {
-      if (appDrawsSubtitles) overlay?.command('subtitle', trackPositions(session).subtitle(subtitle) ?? null);
+      if (appDrawsSubtitles && overlayLoaded.current) overlay?.command('subtitle', trackPositions(session).subtitle(subtitle) ?? null);
       return;
     }
     const v = video.current;
@@ -304,7 +315,7 @@ export default function ChannelPlayer() {
     const track = index === undefined ? undefined : session?.subtitleTracks.find((tr) => tr.index === index);
     setSubtitle(track);
     wantSubs.current = track ? (track.code ?? null) : null;
-    if (track?.code) setPrefs({ subtitleLanguage: track.code });
+    rememberSubtitle(track);
   };
   const chooseAudio = (index: number) => {
     const s = sessionRef.current;
@@ -693,7 +704,7 @@ export default function ChannelPlayer() {
             <LayoutList size={24} />
           </button>
           <div className="volume">
-            <button className="icon-btn" onClick={() => volume.setVol(volume.muted || volume.volume === 0 ? Math.max(volume.volume, 0.5) : 0)} aria-label={volume.muted ? t('Unmute') : t('Mute')}>
+            <button className="icon-btn" onClick={volume.pressMute} aria-label={volume.muted ? t('Unmute') : t('Mute')}>
               {volume.muted || volume.volume === 0 ? <VolumeX size={24} /> : <Volume2 size={24} />}
             </button>
             <input className="volume__slider" type="range" min={0} max={1} step={0.05} value={volume.muted ? 0 : volume.volume} onChange={(e) => volume.setVol(Number(e.target.value))} aria-label={t('Volume')} />

@@ -355,6 +355,10 @@ p {
   height: 18px;
   accent-color: var(--accent);
 }
+.check__note {
+  display: block;
+  font-size: 0.8rem;
+}
 .checks {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
@@ -3416,9 +3420,14 @@ html.is-desktop.is-mac .player__top {
   padding-top: 8px;
   padding-left: 92px;
 }
-html.is-desktop.is-mac .player:fullscreen .player__top {
+/* Full screen (the window's, on the Mac): no window buttons to make room for. */
+html.is-desktop.is-mac .player:fullscreen .player__top,
+html.is-desktop.is-mac.is-fullscreen .player__top {
   padding-top: 18px;
   padding-left: clamp(16px, 3vw, 40px);
+}
+html.is-desktop.is-mac.is-fullscreen .nav {
+  padding-left: var(--gutter);
 }
 
 /* ---------- iPhone & iPad app ---------- */
@@ -3787,26 +3796,38 @@ html.is-tv .together-chip:focus {
 
 /* A pulsing dot: something is happening right now. */
 .live-dot {
+  position: relative;
   display: inline-block;
   width: 9px;
   height: 9px;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 0 0 rgba(54, 226, 198, 0.6);
-  animation: live-pulse 1.8s ease-out infinite;
   flex: none;
 }
+/* The pulse: a ring that grows and fades (moved by the GPU, rather than painted every frame). */
+.live-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(54, 226, 198, 0.6);
+  animation: live-pulse 1.8s ease-out infinite;
+}
 @keyframes live-pulse {
-  70% {
-    box-shadow: 0 0 0 8px rgba(54, 226, 198, 0);
+  from {
+    transform: scale(1);
+    opacity: 1;
   }
-  100% {
-    box-shadow: 0 0 0 0 rgba(54, 226, 198, 0);
+  70%,
+  to {
+    transform: scale(2.8);
+    opacity: 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .live-dot {
+  .live-dot::after {
     animation: none;
+    opacity: 0;
   }
 }
 .row--together .row__title {
@@ -4788,6 +4809,9 @@ html.is-tv .guide__prog:focus {
 html.is-desktop.is-mac .channel__top {
   padding-left: 92px;
 }
+html.is-desktop.is-mac.is-fullscreen .channel__top {
+  padding-left: clamp(16px, 3vw, 40px);
+}
 .channel__bottom {
   position: absolute;
   left: 0;
@@ -5079,6 +5103,13 @@ html.is-desktop.is-mac .channel__top {
   background: repeating-linear-gradient(100deg, rgba(140, 248, 230, 0.05) 0 60px, transparent 60px 190px);
   animation: cb-rays 16s linear infinite;
 }
+/*
+ * Still while waiting (until the 9pm film, or the next programme): a layer this big moving costs
+ * the page every frame, and waits can be long. The bubbles and the fish keep it alive.
+ */
+.cbreak--filler .cbreak__sea::after {
+  animation: none;
+}
 @keyframes cb-rays {
   to {
     transform: translateX(190px);
@@ -5117,11 +5148,40 @@ html.is-desktop.is-mac .channel__top {
 .cbreak__net {
   transform-origin: 80px 45px;
 }
+/*
+ * What keeps moving, each in a layer of its own (the GPU moves them): on the net's grid, 160 by
+ * 90 filling the screen as the SVG does ("slice"); a grid unit is --u. Each piece is a box one
+ * unit square at (--x, --y), so moving it by 100% is one unit.
+ */
+.cbreak__stage {
+  --u: max(0.625vw, 1.1111vh);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.cbreak__bubble,
+.cbreak__fish,
+.cbreak__shoal {
+  position: absolute;
+  left: calc(50% + (var(--x, 0) - 80) * var(--u));
+  top: calc(50% + (var(--y, 0) - 45) * var(--u));
+  width: var(--u);
+  height: var(--u);
+}
 /* The fish: the first four seconds, centre stage (through the net, among the bubbles), then away before what's next. */
 .cbreak__fish {
-  transform: translate(-40px, 42px);
+  transform: translate(-4000%, 4200%);
   animation: cb-cross 4.4s cubic-bezier(0.45, 0, 0.3, 1) forwards;
   animation-delay: var(--elapsed, 0s);
+}
+.cbreak__fish > svg,
+.cbreak__tail {
+  position: absolute;
+  left: calc(-13.44 * var(--u));
+  top: calc(-13.44 * var(--u));
+  width: calc(26.88 * var(--u));
+  height: calc(26.88 * var(--u));
+  overflow: visible;
 }
 .cbreak--bubbles .cbreak__fish {
   animation-name: cb-hover;
@@ -5131,83 +5191,125 @@ html.is-desktop.is-mac .channel__top {
 }
 @keyframes cb-cross {
   from {
-    transform: translate(-40px, 42px);
+    transform: translate(-4000%, 4200%);
   }
   40% {
-    transform: translate(78px, 40px);
+    transform: translate(7800%, 4000%);
   }
   62% {
-    transform: translate(86px, 39px);
+    transform: translate(8600%, 3900%);
   }
   to {
-    transform: translate(200px, 24px);
+    transform: translate(20000%, 2400%);
   }
 }
 @keyframes cb-hover {
   from {
-    transform: translate(80px, 110px);
+    transform: translate(8000%, 11000%);
   }
   30%,
   70% {
-    transform: translate(80px, 40px);
+    transform: translate(8000%, 4000%);
   }
   to {
-    transform: translate(80px, -40px);
+    transform: translate(8000%, -4000%);
   }
 }
 /* Waiting (before the 9pm film, or after a programme ended early): the fish idles about. */
 @keyframes cb-wander {
   from,
   to {
-    transform: translate(-40px, 30px);
+    transform: translate(-4000%, 3000%);
   }
   50% {
-    transform: translate(200px, 52px);
+    transform: translate(20000%, 5200%);
   }
 }
+/* Its tail, a layer of its own too, wagging while it's on screen (it's gone after a few seconds, except while waiting). */
 .cbreak__tail {
-  transform-box: fill-box;
-  transform-origin: 100% 50%;
-  animation: fish-wag 0.6s ease-in-out infinite alternate;
+  transform-origin: 23.4375% 50%; /* where it joins the body: (15, 32) of the fish's 64 */
+  animation: fish-wag 0.6s ease-in-out 8 alternate;
 }
-.cbreak__bubbles circle {
-  fill: none;
-  stroke: rgba(140, 248, 230, 0.32);
-  stroke-width: 0.4;
+.cbreak__tail svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.cbreak--filler .cbreak__tail {
+  animation-iteration-count: infinite;
+}
+.cbreak__bubble {
+  --y: 96;
   animation: cb-rise var(--dur) linear infinite;
   animation-delay: calc(var(--d) + var(--elapsed, 0s));
 }
-.cbreak__bubbles:not(.is-many) circle:nth-child(2n) {
+.cbreak__bubble::before {
+  --w: calc((2 * var(--r) + 0.4) * var(--u));
+  content: '';
+  position: absolute;
+  left: calc(var(--w) / -2);
+  top: calc(var(--w) / -2);
+  box-sizing: border-box;
+  width: var(--w);
+  height: var(--w);
+  border: calc(0.4 * var(--u)) solid rgba(140, 248, 230, 0.32);
+  border-radius: 50%;
+}
+.cbreak__bubbles:not(.is-many) .cbreak__bubble:nth-child(2n) {
   display: none;
 }
-.cbreak__bubbles.is-many circle {
-  stroke: rgba(140, 248, 230, 0.5);
-  stroke-width: 0.45;
+.cbreak__bubbles.is-many .cbreak__bubble::before {
+  border-color: rgba(140, 248, 230, 0.5);
+  border-width: calc(0.45 * var(--u));
 }
 @keyframes cb-rise {
   from {
     transform: translateY(0);
   }
   to {
-    transform: translateY(-110px);
+    transform: translateY(-11000%);
   }
 }
 .cbreak__shoal {
-  transform: translate(-40px, 46px);
+  transform: translate(-4000%, 4600%);
   animation: cb-shoal 4.6s linear forwards;
   animation-delay: var(--elapsed, 0s);
 }
 @keyframes cb-shoal {
   from {
-    transform: translate(-40px, 46px);
+    transform: translate(-4000%, 4600%);
   }
   to {
-    transform: translate(230px, 38px);
+    transform: translate(23000%, 3800%);
   }
 }
+/* Each fish of the shoal around its leader, bobbing while they cross (then they're gone). */
 .cbreak__swimmer {
-  animation: fish-bob 1.6s ease-in-out infinite;
+  position: absolute;
+  left: calc(var(--x) * var(--u));
+  top: calc(var(--y) * var(--u));
+  width: var(--u);
+  height: var(--u);
+  animation: cb-bob 1.6s ease-in-out 4;
   animation-delay: var(--d);
+}
+.cbreak__swimmer svg {
+  position: absolute;
+  left: calc(-10.24 * var(--size) * var(--u));
+  top: calc(-10.24 * var(--size) * var(--u));
+  width: calc(20.48 * var(--size) * var(--u));
+  height: calc(20.48 * var(--size) * var(--u));
+  overflow: visible;
+}
+@keyframes cb-bob {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(200%, -300%);
+  }
 }
 /* The first seconds: Netfish, and the channel. */
 .cbreak__ident {

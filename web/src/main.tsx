@@ -6,6 +6,8 @@ import '@fontsource-variable/inter';
 import './styles.css';
 import { ApiError } from './api';
 import { App } from './App';
+import { markFullscreen } from './lib/desktop';
+import { startSystemVolume } from './lib/systemVolume';
 import { isTV, startTV } from './lib/tv';
 import { language } from './i18n';
 
@@ -24,6 +26,8 @@ const queryClient = new QueryClient({
 // The Mac and Windows apps mark themselves so the UI can leave room for window controls.
 if (/NetfishDesktop/.test(navigator.userAgent)) {
   document.documentElement.classList.add('is-desktop', /Mac/.test(navigator.platform) ? 'is-mac' : 'is-other-os');
+  markFullscreen(document.documentElement);
+  startSystemVolume();
 }
 
 // Phone & tablet apps (iPhone, iPad, Android): room for notches, no volume slider (the device buttons do that).

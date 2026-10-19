@@ -36,6 +36,7 @@ sealed class Bridge(MainWindow window, OfflineStore store)
           const offline = new Set();
           const video = new Set();
           const updates = new Set();
+          const volumes = new Set();
           host.addEventListener('message', (e) => {
             const m = e.data;
             if (!m || typeof m !== 'object') return;
@@ -44,7 +45,7 @@ sealed class Bridge(MainWindow window, OfflineStore store)
               waiting.delete(m.reply);
               if (call) 'error' in m ? call.reject(new Error(m.error)) : call.resolve(m.value);
             } else {
-              const listeners = m.push === 'offline' ? offline : m.push === 'video' ? video : m.push === 'update' ? updates : null;
+              const listeners = m.push === 'offline' ? offline : m.push === 'video' ? video : m.push === 'update' ? updates : m.push === 'volume' ? volumes : null;
               listeners?.forEach((cb) => { try { cb(m.value); } catch (err) { console.error(err); } });
             }
           });
@@ -78,6 +79,13 @@ sealed class Bridge(MainWindow window, OfflineStore store)
             snapshot: () => call('snapshot'),
             serverReachable: () => call('serverReachable'),
             toggleFullscreen: () => send('fullscreen'),
+            // Windows' own volume: the player's slider follows it and sets it.
+            systemVolume: {
+              get: () => call('systemVolume'),
+              set: (volume) => send('systemVolume', { volume }),
+              setMuted: (muted) => send('systemVolume', { muted }),
+              onChange: (cb) => { volumes.add(cb); return () => volumes.delete(cb); },
+            },
             keepAwake: (on) => send('keepAwake', Boolean(on)),
             notify: (n) => send('notify', n),
             update: {
@@ -233,6 +241,15 @@ sealed class Bridge(MainWindow window, OfflineStore store)
                 window.BeginInvoke(() => Application.Exit());
                 return null;
             }
+
+            // Windows' volume
+            case "systemVolume":
+                if (args is JsonObject change)
+                {
+                    if (Num(change["volume"]) is { } volume) window.Volume.SetVolume(volume);
+                    if (change["muted"] is JsonValue muted && muted.TryGetValue<bool>(out var mute)) window.Volume.SetMuted(mute);
+                }
+                return window.Volume.Json();
 
             // Window
             case "fullscreen":

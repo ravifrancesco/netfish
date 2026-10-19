@@ -1,6 +1,6 @@
 {
   "name": "@netfish/server",
-  "version": "0.7.10",
+  "version": "0.7.11",
   "private": true,
   "scripts": {
     "dev": "tsx watch --clear-screen=false src/index.ts",

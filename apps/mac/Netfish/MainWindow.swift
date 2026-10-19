@@ -70,6 +70,7 @@ final class MainWindow: NSWindowController, NSWindowDelegate, WKNavigationDelega
             self?.web.evaluateJavaScript("window.__netfishOpen && window.__netfishOpen(\(json))")
         }
         player.onState = { [weak self] state in self?.pushState(state) }
+        SystemVolume.shared.onChange = { [weak self] in self?.push("__netfishVolume", SystemVolume.shared.json) }
         player.onEnd = { [weak self] finished, error in
             var state: [String: Any] = ["ended": true, "finished": finished]
             if let error { state["error"] = error }
@@ -208,6 +209,8 @@ final class MainWindow: NSWindowController, NSWindowDelegate, WKNavigationDelega
     // prints what the last one returns, then quits. For automated checks only.
     private var selfTestStep = 0
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        // Already full screen (it only says so when that changes): the page leaves no room for the window buttons.
+        if window?.styleMask.contains(.fullScreen) == true { push("__netfishVideo", ["fullscreen": true]) }
         // Only the separate self-test build (its own sign-in, settings and downloads) runs tests.
         guard let folder = ProcessInfo.processInfo.environment["NETFISH_SELFTEST"],
               Bundle.main.bundleIdentifier?.hasSuffix(".selftest") == true else { return }

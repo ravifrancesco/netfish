@@ -2,6 +2,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import styles from './styles.css?inline';
 import inter from '@fontsource-variable/inter/files/inter-latin-wght-normal.woff2';
 import { DownloadPlayer, type DownloadPlayerProps } from './player/DownloadPlayer';
+import { markFullscreen } from './lib/desktop';
+import { startSystemVolume } from './lib/systemVolume';
 
 /**
  * Netfish's player for the apps' downloads page (apps/common/offline.html), which works
@@ -31,7 +33,11 @@ function setUp() {
   // What the web app marks its page with (main.tsx): room for the Mac's window buttons, no
   // volume slider on phones. Here on the player's root, where its styles can see them.
   const ua = navigator.userAgent;
-  if (/NetfishDesktop/.test(ua)) host.classList.add('is-desktop', /Mac/.test(navigator.platform) ? 'is-mac' : 'is-other-os');
+  if (/NetfishDesktop/.test(ua)) {
+    host.classList.add('is-desktop', /Mac/.test(navigator.platform) ? 'is-mac' : 'is-other-os');
+    markFullscreen(host);
+    startSystemVolume();
+  }
   if (/NetfishiOS|NetfishAndroid/.test(ua)) host.classList.add('is-ios-app');
   document.body.append(host);
   const shadow = host.attachShadow({ mode: 'open' });

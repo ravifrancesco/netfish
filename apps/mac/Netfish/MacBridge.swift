@@ -18,6 +18,8 @@ final class MacBridge: NSObject, WKScriptMessageHandlerWithReply {
       window.__netfishVideo = (state) => video.forEach((cb) => { try { cb(state); } catch (e) {} });
       const updates = new Set();
       window.__netfishUpdate = (p) => updates.forEach((cb) => { try { cb(p); } catch (e) {} });
+      const volumes = new Set();
+      window.__netfishVolume = (s) => volumes.forEach((cb) => { try { cb(s); } catch (e) {} });
       window.netfishDesktop = {
         platform: 'darwin',
         version: '\(version)',
@@ -42,6 +44,13 @@ final class MacBridge: NSObject, WKScriptMessageHandlerWithReply {
         snapshot: () => call('snapshot'),
         serverReachable: () => call('serverReachable'),
         toggleFullscreen: () => { call('fullscreen'); },
+        // The Mac's own volume: the player's slider follows it and sets it.
+        systemVolume: {
+          get: () => call('systemVolume'),
+          set: (volume) => { call('systemVolume', { volume }); },
+          setMuted: (muted) => { call('systemVolume', { muted }); },
+          onChange: (cb) => { volumes.add(cb); return () => volumes.delete(cb); },
+        },
         notify: (n) => { call('notify', n); },
         update: {
           check: () => call('updateCheck'),
@@ -173,6 +182,13 @@ final class MacBridge: NSObject, WKScriptMessageHandlerWithReply {
                 Task { @MainActor in window?.push("__netfishUpdate", ["received": received, "total": total]) }
             }
             return nil
+
+        // The Mac's volume
+        case "systemVolume":
+            let change = args as? [String: Any] ?? [:]
+            if let volume = change["volume"] as? Double { SystemVolume.shared.set(volume: volume) }
+            if let muted = change["muted"] as? Bool { SystemVolume.shared.set(muted: muted) }
+            return SystemVolume.shared.json
 
         // Window
         case "fullscreen":
