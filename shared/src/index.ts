@@ -1013,8 +1013,10 @@ export interface ChannelProgram {
 /** A programme in the guide, opened: what it's about, and the page of its film or show. */
 export interface ProgramAbout {
   overview?: string;
-  /** The Jellyfin id of the film, or of the show an episode is from. */
-  pageId: string;
+  /** The Jellyfin id of the film, or of the show an episode is from (none for a new title still on its way). */
+  pageId?: string;
+  /** A new title on a channel that someone has kept, or asked for: it stays, in the library. */
+  requested?: boolean;
 }
 
 export interface Channel {

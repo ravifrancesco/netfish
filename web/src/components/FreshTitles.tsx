@@ -60,6 +60,12 @@ function NumberField({ label, value, min, max, unit, hint, disabled, onSave }: {
 }
 
 function stateLabel(f: FreshTitle, fromHour: number): string {
+  const text = stateText(f, fromHour);
+  // Asked for before it was here: it carries on as planned, then stays.
+  return f.keptBy && f.state !== 'kept' ? `${text} · ${t('Requested by {name}', { name: f.keptBy })}` : text;
+}
+
+function stateText(f: FreshTitle, fromHour: number): string {
   switch (f.state) {
     case 'planned':
       return f.airAt && f.downloadAt
@@ -248,13 +254,12 @@ export function FreshTitles({ data, save, busy }: { data: ChannelAdmin; save: (p
                     <span className="small fresh__state">{stateLabel(f, fresh.fromHour)}</span>
                     {f.state === 'downloading' && !f.paused && <Progress value={f.progress ?? 0} />}
                   </span>
-                  {f.state !== 'kept' && (
+                  {/* Kept, or asked for: someone's, not to take off. */}
+                  {f.state !== 'kept' && !f.keptBy && (
                     <span className="fresh__actions">
-                      {f.state !== 'planned' && (
-                        <button className="btn btn--ghost btn--sm" disabled={act.isPending} onClick={() => act.mutate(() => api.freshKeep(f.key))} title={t('Keep it: it joins the library')}>
-                          <Check size={14} /> {t('Keep')}
-                        </button>
-                      )}
+                      <button className="btn btn--ghost btn--sm" disabled={act.isPending} onClick={() => act.mutate(() => api.freshKeep(f.key))} title={t('Keep it: it joins the library')}>
+                        <Check size={14} /> {t('Keep')}
+                      </button>
                       <button className="icon-btn icon-btn--sm" disabled={act.isPending} onClick={() => act.mutate(() => api.freshRemove(f.key))} aria-label={t('Remove {name}', { name: f.title })}>
                         <Trash2 size={16} />
                       </button>

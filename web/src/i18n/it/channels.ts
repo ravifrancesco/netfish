@@ -133,6 +133,11 @@ export default {
   Tomorrow: 'Domani',
   Today: 'Oggi',
   'Watch channel {n} now': 'Guarda ora il canale {n}',
+  'Requested: {title} is in the library now': 'Richiesto: {title} ora è nella libreria',
+  'Requested: {title} joins the library once it’s downloaded': 'Richiesto: {title} entra nella libreria appena è scaricato',
+  'Requested: it stays, and joins the library.': 'Richiesto: resta, ed entra nella libreria.',
+  'New on this channel: deleted after it airs, unless someone requests it.': 'Nuovo su questo canale: viene cancellato dopo la messa in onda, a meno che qualcuno non lo richieda.',
+  'Requested by {name}': 'Richiesto da {name}',
   When: 'Quando',
   'always channel 1': 'sempre il canale 1',
 } as Record<string, string>;

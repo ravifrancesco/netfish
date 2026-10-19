@@ -62,6 +62,13 @@ export default function ChannelPlayer() {
   statusRef.current = status;
   /** Where in its programme the latest stream was asked to start (seconds). */
   const startedAt = useRef(0);
+  /**
+   * Tuning in (a channel opened, or changed to): static until its picture comes. The next
+   * programme on the channel already on comes from black instead, like TV.
+   */
+  const [tuning, setTuning] = useState(true);
+  /** The channel on screen (its programme or its break). */
+  const shownChannel = useRef<string>(undefined);
   const [subtitle, setSubtitle] = useState<StreamTrack>();
   const [audioIndex, setAudioIndex] = useState<number>();
   /** Subtitles chosen on this channel carry on to the next programme: a language, or off (null). */
@@ -135,8 +142,8 @@ export default function ChannelPlayer() {
 
   const handlers = useRef<Record<string, () => void>>({});
   handlers.current = {
-    // From static (a new channel or programme), the picture shows once the new one is really
-    // moving: the apps' players can say "playing" with the last channel's picture still up.
+    // From static (a new channel) or black (the next programme), the picture shows once the new
+    // one is really moving: the apps' players can say "playing" with the last picture still up.
     onPlaying: () => {
       if (statusRef.current !== 'loading') return setStatus('playing');
       const began = Date.now();
@@ -212,9 +219,11 @@ export default function ChannelPlayer() {
 
   // A new programme (or channel): play it from where the schedule is.
   useEffect(() => {
-    if (!key || !program) return;
+    if (!key || !program || !channel) return;
     let alive = true;
     programRef.current = program;
+    setTuning(shownChannel.current !== channel.id);
+    shownChannel.current = channel.id;
     setStatus('loading');
     setSession(undefined);
     void (async () => {
@@ -248,6 +257,11 @@ export default function ChannelPlayer() {
       stopStream();
     };
   }, [key, useOverlay, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // In a break, the channel is on screen too: its next programme isn't a change of channel.
+  useEffect(() => {
+    if (channel && !program) shownChannel.current = channel.id;
+  }, [channel, program]);
 
   // Leaving the channels (or the page): everything stops.
   useEffect(() => {
@@ -622,8 +636,10 @@ export default function ChannelPlayer() {
           </button>
         </div>
       )}
-      {/* Changing channel, and until the picture comes: static (not a still of what's coming). */}
-      {(switching || (!showSea && status === 'loading')) && <ChannelStatic onDone={doneSwitching} />}
+      {/* Changing channel, and until its picture comes: static (not a still of what's coming). */}
+      {(switching || (tuning && !showSea && status === 'loading')) && <ChannelStatic onDone={doneSwitching} />}
+      {/* The next programme on the same channel: black until it comes (not the last one's last picture). */}
+      {!switching && !tuning && !showSea && status === 'loading' && <div className="channel__black" aria-hidden="true" />}
 
       {/* The last minutes of a programme: what's next, in the corner, like TV. */}
       {program && next && status === 'playing' && programEnd(program) - now <= 90_000 && (

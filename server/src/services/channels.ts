@@ -1029,8 +1029,8 @@ linkChannels({
   },
 });
 
-/** For telling the fresh side someone chose to watch it: the film's or the show's key. */
-export const keyOfItem = (itemId: string) => library?.byId.get(itemId)?.key;
+/** For telling the fresh side about a programme: its film's or show's key (a stand-in's too). */
+export const keyOfItem = (itemId: string) => (isPlaceholder(itemId) ? placeholderKey(itemId) : library?.byId.get(itemId)?.key);
 
 // ---------- Who's watching ----------
 
@@ -1099,7 +1099,8 @@ export async function listChannels(user: SessionUser, hours = 4, now = Date.now(
   // Three hours back at most (as far as schedules keep what's been on).
   const start = from && Number.isFinite(from) ? Math.min(Math.max(from, now - KEEP_BEHIND), now + GUIDE_AHEAD) : now;
   const until = start + Math.min(7 * 24, Math.max(1, hours)) * 3600_000;
-  const owners = new Map(freshPlans().map((p) => [p.key, p.channelId]));
+  // New on a channel (it goes after it airs): not one someone asked for.
+  const owners = new Map(freshPlans().flatMap((p) => (p.requested ? [] : [[p.key, p.channelId] as const])));
   const channels: Channel[] = visible.map((def) => {
     const entries = stored.schedules[def.id]?.entries ?? [];
     const programs = entries

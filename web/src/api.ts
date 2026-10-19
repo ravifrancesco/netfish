@@ -169,7 +169,8 @@ export const api = {
   saveChannels: (patch: Partial<ChannelSettings>) => call<ChannelAdmin>('/admin/channels', { method: 'PUT', body: patch }),
   resetChannels: () => call<ChannelAdmin>('/admin/channels/reset', { method: 'POST' }),
   /** A new title on a channel: keep it (it joins the library). */
-  keepChannelTitle: (itemId: string) => call<{ ok: true }>('/channels/keep', { body: { itemId } }),
+  /** `here`: in the library now; otherwise once it's downloaded. */
+  keepChannelTitle: (itemId: string) => call<{ ok: true; here: boolean }>('/channels/keep', { body: { itemId } }),
   freshStatus: () => call<FreshStatus>('/admin/channels/fresh'),
   freshRun: () => call<FreshStatus>('/admin/channels/fresh/run', { method: 'POST' }),
   freshKeep: (key: string) => call<FreshStatus>('/admin/channels/fresh/keep', { body: { key } }),

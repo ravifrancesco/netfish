@@ -70,6 +70,7 @@ interface Fresh {
   size: number;
   progress?: number;
   airedAt?: number;
+  /** Who kept it, or asked for it before it was here (it carries on as planned, then stays). */
   keptBy?: string;
   /** TMDB's details, for the guide until it's here: length, picture, genres; a show's episodes. */
   seconds: number;
@@ -144,33 +145,46 @@ export interface FreshPlan {
   image?: string;
   genres: string[];
   episodes?: Episode[];
+  /** Someone asked for it: it stays once it has aired. */
+  requested: boolean;
 }
 
 /** Still to air: planned, downloading, or here. */
 export function freshPlans(): FreshPlan[] {
   return stored.titles
     .filter((f) => f.state === 'planned' || f.state === 'downloading' || f.state === 'ready')
-    .map((f) => ({ key: f.key, channelId: f.channelId, mediaType: f.mediaType, title: f.title, year: f.year, notBefore: f.notBefore, added: f.addedAt, seconds: f.seconds, image: f.image, genres: f.genres, episodes: f.episodes }));
+    .map((f) => ({ key: f.key, channelId: f.channelId, mediaType: f.mediaType, title: f.title, year: f.year, notBefore: f.notBefore, added: f.addedAt, seconds: f.seconds, image: f.image, genres: f.genres, episodes: f.episodes, requested: Boolean(f.keptBy) }));
 }
 /** Aired, on the way out: on no channel any more. */
 export const freshRetired = () => new Set(stored.titles.filter((f) => f.state === 'aired').map((f) => f.key));
-/** Not in anyone's library or Activity (all of them, until someone keeps one). */
-export const freshHidden = () => new Set(stored.titles.filter((f) => f.state !== 'kept').map((f) => f.key));
+/** Not in anyone's library or Activity (all of them, until someone keeps one or asks for it). */
+export const freshHidden = () => new Set(stored.titles.filter((f) => f.state !== 'kept' && !f.keptBy).map((f) => f.key));
 
-/** Someone keeps it: it stays, and joins the library. */
-export function keepFresh(key: string, by: string) {
-  const f = stored.titles.find((x) => x.key === key && x.state !== 'planned');
+/** Whether someone kept a new title, or asked for it. Undefined: it isn't one. */
+export const freshRequested = (key: string) => {
+  const f = stored.titles.find((x) => x.key === key);
+  return f && (f.state === 'kept' || Boolean(f.keptBy));
+};
+
+/**
+ * Someone keeps it: it stays, and joins the library. One not here yet (or still downloading)
+ * carries on as planned, joins the library once it's here, and isn't deleted after it airs.
+ */
+export function keepFresh(key: string, by: string): { here: boolean } {
+  const f = stored.titles.find((x) => x.key === key);
   if (!f) throw new HttpError(404, t('Not a new title on a channel'));
-  if (f.state === 'kept') return;
-  f.state = 'kept';
-  f.keptBy = by;
+  if (f.state === 'kept') return { here: true };
+  f.keptBy ??= by;
+  const here = f.state === 'ready' || f.state === 'aired';
+  if (here) f.state = 'kept';
   save();
   onChange();
+  return { here };
 }
 
-/** An admin takes it off now (not one someone kept: that's theirs, deleted like anything else). */
+/** An admin takes it off now (not one someone kept or asked for: that's theirs, deleted like anything else). */
 export async function removeFresh(key: string) {
-  const f = stored.titles.find((x) => x.key === key && x.state !== 'kept');
+  const f = stored.titles.find((x) => x.key === key && x.state !== 'kept' && !x.keptBy);
   if (!f) throw new HttpError(404, t('Not a new title on a channel'));
   if (f.arrId !== undefined) {
     const api = f.mediaType === 'movie' ? radarr : sonarr;
@@ -514,8 +528,9 @@ async function step(now: number) {
   for (const f of stored.titles) {
     f.airAt = link.airAt(f.key);
     if (f.state === 'planned') {
-      // Its slot went by (or went to something else) before it was even downloading: forgotten.
-      if (link.missed(f.key) || (f.airAt === undefined && f.notBefore < now - DAY)) gone.push(f);
+      // Its slot went by (or went to something else) before it was even downloading: forgotten,
+      // unless someone asked for it (it downloads anyway, and goes on once it's here).
+      if (!f.keptBy && (link.missed(f.key) || (f.airAt === undefined && f.notBefore < now - DAY))) gone.push(f);
       continue;
     }
     if (f.arrId === undefined || (f.mediaType === 'movie' && !movies) || (f.mediaType === 'tv' && !shows)) continue;
@@ -549,7 +564,7 @@ async function step(now: number) {
   }
   // Bigger than the space left, now the release is known: the newest download goes.
   const limit = s.maxGb * GB;
-  const newest = stored.titles.filter((f) => f.state === 'downloading' && !gone.includes(f)).sort((a, b) => b.addedAt - a.addedAt)[0];
+  const newest = stored.titles.filter((f) => f.state === 'downloading' && !f.keptBy && !gone.includes(f)).sort((a, b) => b.addedAt - a.addedAt)[0];
   if (newest && used() > limit * 1.05 && used() - newest.size <= limit) {
     await settle(remove(newest, queueOf(newest)), undefined);
     gone.push(newest);
@@ -580,6 +595,11 @@ async function step(now: number) {
     if (f.state === 'kept') continue;
     const wanted = defs.some((d) => d.id === f.channelId);
     const done = link.doneAt(f.key);
+    // Asked for by someone: theirs once it has aired (or once its channel stops wanting new titles).
+    if (f.keptBy && f.state !== 'planned' && ((f.state === 'ready' && done && now >= done) || (!wanted && !link.onAir(f.key)))) {
+      f.state = 'kept';
+      continue;
+    }
     // On until `done`: aired once that's past.
     if (f.state === 'ready' && done && now >= done) {
       f.state = 'aired';
@@ -647,9 +667,10 @@ async function step(now: number) {
 /** Starts the download of the planned title whose day has come (one at a time). */
 async function startDue(s: FreshSettings, go: boolean, lowDisk: boolean, now: number): Promise<FreshStatus['waiting']> {
   if (stored.titles.some((f) => f.state === 'downloading')) return undefined;
+  // Asked for by someone: due now (with or without a slot of its own still to come).
   const due = stored.titles
-    .filter((f) => f.state === 'planned' && f.airAt !== undefined && now >= downloadAt(f, s)!)
-    .sort((a, b) => a.airAt! - b.airAt!)[0];
+    .filter((f) => f.state === 'planned' && (f.keptBy || (f.airAt !== undefined && now >= downloadAt(f, s)!)))
+    .sort((a, b) => (a.airAt ?? now) - (b.airAt ?? now))[0];
   if (!due) return undefined;
   if (lowDisk) return 'disk';
   if (!go) return 'hours';
@@ -738,7 +759,8 @@ export async function freshStatus(): Promise<FreshStatus> {
     paused: f.state === 'downloading' && settings ? !inHours(s, Date.now(), settings.timeZone) && has.qbittorrent() : undefined,
     addedAt: new Date(f.addedAt).toISOString(),
     airAt: iso(f.airAt),
-    downloadAt: f.state === 'planned' ? iso(downloadAt(f, s)) : undefined,
+    // Asked for: as soon as it can.
+    downloadAt: f.state === 'planned' ? iso(f.keptBy ? Date.now() : downloadAt(f, s)) : undefined,
     keptBy: f.keptBy,
   }));
   const order: Record<FreshState, number> = { downloading: 0, planned: 1, ready: 1, aired: 2, kept: 3 };

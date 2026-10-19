@@ -54,7 +54,8 @@ import { readyToWatch } from './services/ready';
 import { command, control, createRoom, endRoom, getRoom, leave, listRooms, openStream, setTracks, setWaiting } from './services/together';
 import { listDevices, listScreens, openLive, playOn } from './services/screens';
 import { channelAdmin, channelsEnabled, keyOfItem, listChannels, resetChannels, updateChannels, watching } from './services/channels';
-import { freshStatus, keepFresh, noteChosen, removeFresh, runFresh } from './services/fresh';
+import { freshRequested, freshStatus, keepFresh, noteChosen, removeFresh, runFresh } from './services/fresh';
+import { catalog } from './services/catalog';
 import { cleanupSuggestions, keepForGood } from './services/cleanup';
 import { cancelRequest, deleteFromDisk, downloadAgain, removedTitles, stopDownload, storage } from './services/manage';
 import { createRequest, listRequests, myRequestKeys } from './services/requests';
@@ -438,15 +439,26 @@ export async function apiRoutes(app: FastifyInstance) {
     // A programme opened in the guide: what it's about, and where its page is.
     api.get<{ Params: { itemId: string } }>('/channels/about/:itemId', async (req): Promise<ProgramAbout> => {
       const user = userOf(req);
-      const item = await jellyfin.item(user.token, user.id, clean(req.params.itemId, 64));
-      return { overview: item.Overview, pageId: item.SeriesId ?? item.Id };
+      const itemId = clean(req.params.itemId, 64);
+      const key = keyOfItem(itemId);
+      const requested = key ? freshRequested(key) : undefined;
+      // A new title not downloaded yet: what TMDB says about it.
+      if (itemId.startsWith('fresh:')) {
+        const [type, id] = (key ?? '').split('-');
+        const found = await settle<{ overview?: string } | undefined>(type === 'movie' ? catalog.movie(Number(id)) : catalog.tv(Number(id)), undefined);
+        return { overview: found?.overview, requested };
+      }
+      const item = await jellyfin.item(user.token, user.id, itemId);
+      return { overview: item.Overview, pageId: item.SeriesId ?? item.Id, requested };
     });
-    // A new title on a channel: anyone can keep it (it joins the library).
+    // A new title on a channel: anyone can keep it, or ask for it before it's here (it joins the library).
     api.post<{ Body: { itemId?: string } }>('/channels/keep', async (req) => {
       const key = keyOfItem(clean(req.body?.itemId, 64));
       if (!key) throw new HttpError(404, t('Not a new title on a channel'));
-      keepFresh(key, userOf(req).name);
-      return { ok: true };
+      const kept = keepFresh(key, userOf(req).name);
+      // Not here yet: it starts downloading now (not on its day).
+      if (!kept.here) void runFresh();
+      return { ok: true, ...kept };
     });
     api.get('/admin/channels', { preHandler: requireAdmin }, async (req) => channelAdmin(userOf(req)));
     api.get('/admin/channels/fresh', { preHandler: requireAdmin }, async () => freshStatus());

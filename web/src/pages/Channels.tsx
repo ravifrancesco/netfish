@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Ref } from 'react';
 import { Link } from 'react-router';
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Check, Plus } from 'lucide-react';
 import type { Channel, ChannelProgram } from '@netfish/shared';
 import { api } from '../api';
-import { ErrorState, Empty, Modal, PageLoader, Spinner } from '../components/ui';
+import { ErrorState, Empty, Modal, PageLoader, Spinner, useToast } from '../components/ui';
 import { clockTime, episodeLine, programEnd, programTitle, serverNow, useChannels, useServerNow } from '../lib/channels';
 import { duration } from '../lib/format';
 import { useMe } from '../lib/hooks';
-import { NewBadge, isStandIn } from '../components/NewBadge';
+import { NewBadge } from '../components/NewBadge';
 import { locale, t, tn } from '../i18n';
 
 /**
@@ -158,17 +159,32 @@ function Block({
   );
 }
 
-/** A programme still to come, opened: when, where, what it is. */
+/** A programme still to come, opened: when, where, what it is. A new title can be asked for there. */
 function About({ program, channel, now, onClose }: { program: ChannelProgram; channel: Channel; now: number; onClose: () => void }) {
-  const standIn = isStandIn(program.itemId);
-  const about = useQuery({ queryKey: ['program-about', program.itemId], queryFn: () => api.programAbout(program.itemId), enabled: !standIn, staleTime: 10 * MINUTE });
+  const qc = useQueryClient();
+  const toast = useToast();
+  const about = useQuery({ queryKey: ['program-about', program.itemId], queryFn: () => api.programAbout(program.itemId), staleTime: 10 * MINUTE });
+  // New on the channel (deleted once it has aired): anyone can ask for it to stay, even before it's here.
+  const request = useMutation({
+    mutationFn: () => api.keepChannelTitle(program.itemId),
+    onSuccess: (res) => {
+      const title = program.seriesTitle ?? program.title;
+      toast('ok', res.here ? t('Requested: {title} is in the library now', { title }) : t('Requested: {title} joins the library once it’s downloaded', { title }));
+      void qc.invalidateQueries({ queryKey: ['program-about', program.itemId] });
+      void qc.invalidateQueries({ queryKey: ['channels'] });
+    },
+    onError: (err) => toast('error', (err as Error).message),
+  });
+  const requested = request.isSuccess || Boolean(about.data?.requested);
+  // Once asked for, it isn't new any more (it stays): still said here.
+  const askable = program.isNew || requested;
   const sub = episodeLine(program);
   return (
     <Modal
       title={
         <>
           {programTitle(program)}
-          {program.isNew && <> <NewBadge /></>}
+          {program.isNew && !requested && <> <NewBadge /></>}
         </>
       }
       onClose={onClose}
@@ -177,6 +193,16 @@ function About({ program, channel, now, onClose }: { program: ChannelProgram; ch
           <Link to={`/channels/${channel.number}`} className="btn btn--ghost">
             {t('Watch channel {n} now', { n: channel.number })}
           </Link>
+          {askable &&
+            (requested ? (
+              <button className="btn btn--ghost" disabled>
+                <Check size={18} /> {t('Requested')}
+              </button>
+            ) : (
+              <button className="btn btn--accent" disabled={request.isPending || about.isLoading} onClick={() => request.mutate()}>
+                {request.isPending ? <Spinner size={18} /> : <Plus size={18} />} {t('Request')}
+              </button>
+            ))}
           {about.data?.pageId && (
             <Link to={`/title/jf/${about.data.pageId}`} className="btn btn--primary">
               {t('More info')}
@@ -192,6 +218,11 @@ function About({ program, channel, now, onClose }: { program: ChannelProgram; ch
         </p>
         {sub && <p className="about__episode">{sub}</p>}
         <p className="muted small">{[program.year, program.rating, duration(program.seconds)].filter(Boolean).join(' · ')}</p>
+        {askable && (
+          <p className="about__new small">
+            {requested ? t('Requested: it stays, and joins the library.') : t('New on this channel: deleted after it airs, unless someone requests it.')}
+          </p>
+        )}
         {about.isLoading ? <Spinner size={18} /> : about.data?.overview ? <p className="about__overview">{about.data.overview}</p> : null}
       </div>
     </Modal>
