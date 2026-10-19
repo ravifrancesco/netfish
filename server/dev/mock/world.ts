@@ -69,6 +69,9 @@ export const TITLES: Title[] = [
   M(28, 'Neon Squid', 2027, ['Animation'], 'A colour-changing squid wants to be a famous DJ. The ocean is not ready.'),
   M(29, 'Sea of Glass', 2027, ['Science Fiction'], 'The oceans froze clear overnight. Now everyone can see what was down there.'),
   M(30, 'Moonpool', 2026, ['Thriller'], 'Six engineers sealed in a drilling platform. One of them opened the moonpool.'),
+  // Documentaries nobody has: two about nature (for Netfish's own), one about music (not for it).
+  { ...M(31, 'Tides of the Wild', 2019, ['Documentary'], 'A year on a wild coastline: orcas hunting, seabirds nesting and the animals that live between the tides.'), rating: 8.1 },
+  { ...M(32, 'Brass Section', 2018, ['Documentary', 'Music'], 'On the road with a touring brass band, from the first rehearsal to the last encore.'), rating: 8.4 },
   T(101, 'Depth Charge', 2022, 3, ['Drama', 'War'], 'A submarine crew in a war that never officially happened.'),
   T(102, 'Fishmongers', 2021, 2, ['Comedy'], 'The loudest family-run fish market in Glasgow, and the people who somehow keep it afloat.'),
   T(103, 'The Tide Keepers', 2024, 2, ['Fantasy'], 'An ancient order controls the tides. Their newest recruit has never seen the sea.'),
@@ -79,6 +82,7 @@ export const TITLES: Title[] = [
   T(108, 'Bait', 2024, 2, ['Thriller'], 'An undercover cop poses as a fisherman to catch a killer who hunts the docks.'),
   T(109, 'Salt Marsh', 2022, 2, ['Mystery'], 'A missing birdwatcher, a marsh full of secrets, and a village that would rather not know.'),
   T(110, 'Krill Chill', 2026, 1, ['Animation', 'Comedy'], 'Very small creatures, very big feelings.'),
+  { ...T(111, 'Blue Worlds', 2020, 1, ['Documentary'], "The planet's oceans, from coral reefs to the deep sea, and the wildlife that lives there."), rating: 8.7 },
 ];
 
 export const titleByTmdb = new Map(TITLES.map((t) => [`${t.type}-${t.tmdbId}`, t]));

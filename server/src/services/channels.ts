@@ -656,6 +656,10 @@ function documentary(sched: Schedule, lib: Library, at: number, day: number): Pr
  * second-best series: Sunday nights start with the best), else a documentary film.
  */
 function noonDocumentary(sched: Schedule, lib: Library, at: number): Pick {
+  // A nature series new on the channel: one a weekday, from the first, until it's all been on.
+  const fresh = lib.fresh?.shows.find((id) => lib.kinds.docShows.includes(id) && dueNow(lib, id));
+  const first = fresh && nextEpisode(sched, lib, fresh);
+  if (first) return { program: first };
   const shows = usual(lib, lib.kinds.docShows);
   if (shows.length) {
     const order = [...shows.slice(1), shows[0]];

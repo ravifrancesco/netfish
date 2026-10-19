@@ -86,6 +86,8 @@ interface Stored {
   log: Array<{ at: number; channelId: string }>;
   /** Downloads this stopped outside the hours (to start again, and only those). */
   stopped: string[];
+  /** How many each channel has picked, ever: its turn (Netfish's own takes a documentary every other one). */
+  turns: Record<string, number>;
 }
 
 function load(): Stored {
@@ -93,9 +95,9 @@ function load(): Stored {
     const data = JSON.parse(fs.readFileSync(FILE, 'utf8')) as Partial<Stored>;
     const titles = (data.titles ?? []).map((f) => ({ ...f, notBefore: f.notBefore ?? f.addedAt, seconds: f.seconds ?? 0, genres: f.genres ?? [] }));
     const log = (data.log ?? []).map((x) => (typeof x === 'number' ? { at: x, channelId: '' } : x));
-    return { titles, tried: data.tried ?? [], log, stopped: data.stopped ?? [] };
+    return { titles, tried: data.tried ?? [], log, stopped: data.stopped ?? [], turns: data.turns ?? {} };
   } catch {
-    return { titles: [], tried: [], log: [], stopped: [] };
+    return { titles: [], tried: [], log: [], stopped: [], turns: {} };
   }
 }
 let stored = load();
@@ -246,6 +248,11 @@ const FAMILY = 10751;
 const KIDS = 10762;
 const HORROR = 27;
 const GRIM = [80, 10752, 10768];
+/** Not what a nature documentary is: history, music; on TV, reality, news, talk, children's, soaps. */
+const NOT_NATURE = [36, 10402, 10764, 10763, 10767, 10762, 10766];
+/** What a nature documentary talks about (TMDB's text, in English or Italian). */
+const NATURE =
+  /\b(nature|natural world|wildlife|wild|animals?|species|planet|earth|oceans?|seas?|marine|reefs?|coral|forests?|jungles?|rainforests?|arctic|antarctic|polar|deserts?|savann?ah?|predators?|whales?|sharks?|penguins?|birds?|insects?|habitats?|ecosystems?|migration|natura|animali|fauna|selvagg\w*|pianeta|terra|ocean[oi]|mari?|forest[ae]|giungl[ae]|specie)\b/i;
 
 interface Want {
   mediaType: MediaType;
@@ -255,17 +262,25 @@ interface Want {
   recent?: boolean;
   /** Sitcoms: short episodes. */
   shortEpisodes?: boolean;
+  /** About nature (wildlife, oceans, the planet): Netfish's documentaries. */
+  nature?: boolean;
+  /** How well liked, at least (TMDB's score and its number of votes): 6.8 by 200 people unless said. */
+  minRating?: number;
+  minVotes?: number;
 }
 
 /** What a channel would like new, given what it plays. `turn` varies Netfish's own channel. */
 export function wantsOf(source: ChannelSource, turn = 0): Want[] {
   switch (source.kind) {
-    case 'mix':
-      // A film for nine o'clock; now and then a documentary for its nights (a film if there's none).
-      return [
-        ...(turn % 3 === 2 ? [{ mediaType: 'movie' as const, genres: [DOCUMENTARY], avoid: GRIM }] : []),
-        { mediaType: 'movie', genres: [], avoid: [ANIMATION, FAMILY, DOCUMENTARY, HORROR] },
-      ];
+    case 'mix': {
+      // Every other one a nature documentary, and a much-liked one: a series' first season for
+      // the weekday one o'clock, or a film for the documentary nights (each in turn; the other
+      // if there's none, then a film). Otherwise a film for nine o'clock.
+      const series: Want = { mediaType: 'tv', genres: [DOCUMENTARY], avoid: [...GRIM, ...NOT_NATURE], nature: true, minRating: 8, minVotes: 80 };
+      const film: Want = { mediaType: 'movie', genres: [DOCUMENTARY], avoid: [...GRIM, ...NOT_NATURE], nature: true, minRating: 7.5, minVotes: 150 };
+      const documentaries = turn % 2 === 1 ? (Math.floor(turn / 2) % 2 ? [film, series] : [series, film]) : [];
+      return [...documentaries, { mediaType: 'movie', genres: [], avoid: [ANIMATION, FAMILY, DOCUMENTARY, HORROR] }];
+    }
     case 'cartoons':
       return [{ mediaType: 'tv', genres: [ANIMATION], avoid: [] }];
     case 'sitcoms':
@@ -296,7 +311,8 @@ export function suits(r: SeerrResult, want: Want, now: number): boolean {
   const genres = r.genreIds ?? [];
   if (want.genres.length && !genres.some((g) => want.genres.includes(g))) return false;
   if (genres.some((g) => want.avoid.includes(g))) return false;
-  if ((r.voteAverage ?? 0) < 6.8 || (r.voteCount ?? 0) < 200) return false;
+  if ((r.voteAverage ?? 0) < (want.minRating ?? 6.8) || (r.voteCount ?? 0) < (want.minVotes ?? 200)) return false;
+  if (want.nature && !NATURE.test(`${r.title ?? r.name ?? ''} ${r.overview ?? ''}`)) return false;
   // Unknown to Seerr (not requested, not on the server, not turned down).
   if (r.mediaInfo && r.mediaInfo.status > 1) return false;
   const out = dateOf(r);
@@ -311,9 +327,15 @@ const score = (r: SeerrResult, seed: number) => (r.voteAverage ?? 0) * Math.log1
 
 async function candidates(want: Want, now: number): Promise<SeerrResult[]> {
   const kind = want.mediaType === 'movie' ? 'movies' : 'tv';
-  const extra: Record<string, string | number> = { sortBy: 'popularity.desc', voteCountGte: 200, voteAverageGte: 6.8 };
+  // Nature documentaries: the best-rated first, and a few more pages (most documentaries aren't about nature).
+  const extra: Record<string, string | number> = {
+    sortBy: want.nature ? 'vote_average.desc' : 'popularity.desc',
+    voteCountGte: want.minVotes ?? 200,
+    voteAverageGte: want.minRating ?? 6.8,
+  };
   if (want.genres.length) extra.genre = want.genres.join('|');
-  const pages = await Promise.all([1, 2, 3].map((page) => settle(seerr.discover(kind, page, extra), undefined)));
+  const pageNumbers = want.nature ? [1, 2, 3, 4, 5] : [1, 2, 3];
+  const pages = await Promise.all(pageNumbers.map((page) => settle(seerr.discover(kind, page, extra), undefined)));
   const seen = new Set<number>();
   const seed = Math.floor(now / DAY);
   return pages
@@ -666,7 +688,7 @@ async function planOne(s: FreshSettings, defs: ChannelDef[], now: number): Promi
     // Spread over the channel's week, each far enough ahead to download in good time.
     const last = Math.max(0, ...mine(def.id).map((f) => f.notBefore));
     const notBefore = Math.max(now + s.aheadDays * DAY, last + WEEK / s.perWeek);
-    const turn = stored.titles.filter((f) => f.channelId === def.id).length + pickedThisWeek(now, def.id);
+    const turn = stored.turns[def.id] ?? 0;
     for (const want of wantsOf(def.source, turn)) {
       if ((want.mediaType === 'movie' && !has.radarr()) || (want.mediaType === 'tv' && !has.sonarr())) continue;
       const need = guess(want.mediaType);
@@ -683,6 +705,7 @@ async function planOne(s: FreshSettings, defs: ChannelDef[], now: number): Promi
         if (plan) {
           stored.titles.push(plan);
           stored.log.push({ at: now, channelId: def.id });
+          stored.turns[def.id] = turn + 1;
           return undefined;
         }
       }
