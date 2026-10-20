@@ -34,6 +34,7 @@ export default {
   'In your library': 'Nella tua libreria',
   'Partly in your library': 'In parte nella tua libreria',
   'On its way': 'In arrivo',
+  'In library': 'In libreria',
   Requested: 'Richiesto',
   'Not in your library': 'Non è nella tua libreria',
   Partial: 'Parziale',
@@ -66,7 +67,7 @@ export default {
   Series: 'Serie',
   Film: 'Film',
   Request: 'Richiedi',
-  'Your library is empty for now. Search for something and request it.': 'Per ora la tua libreria è vuota. Cerca qualcosa e richiedilo.',
+  'Your library is empty.': 'La tua libreria è vuota.',
 
   // Movies and shows
   'Recently added': 'Aggiunti di recente',
@@ -89,10 +90,8 @@ export default {
   'Delete "{title}" from this device?': 'Eliminare "{title}" da questo dispositivo?',
   'Delete all {n} downloaded episode of "{title}"?': 'Eliminare l\'episodio scaricato di "{title}"?',
   'Delete all {n} downloaded episodes of "{title}"?': 'Eliminare tutti i {n} episodi scaricati di "{title}"?',
-  'No movies on {device} yet. Press Download on any movie to watch it offline.':
-    'Ancora nessun film su {device}. Premi Scarica su un film per guardarlo offline.',
-  'No episodes on {device} yet. Use the download icon next to any episode.':
-    "Ancora nessun episodio su {device}. Usa l'icona di download accanto a un episodio.",
+  'No movies on {device} yet.': 'Ancora nessun film su {device}.',
+  'No episodes on {device} yet.': 'Ancora nessun episodio su {device}.',
   'Ready · {size}': 'Pronto · {size}',
   'Downloading · {done}': 'Download in corso · {done}',
   'Downloading · {done} of {total}': 'Download in corso · {done} di {total}',
@@ -102,9 +101,7 @@ export default {
   '{n} downloading': '{n} in download',
 
   // Title page
-  "Requested — looking for a good release. It'll start downloading as soon as one turns up.":
-    'Richiesto: stiamo cercando una buona versione. Il download partirà appena ne troviamo una.',
-  'Waiting for an admin to approve the request.': 'In attesa che un amministratore approvi la richiesta.',
+  'Requested. Looking for a copy.': 'Richiesto. Cerco una copia.',
   'Requested by you {when}': 'Richiesto da te {when}',
   'Requested by {name} {when}': 'Richiesto da {name} {when}',
   declined: 'richiesta rifiutata',
@@ -144,26 +141,23 @@ export default {
 
   // Request and download buttons
   'Requested {title}. Waiting for approval.': 'Hai richiesto {title}. In attesa di approvazione.',
-  "Requested {title}. It'll start downloading shortly.": 'Hai richiesto {title}. Il download partirà a breve.',
+  'Requested {title}.': 'Hai richiesto {title}.',
   'Request more': 'Richiedi altre stagioni',
   'Request {title}': 'Richiedi {title}',
   'Request all seasons': 'Richiedi tutte le stagioni',
   'Request {n} season': 'Richiedi {n} stagione',
   'Request {n} seasons': 'Richiedi {n} stagioni',
-  "Pick the seasons you want. Ones you already have aren't listed.": 'Scegli le stagioni che vuoi. Quelle che hai già non sono elencate.',
   'All missing seasons': 'Tutte le stagioni mancanti',
   '{n} episode': '{n} episodio',
   '{n} episodes': '{n} episodi',
-  'Downloading to {device}. Find it in the Offline tab, or under Downloads in your profile menu.':
-    'Download su {device} in corso. Lo trovi nella scheda Offline o in Download nel menu del profilo.',
+  'Downloading to {device}.': 'Download su {device}.',
   'Preparing…': 'Preparazione…',
   'Retry download': 'Riprova il download',
 
   // Search
   'Search movies and shows': 'Cerca film e serie TV',
   'Search your library and everything you could add to it.': 'Cerca nella tua libreria e in tutto ciò che puoi aggiungere.',
-  'Search your library and everything you could add to it, or a director or actor to see their work.':
-    'Cerca nella tua libreria e in tutto ciò che puoi aggiungere, oppure un regista o un attore per vedere i suoi lavori.',
+  'Films, shows and people.': 'Film, serie e persone.',
   People: 'Persone',
   'Shortest first': 'Prima i più brevi',
   'Mark as watched': 'Segna come visto',
@@ -184,18 +178,15 @@ export default {
   'Starts {date}': 'Inizia il {date}',
   'Starts {date}.': 'Inizia il {date}.',
   'Next episode {date}.': 'Prossimo episodio il {date}.',
-  'Request it now and it downloads by itself once it can be streamed or bought.':
-    'Richiedilo ora: si scaricherà da solo appena sarà disponibile in streaming o da acquistare.',
-  'It downloads by itself once it can be streamed or bought, expected {date}.':
-    'Si scaricherà da solo appena sarà disponibile in streaming o da acquistare, previsto il {date}.',
-  'It downloads by itself once it can be streamed or bought.': 'Si scaricherà da solo appena sarà disponibile in streaming o da acquistare.',
+  "Request it and it arrives as soon as it's out.": 'Richiedilo e arriva appena esce.',
+  "Arrives as soon as it's out, expected {date}.": 'Arriva appena esce, previsto il {date}.',
+  "Arrives as soon as it's out.": 'Arriva appena esce.',
   'It downloads by itself after it airs.': 'Si scaricherà da solo dopo la messa in onda.',
-  'Episodes download by themselves as they air.': 'Gli episodi si scaricano da soli man mano che vanno in onda.',
-  'Request it now and episodes download by themselves as they air.': 'Richiedila ora: gli episodi si scaricheranno da soli man mano che vanno in onda.',
+  'New episodes arrive as they air.': 'I nuovi episodi arrivano man mano che vanno in onda.',
+  'Request it and new episodes arrive as they air.': 'Richiedila e i nuovi episodi arrivano man mano che vanno in onda.',
   'Next episode {date}': 'Prossimo episodio il {date}',
-  "This movie can't be streamed or bought yet, so anything listed here was most likely filmed in a cinema (CAM, TS) and looks poor. Radarr waits for a proper release by itself.":
-    'Questo film non è ancora disponibile in streaming o da acquistare, quindi quello che vedi qui è quasi sempre registrato al cinema (CAM, TS) e di scarsa qualità. Radarr aspetta da solo una versione buona.',
-  "This show hasn't started yet, so there's nothing to find so far.": 'Questa serie non è ancora iniziata, quindi per ora non c’è niente da trovare.',
+  'Not out on streaming yet: these are most likely cinema recordings (CAM, TS).': 'Non ancora uscito in streaming: sono quasi certamente registrazioni dal cinema (CAM, TS).',
+  "Hasn't aired yet.": 'Non è ancora andata in onda.',
 
   // A person's page
   'Born {date}': 'Data di nascita: {date}',
@@ -213,7 +204,7 @@ export default {
   Approved: 'Approvata',
   Declined: 'Rifiutata',
   Done: 'Completata',
-  'No requests yet. Find something and hit Request.': 'Ancora nessuna richiesta. Trova qualcosa e premi Richiedi.',
+  'No requests yet.': 'Ancora nessuna richiesta.',
   'Season {list}': 'Stagione {list}',
   'Seasons {list}': 'Stagioni {list}',
   You: 'Tu',

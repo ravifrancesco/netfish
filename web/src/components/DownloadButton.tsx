@@ -137,7 +137,7 @@ function RoundDownload({ itemId, entry, start, starting }: { itemId: string; ent
             </>
           }
         >
-          <p className="muted">{t('Only the copy on {device} goes; the film stays on your server.', { device: appKind().device })}</p>
+          <p className="muted">{t('Removes it from {device} only.', { device: appKind().device })}</p>
         </Modal>
       )}
     </div>
@@ -156,7 +156,7 @@ export function DownloadButton({ itemId, compact, round }: { itemId: string; com
       return app.download!(await api.offline(itemId, app.offlineFormat ?? (app.platform === 'ios' ? 'apple' : 'desktop')));
     },
     onSuccess: () =>
-      toast('ok', t('Downloading to {device}. Find it in the Offline tab, or under Downloads in your profile menu.', { device: appKind().device })),
+      toast('ok', t('Downloading to {device}.', { device: appKind().device })),
     onError: (err) => toast('error', (err as Error).message),
   });
   if (!canDownloadHere()) return null;

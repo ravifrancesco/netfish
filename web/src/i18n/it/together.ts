@@ -18,8 +18,6 @@ export default {
   '{n} watching': 'In {n}',
   'Invite link': 'Link d’invito',
   'Copy link': 'Copia link',
-  'Play, pause and skipping happen for everyone. Anyone on this server can join from Home or with this link.':
-    'Play, pausa e salti valgono per tutti. Chiunque su questo server può partecipare dalla Home o con questo link.',
   Away: 'Assente',
   Here: 'Presente',
   Leave: 'Esci',
@@ -30,8 +28,8 @@ export default {
   '{name} moved on to the next episode': '{name} ha avviato il prossimo episodio',
   '{name} joined': '{name} ha raggiunto la stanza',
   '{name} left': '{name} ha lasciato la stanza',
-  "The room has ended. You're watching on your own now.": 'La stanza è stata chiusa. Ora continui a guardare per conto tuo.',
-  "Everyone's player starts together: press play when you're all here.": 'Si parte tutti insieme: premi play quando ci siete tutti.',
+  'Room ended. Still playing for you.': 'Stanza chiusa. Continui a guardare tu.',
+  "Press play when everyone's here.": 'Premi play quando ci siete tutti.',
   '{name} wants to watch together': '{name} vuole guardare insieme',
   'Notify me when someone wants to watch together': 'Avvisami quando qualcuno vuole guardare insieme',
 } as Record<string, string>;

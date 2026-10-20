@@ -62,7 +62,7 @@ export default function PersonPage() {
       {p.sections.map((s) => (
         <section key={s.kind} className="section">
           <h2>{s.title}</h2>
-          <Grid cards={s.items} />
+          <Grid cards={s.items} markAvailable />
         </section>
       ))}
       {p.sections.length === 0 && (

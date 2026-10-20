@@ -7,7 +7,6 @@ import { api } from '../api';
 import { ErrorState, Empty, Modal, PageLoader, Spinner, useToast } from '../components/ui';
 import { clockTime, episodeLine, programEnd, programTitle, serverNow, useChannels, useServerNow } from '../lib/channels';
 import { duration } from '../lib/format';
-import { useMe } from '../lib/hooks';
 import { NewBadge } from '../components/NewBadge';
 import { locale, t, tn } from '../i18n';
 
@@ -169,7 +168,7 @@ function About({ program, channel, now, onClose }: { program: ChannelProgram; ch
     mutationFn: () => api.keepChannelTitle(program.itemId),
     onSuccess: (res) => {
       const title = program.seriesTitle ?? program.title;
-      toast('ok', res.here ? t('Requested: {title} is in the library now', { title }) : t('Requested: {title} joins the library once it’s downloaded', { title }));
+      toast('ok', res.here ? t('Requested: {title} is in the library now', { title }) : t('Requested {title}.', { title }));
       void qc.invalidateQueries({ queryKey: ['program-about', program.itemId] });
       void qc.invalidateQueries({ queryKey: ['channels'] });
     },
@@ -220,7 +219,7 @@ function About({ program, channel, now, onClose }: { program: ChannelProgram; ch
         <p className="muted small">{[program.year, program.rating, duration(program.seconds)].filter(Boolean).join(' · ')}</p>
         {askable && (
           <p className="about__new small">
-            {requested ? t('Requested: it stays, and joins the library.') : t('New on this channel: deleted after it airs, unless someone requests it.')}
+            {requested ? t('Requested. It stays in the library.') : t('New on this channel. Leaves after it airs unless requested.')}
           </p>
         )}
         {about.isLoading ? <Spinner size={18} /> : about.data?.overview ? <p className="about__overview">{about.data.overview}</p> : null}
@@ -231,7 +230,6 @@ function About({ program, channel, now, onClose }: { program: ChannelProgram; ch
 
 export default function ChannelsPage() {
   const live = useChannels();
-  const me = useMe().data;
   const now = useServerNow(15_000);
   // Where the guide's time starts (the half hour before now when it opened), while it's open.
   const [origin] = useState(() => liveStart(serverNow()));
@@ -349,7 +347,7 @@ export default function ChannelsPage() {
     <div className="page container guide">
       <h1 className="page__title">{t('Channels')}</h1>
       {channels.length === 0 ? (
-        <Empty>{me?.isAdmin ? t('No channels yet. Add some in Settings → Channels.') : t('No channels yet.')}</Empty>
+        <Empty>{t('No channels yet.')}</Empty>
       ) : (
         <>
           <div className="guide__when" role="group" aria-label={t('When')}>

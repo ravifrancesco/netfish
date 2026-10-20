@@ -731,7 +731,7 @@ export default function ChannelPlayer() {
             {fullscreen ? <Minimize size={24} /> : <Maximize size={24} />}
           </button>
           {program?.isNew && !isStandIn(program.itemId) && kept !== program.itemId && (
-            <button className="btn btn--ghost btn--sm channel__keep" onClick={keep} title={t('Keep it: it isn’t deleted after it airs, and joins the library')}>
+            <button className="btn btn--ghost btn--sm channel__keep" onClick={keep} title={t('Keep it in the library')}>
               <Check size={16} /> {t('Keep')}
             </button>
           )}

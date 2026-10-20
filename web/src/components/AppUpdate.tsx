@@ -174,7 +174,7 @@ export const longDate = (date: Date) => date.toLocaleDateString(locale, { weekda
 export function InstallExpiry() {
   const date = useInstallExpiry();
   if (!date) return null;
-  return <p className="muted small">{t('This install opens until {date}. To renew it, plug this device into the Mac it was installed from.', { date: longDate(date) })}</p>;
+  return <p className="muted small">{t('Works until {date}. Renew it from your Mac.', { date: longDate(date) })}</p>;
 }
 
 /** The Mac and Windows apps: is updating by itself on, and is a new version waiting (checked every few hours). */
@@ -247,18 +247,18 @@ export function UpdateNudge() {
 
   let text: string;
   if (expiring) {
-    text = t('Netfish stops opening on this device on {date}. Plug it into the Mac it was installed from to renew it.', { date: longDate(expiring) });
+    text = t('Netfish stops opening here on {date}. Renew it from your Mac.', { date: longDate(expiring) });
   } else {
     const how =
       update || !which
         ? ''
         : which.name === 'ios'
-          ? t('Update it the way you installed it: from your Mac, or in AltStore or SideStore.')
+          ? t('Update it from your Mac, AltStore or SideStore.')
           : which.name === 'android'
             ? app?.platform === 'firetv'
-              ? t('Download it again with the Downloader app, the same way you installed it.')
-              : t('Download the new version from GitHub and install it, the same way you installed it.')
-            : t('Reinstall it from your computer, the same way you installed it.');
+              ? t('Update it with the Downloader app.')
+              : t('Get the new version from GitHub.')
+            : t('Reinstall it from your computer.');
     text = [need!.why, how].filter(Boolean).join(' ');
   }
   const status =
@@ -277,7 +277,7 @@ export function UpdateNudge() {
     <div className={`nudge${need?.level === 'needed' || expiring ? ' nudge--warn' : ''}`} role="status">
       {expiring ? <CalendarClock size={18} /> : <Download size={18} />}
       <span className="nudge__text">
-        {!expiring && <strong>{need!.level === 'needed' ? t('This app needs an update.') : t('An update for this app is worth installing.')} </strong>}
+        {!expiring && <strong>{need!.level === 'needed' ? t('This app needs an update.') : t('An app update is available.')} </strong>}
         {text}
         {status && <span className={`nudge__status${error ? ' is-bad' : ''}`}>{status}</span>}
       </span>

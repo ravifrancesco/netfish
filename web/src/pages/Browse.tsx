@@ -184,7 +184,7 @@ function Offline({ mediaType }: { mediaType: MediaType }) {
 
   if (mediaType === 'movie') {
     const movies = list.filter((i) => i.kind === 'Movie');
-    if (!movies.length) return <Empty>{t('No movies on {device} yet. Press Download on any movie to watch it offline.', { device: appKind().device })}</Empty>;
+    if (!movies.length) return <Empty>{t('No movies on {device} yet.', { device: appKind().device })}</Empty>;
     return (
       <div className="grid">
         {movies.map((m) => (
@@ -219,7 +219,7 @@ function Offline({ mediaType }: { mediaType: MediaType }) {
 
   const shows = new Map<string, OfflineItem[]>();
   for (const ep of list.filter((i) => i.kind === 'Episode')) shows.set(showKey(ep), [...(shows.get(showKey(ep)) ?? []), ep]);
-  if (!shows.size) return <Empty>{t('No episodes on {device} yet. Use the download icon next to any episode.', { device: appKind().device })}</Empty>;
+  if (!shows.size) return <Empty>{t('No episodes on {device} yet.', { device: appKind().device })}</Empty>;
   return (
     <div className="grid">
       {[...shows.entries()].map(([key, eps]) => {

@@ -56,7 +56,7 @@ export function StopDownload({ d, small }: { d: DownloadItem; small?: boolean })
               <RefreshCw size={20} />
               <span>
                 <strong>{t('Try another release')}</strong>
-                <span className="muted small">{t('Throws this one away and looks for a different copy by itself. Good when it is stuck or looks wrong.')}</span>
+                <span className="muted small">{t('Drops this download and finds another copy.')}</span>
               </span>
             </button>
             <button type="button" className="choice choice--danger" disabled={stop.isPending} onClick={() => stop.mutate('stop')}>
@@ -65,7 +65,7 @@ export function StopDownload({ d, small }: { d: DownloadItem; small?: boolean })
                 <strong>{t('Stop for good')}</strong>
                 <span className="muted small">
                   {d.mediaType === 'movie'
-                    ? t("Cancels the download and stops looking for it. It can be requested again later.")
+                    ? t('Cancels the download and stops looking for it.')
                     : t("Cancels the download and stops looking for these episodes.")}
                 </span>
               </span>
@@ -146,8 +146,8 @@ export function DeleteFromDisk({ d, menu }: { d: TitleDetail; menu?: boolean }) 
             )}
             <p className="muted">
               {isTv
-                ? t('The episodes are deleted from your server. The show stays in your library, and you can download them again any time.')
-                : t("The file is deleted from your server. The movie stays in your library as Not on disk, and you can download it again any time.")}
+                ? t('Deletes the episodes from your server. You can download them again anytime.')
+                : t('Deletes the file from your server. You can download it again anytime.')}
             </p>
           </div>
         </Modal>
@@ -192,7 +192,7 @@ export function CancelRequest({ d }: { d: TitleDetail }) {
             </>
           }
         >
-          <p className="muted">{t("Radarr and Sonarr stop looking for it, and it's no longer requested. You can request it again any time.")}</p>
+          <p className="muted">{t('Stops looking for it and withdraws the request.')}</p>
         </Modal>
       )}
     </>

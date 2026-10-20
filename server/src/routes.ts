@@ -59,7 +59,7 @@ import { freshRequested, freshStatus, keepFresh, noteChosen, removeFresh, runFre
 import { catalog } from './services/catalog';
 import { cleanupSuggestions, keepForGood } from './services/cleanup';
 import { playbackPrefs, setPlaybackPrefs } from './services/playbackPrefs';
-import { cancelRequest, deleteFromDisk, downloadAgain, removedTitles, stopDownload, storage } from './services/manage';
+import { cancelRequest, deleteFromDisk, downloadAgain, goneKeys, removedTitles, stopDownload, storage } from './services/manage';
 import { createRequest, listRequests, myRequestKeys } from './services/requests';
 import { scrobble, setScrobble, startImport, startLink, traktStatus, unlink } from './services/trakt';
 import { runSuggestarr, suggestarrStatus } from './services/suggestarr';
@@ -287,9 +287,12 @@ export async function apiRoutes(app: FastifyInstance) {
     });
 
     // Requests & downloads
-    api.get<{ Querystring: { scope?: string } }>('/requests', async (req) => ({
-      items: await listRequests(userOf(req), req.query.scope === 'all' ? 'all' : 'mine'),
-    }));
+    api.get<{ Querystring: { scope?: string } }>('/requests', async (req) => {
+      const user = userOf(req);
+      const [items, gone] = await Promise.all([listRequests(user, req.query.scope === 'all' ? 'all' : 'mine'), settle(goneKeys(user), new Set<string>())]);
+      // Deleted from disk since: said so, rather than looking like it's on its way.
+      return { items: items.map((r) => (gone.has(`${r.mediaType}-${r.tmdbId}`) ? { ...r, removed: true } : r)) };
+    });
     api.post<{ Body: CreateRequest }>('/requests', async (req, reply) => {
       reply.code(201);
       return createRequest(userOf(req), req.body ?? ({} as CreateRequest));

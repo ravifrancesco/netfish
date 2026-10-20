@@ -8,14 +8,15 @@ import { duration, titleHref } from '../lib/format';
 import { Img, Progress, StatusChip } from './ui';
 import { t } from '../i18n';
 
-export function PosterCard({ card, showLength }: { card: Card; showLength?: boolean }) {
+/** `markAvailable`: say which titles are on the server (search, a person's page), where not all of them are. */
+export function PosterCard({ card, showLength, markAvailable }: { card: Card; showLength?: boolean; markAvailable?: boolean }) {
   const downloading = card.downloadProgress !== undefined && card.status !== 'available';
   return (
     <Link to={titleHref(card)} className="card" aria-label={`${card.title}${card.year ? ` (${card.year})` : ''}${card.subtitle ? `. ${card.subtitle}` : ''}`}>
       <div className="card__frame">
         <Img src={card.poster} className="card__img" fallback={<span className="card__fallback">{card.title}</span>} />
         <div className="card__chip">
-          <StatusChip status={card.status} progress={card.downloadProgress} compact />
+          <StatusChip status={card.status} progress={card.downloadProgress} compact showAvailable={markAvailable} />
         </div>
         {downloading && <Progress value={card.downloadProgress!} className="card__bar" />}
         {showLength && card.runtimeMinutes && <span className="card__length">{duration(card.runtimeMinutes * 60)}</span>}
@@ -124,11 +125,11 @@ export function Row({ row }: { row: RowData }) {
 }
 
 /** `showLength`: each poster shows its length (when the list is sorted by it). */
-export function Grid({ cards, showLength }: { cards: Card[]; showLength?: boolean }) {
+export function Grid({ cards, showLength, markAvailable }: { cards: Card[]; showLength?: boolean; markAvailable?: boolean }) {
   return (
     <div className="grid">
       {cards.map((card) => (
-        <PosterCard key={card.key} card={card} showLength={showLength} />
+        <PosterCard key={card.key} card={card} showLength={showLength} markAvailable={markAvailable} />
       ))}
     </div>
   );

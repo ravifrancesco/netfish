@@ -25,7 +25,7 @@ A Netflix-style front door for a home media server. One app to browse, discover,
 - **Play on TV:** connect to the TV (or any device with Netfish open) with the cast button next to your profile picture, like YouTube; then Play plays there and your phone becomes the remote: pause, skip, audio and subtitles. A film you're already watching can be handed over mid-way.
 - **Chromecast:** in the Android app on phones and tablets, the player's cast button also lists the Chromecasts on your network. The film carries on there from the same spot, the phone is the remote, and **Stop casting** brings it back.
 - **Watch together:** turn what you're watching into a room from the player (or from a title's **⋯** menu). Play, pause, skipping and the next episode stay in step on every device, and the room shows up for everyone on your server right away.
-- **Channels:** your library as TV, when an admin turns them on. Each channel plays around the clock and everyone on it sees the same minute; there's no pausing, a short fish-and-net break between programmes with a look at what's next, and a guide up to three days ahead. Netfish's own channel keeps a real timetable: cartoons in the morning, sitcoms in the afternoon, The Simpsons at half six, then a film at nine (a documentary on some nights).
+- **Channels:** your library as TV, when an admin turns them on. Each channel plays around the clock and everyone on it sees the same minute; there's no pausing, a short fish-and-net break between programmes with a look at what's next, and a guide up to three days ahead.
 - **New on the channels (optional):** Netfish can bring in well-liked films and shows nobody here has for the channels you pick. They're in the guide a week ahead marked *New*, downloaded a few days before they air, and deleted afterwards unless someone presses **Keep**.
 - **Mark as watched:** a film, an episode or a whole season; take anything off *Continue Watching* with one click.
 - **Offline:** download movies and episodes in the Mac, Windows, iPhone/iPad and Android phone apps, with their subtitles and scrubbing previews. Play then always uses the downloaded copy, and where you stop still counts on the server. When the server can't be reached, the apps switch to offline mode: your downloads first, the rest of your Home greyed out.
@@ -134,7 +134,7 @@ The apps show the interface from your server, so most new features arrive by upd
 
 **1. Portainer → Stacks → Add stack**, name it `netfish`, paste [`docker-compose.yml`](docker-compose.yml), and **Deploy**. No variables are needed: Portainer pulls the ready-made image `ghcr.io/ravifrancesco/netfish:latest` (built by GitHub for Raspberry Pi and PCs).
 
-**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.7.14`.
+**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.7.15`.
 
 <details>
 <summary>Or build the image on the Pi yourself</summary>

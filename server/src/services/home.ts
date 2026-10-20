@@ -8,7 +8,7 @@ import { jfPlayableCard, jfToCard, seerrCards, type ProgressMap } from './cards'
 import { catalog } from './catalog';
 import { allDownloads, progressByTitle } from './downloads';
 import type { LibraryIndex } from './library';
-import { leftOut, playableIndex } from './manage';
+import { goneKeys, leftOut, playableIndex } from './manage';
 import { listRequests } from './requests';
 import { traktPicks } from './trakt';
 import { isHidden } from './watched';
@@ -120,7 +120,7 @@ export async function buildHome(user: SessionUser): Promise<HomeResponse> {
   if (has.seerr()) {
     const exclude = new Set([...watched, ...topSeeds.map((s) => s.key)]);
     const tasteAndPeople = tasteOf(seeds).then(async (taste: Taste) => ({ taste, people: await peopleRows(taste, exclude, index, progress) }));
-    const [recPages, trendingP, moviesP, tvP, upcomingP, myRequests, traktM, traktS, mine, sarr] = await Promise.all([
+    const [recPages, trendingP, moviesP, tvP, upcomingP, myRequests, traktM, traktS, mine, sarr, gone] = await Promise.all([
       Promise.all(topSeeds.map((s) => settle(catalog.recommendations(s.mediaType, s.tmdbId), undefined))),
       settle(catalog.discover('trending'), EMPTY_PAGE),
       settle(catalog.discover('movies'), EMPTY_PAGE),
@@ -131,6 +131,7 @@ export async function buildHome(user: SessionUser): Promise<HomeResponse> {
       settle(traktPicks('tv'), []),
       settle(tasteAndPeople, undefined),
       settle(suggestedFor(user, index), []),
+      settle(goneKeys(user), new Set<string>()),
     ]);
     traktMovies = seerrCards(traktM, index, progress);
     traktShows = seerrCards(traktS, index, progress);
@@ -165,8 +166,9 @@ export async function buildHome(user: SessionUser): Promise<HomeResponse> {
     popularMovies = seerrCards(moviesP.results, index, progress);
     popularTv = seerrCards(tvP.results, index, progress);
     upcoming = seerrCards(upcomingP.results, index, progress);
+    // What's still to come: not here yet, not declined, and not deleted from disk (that isn't coming back by itself).
     requested = myRequests
-      .filter((r) => r.status !== 'available' && r.requestStatus !== 'declined')
+      .filter((r) => r.status !== 'available' && r.requestStatus !== 'declined' && !gone.has(`${r.mediaType}-${r.tmdbId}`))
       .map((r) => ({
         key: `${r.mediaType}-${r.tmdbId}`,
         mediaType: r.mediaType,

@@ -50,7 +50,7 @@ export default function Login({ adding, again, onCancel, onDone }: { adding?: bo
           <Wordmark className="wordmark--lg" />
         </div>
         <p className="muted">
-          {again ? t('{name}, sign in again: this device’s sign-in has run out.', { name: again }) : adding ? t('Add a profile: sign in with another Jellyfin account.') : t('Sign in with your Jellyfin account.')}
+          {again ? t('{name}, sign in again.', { name: again }) : adding ? t('Sign in to add a profile.') : t('Sign in with your Jellyfin account.')}
         </p>
         {config && !config.jellyfinConfigured && (
           <p className="login__error">{t("This server isn't connected to Jellyfin yet. Set {variable} in the stack.", { variable: 'JELLYFIN_URL' })}</p>

@@ -69,7 +69,8 @@ export function Spinner({ size = 20, label }: { size?: number; label?: string })
 
 // ---------- Status chip ----------
 
-export function StatusChip({ status, progress, compact }: { status: Availability; progress?: number; compact?: boolean }) {
+/** A title's state on a poster; `showAvailable` marks what's already on the server (where not everything is). */
+export function StatusChip({ status, progress, compact, showAvailable }: { status: Availability; progress?: number; compact?: boolean; showAvailable?: boolean }) {
   if (progress !== undefined && status !== 'available') {
     return (
       <span className="chip chip--dl">
@@ -79,6 +80,13 @@ export function StatusChip({ status, progress, compact }: { status: Availability
     );
   }
   switch (status) {
+    case 'available':
+      return showAvailable ? (
+        <span className="chip chip--available">
+          <CircleCheck size={13} aria-hidden="true" />
+          {t('In library')}
+        </span>
+      ) : null;
     case 'processing':
       return <span className="chip chip--processing">{t('On its way')}</span>;
     case 'pending':

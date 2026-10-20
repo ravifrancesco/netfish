@@ -33,7 +33,6 @@
       .btn:hover { background: rgba(130, 145, 160, 0.34); }
       .btn--accent { background: var(--accent); color: #03221c; }
       main { padding: 28px 32px 60px; }
-      .note { color: var(--text-3); margin: 0 0 22px; font-size: 14px; }
       .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 22px; }
       .item { display: grid; gap: 8px; }
       .poster { position: relative; aspect-ratio: 2 / 3; border-radius: 8px; overflow: hidden; background: linear-gradient(140deg, #1a212a, #12171e); border: 0; padding: 0; }
@@ -130,14 +129,13 @@
         </svg>
         <div class="offline__text" aria-live="polite">
           <strong id="offline-title" data-t>You're offline</strong>
-          <span id="offline-text" data-t>Netfish can't reach your server. What's downloaded on this device still plays.</span>
+          <span id="offline-text" data-t>Your downloads still play.</span>
         </div>
         <div class="offline__actions">
           <button class="btn btn--accent" id="retry" data-t>Try again</button>
           <button class="link" id="change-server" hidden data-t>Change server…</button>
         </div>
       </div>
-      <p class="note" id="note" data-t>These play without a connection to your server. Download more from any movie or episode page.</p>
       <div id="view"></div>
     </main>
     <!-- Netfish's own player, built from the web app into every app (npm run build:player). -->
@@ -152,8 +150,6 @@
         'Downloads on this computer': 'Download su questo computer',
         'Downloads on this device': 'Download su questo dispositivo',
         'Back to Netfish': 'Torna a Netfish',
-        'These play without a connection to your server. Download more from any movie or episode page.':
-          'Puoi guardarli anche senza connessione al tuo server. Scaricane altri dalla pagina di un film o di un episodio.',
         Play: 'Riproduci',
         'Ready · {size}': 'Pronto · {size}',
         'Downloading {pct}% · {received} of {size}': 'Download al {pct}% · {received} di {size}',
@@ -173,7 +169,6 @@
         Episodes: 'Episodi',
         'Delete all': 'Elimina tutto',
         'Nothing downloaded yet': 'Ancora nessun download',
-        'Open a movie or episode in Netfish and press Download.': 'Apri un film o un episodio in Netfish e premi Scarica.',
         Movies: 'Film',
         Shows: 'Serie TV',
         '← All downloads': '← Tutti i download',
@@ -185,13 +180,13 @@
         'Delete all {n} downloaded episode of "{title}"?': 'Eliminare l\'episodio scaricato di "{title}"?',
         'Delete all {n} downloaded episodes of "{title}"?': 'Eliminare tutti i {n} episodi scaricati di "{title}"?',
         "You're offline": 'Sei offline',
-        "Netfish can't reach your server. What's downloaded on this device still plays.": 'Netfish non raggiunge il tuo server. Quello che hai scaricato su questo dispositivo si guarda lo stesso.',
+        "Your downloads still play.": 'I tuoi download si guardano lo stesso.',
         'Try again': 'Riprova',
         'Your Home': 'La tua Home',
         'needs your server': 'serve il tuo server',
         'Checking…': 'Controllo…',
-        "Still can't reach your server. Netfish keeps trying and will tell you when it's back.": 'Il server non risponde ancora. Netfish continua a provare e ti avvisa quando torna.',
-        "Netfish can't reach your server. It keeps trying and will tell you when it's back.": 'Netfish non raggiunge il tuo server. Continua a provare e ti avvisa quando torna.',
+        "Still can't reach your server. Trying again…": 'Il server non risponde ancora. Riprovo…',
+        "Can't reach your server. Trying again…": 'Il server non risponde. Riprovo…',
         'Your server is back': 'Il tuo server è tornato',
         'Reconnect to get all of Netfish back.': 'Riconnettiti per riavere tutto Netfish.',
         'Reconnect': 'Riconnetti',
@@ -229,7 +224,6 @@
       const offlineMode = ['1', 'true'].includes(query.get('offline') || '');
       if (offlineMode) {
         document.getElementById('offline').hidden = false;
-        document.getElementById('note').hidden = true;
         document.getElementById('home').hidden = true;
         // The server might have moved (a new address): set it again from here.
         const change = document.getElementById('change-server');
@@ -279,7 +273,7 @@
           retry.disabled = false;
           if (up) return desktop.openServer();
           retry.textContent = t('Try again');
-          text.textContent = t("Still can't reach your server. Netfish keeps trying and will tell you when it's back.");
+          text.textContent = t("Still can't reach your server. Trying again…");
         };
         setInterval(() => !document.hidden && !back && check(), 15_000);
         document.addEventListener('visibilitychange', () => !document.hidden && !back && check());
@@ -356,7 +350,7 @@
         });
 
         if (!list.length) {
-          return `<div class="empty"><strong>${t('Nothing downloaded yet')}</strong><span>${t('Open a movie or episode in Netfish and press Download.')}</span></div>`;
+          return `<div class="empty"><strong>${t('Nothing downloaded yet')}</strong></div>`;
         }
         return `${movieTiles.length ? `<h2>${t('Movies')}</h2><div class="grid">${movieTiles.join('')}</div>` : ''}
           ${showTiles.length ? `<h2>${t('Shows')}</h2><div class="grid">${showTiles.join('')}</div>` : ''}`;
@@ -432,7 +426,7 @@
         update(list);
         // Offline with nothing downloaded: no promise of something to watch, just that it keeps trying.
         if (offlineMode && !list.some((i) => i.state === 'done')) {
-          document.getElementById('offline-text').textContent = t("Netfish can't reach your server. It keeps trying and will tell you when it's back.");
+          document.getElementById('offline-text').textContent = t("Can't reach your server. Trying again…");
         }
       });
       desktop.onOfflineChange(update);

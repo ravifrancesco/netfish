@@ -121,26 +121,36 @@ export function FishGlyph({ size = 40, stranded, className = '' }: { size?: numb
   );
 }
 
-/** Two fish swimming together, one a little behind the other: Watch together. */
-export function FishPair({ size = 34 }: { size?: number }) {
-  const shape = (className: string, tail: number, body: number) => (
-    <g className={className} strokeLinejoin="round">
-      <path className="fish-pair__tail" d={TAIL} strokeWidth={tail} />
-      <path d={BODY} strokeWidth={body} />
+/** Two fish swimming together, one a little behind the other: Watch together, in outline (`still` in buttons). */
+export function FishPair({ size = 34, still }: { size?: number; still?: boolean }) {
+  const cut = useSvgId('fish-pair-cut');
+  const shape = (className: string, width: number) => (
+    <g className={className} strokeLinejoin="round" strokeWidth={width}>
+      <path className="fish-pair__tail" d={TAIL} />
+      <path d={BODY} />
+    </g>
+  );
+  // The one in front: drawn, and (wider) cut out of the one behind, so they read apart on any background.
+  const front = (className: string, width: number) => (
+    <g transform="translate(20 12) scale(0.72)">
+      <g className="fish-pair__swim is-front">{shape(className, width)}</g>
     </g>
   );
   return (
-    <svg viewBox="0 0 64 52" width={size} height={(size * 52) / 64} className="fish-pair" aria-hidden="true">
-      {/* Behind: a little larger and dimmer. In front: a halo in the page's colour, so the two read apart. */}
-      <g transform="translate(-2 -6) scale(0.82)">
-        <g className="fish-pair__swim">{shape('fish-pair__fish is-back', 4, 6)}</g>
-      </g>
-      <g transform="translate(20 12) scale(0.72)">
-        <g className="fish-pair__swim is-front">
-          {shape('fish-pair__halo', 12, 14)}
-          {shape('fish-pair__fish', 4, 6)}
+    <svg viewBox="0 0 64 52" width={size} height={(size * 52) / 64} className={`fish-pair${still ? ' is-still' : ''}`} aria-hidden="true">
+      <defs>
+        <mask id={cut} maskUnits="userSpaceOnUse" x="-12" y="-12" width="88" height="76">
+          <rect x="-12" y="-12" width="88" height="76" fill="white" />
+          {front('fish-pair__cut', 16)}
+        </mask>
+      </defs>
+      {/* Behind: a little larger and dimmer. */}
+      <g mask={`url(#${cut})`}>
+        <g transform="translate(-2 -6) scale(0.82)">
+          <g className="fish-pair__swim">{shape('fish-pair__fish is-back', 5)}</g>
         </g>
       </g>
+      {front('fish-pair__fish', 5.5)}
     </svg>
   );
 }

@@ -405,6 +405,12 @@ p {
   background: var(--accent);
   color: var(--accent-ink);
 }
+/* Already on the server, among titles that aren't (search, a person's page). */
+.chip--available {
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
 .chip--processing {
   background: rgba(54, 226, 198, 0.2);
   color: var(--accent);
@@ -628,15 +634,27 @@ p {
   flex: none;
 }
 .fish-pair__fish {
-  fill: currentColor;
+  fill: none;
   stroke: currentColor;
 }
 .fish-pair__fish.is-back {
   opacity: 0.55;
 }
-.fish-pair__halo {
-  fill: var(--bg);
-  stroke: var(--bg);
+.fish-pair__cut {
+  fill: black;
+  stroke: black;
+}
+.fish-pair.is-still * {
+  animation: none;
+}
+.menu .fish-pair {
+  /* As wide as the other items' icons, so the labels line up. */
+  margin: 0 -3px;
+}
+/* A title's ⋯ menu and the player's buttons: in the text's colour, like the icons beside them. */
+.more__menu .fish-pair,
+.player__top .icon-btn .fish-pair {
+  color: inherit;
 }
 .fish-pair__swim {
   animation: fish-bob 2.6s ease-in-out infinite;

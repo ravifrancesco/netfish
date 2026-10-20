@@ -89,7 +89,7 @@ export function VersionsSheet({
     onSuccess: (_, r) => {
       setGrabbed((g) => new Set(g).add(r.guid));
       setConfirming(undefined);
-      toast('ok', t('Sent to the downloader — follow it in Activity.'));
+      toast('ok', t('Downloading this version.'));
       refresh(title.mediaType, title.tmdbId);
     },
     onError: (err) => toast('error', (err as Error).message),
@@ -159,12 +159,12 @@ export function VersionsSheet({
             <div className="release__warn">
               <TriangleAlert size={14} />
               <span>
-                {r.rejected && `${t("Radarr/Sonarr wouldn't pick this automatically: {reasons}.", { reasons: r.rejections.join('; ') || t('rejected') })} `}
+                {r.rejected && `${t('Not picked automatically: {reasons}.', { reasons: r.rejections.join('; ') || t('rejected') })} `}
                 {data?.current &&
                   !r.likelyImports &&
                   (data.current.quality
-                    ? t('It may not replace your current {quality} (lower quality).', { quality: data.current.quality })
-                    : t('It may not replace your current copy (lower quality).'))}
+                    ? t('Lower quality than your current {quality}.', { quality: data.current.quality })
+                    : t('Lower quality than your current copy.'))}
               </span>
             </div>
           )}
@@ -288,8 +288,8 @@ export function VersionsSheet({
         {title.notOut && title.notOut.kind !== 'airing' && (
           <p className="versions__limit">
             {title.mediaType === 'movie'
-              ? t("This movie can't be streamed or bought yet, so anything listed here was most likely filmed in a cinema (CAM, TS) and looks poor. Radarr waits for a proper release by itself.")
-              : t("This show hasn't started yet, so there's nothing to find so far.")}
+              ? t('Not out on streaming yet: these are most likely cinema recordings (CAM, TS).')
+              : t("Hasn't aired yet.")}
           </p>
         )}
         {data && data.hiddenOversized > 0 && data.limit && (
@@ -308,7 +308,7 @@ export function VersionsSheet({
         {search.isLoading || search.isFetching ? (
           <div className="versions__loading">
             <SwimmingFish size={40} />
-            <p>{t('Asking your indexers… this can take up to a minute.')}</p>
+            <p>{t('Searching every indexer…')}</p>
           </div>
         ) : search.isError ? (
           <ErrorState error={search.error} retry={() => void search.refetch()} />

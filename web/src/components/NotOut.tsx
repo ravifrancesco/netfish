@@ -26,13 +26,13 @@ export function notOutText(n: NotOut, mediaType: MediaType, requested: boolean):
   }[n.kind];
   let next: string;
   if (mediaType === 'movie') {
-    if (!requested) next = t('Request it now and it downloads by itself once it can be streamed or bought.');
-    else if (n.kind === 'cinemas' && date) next = t('It downloads by itself once it can be streamed or bought, expected {date}.', { date });
-    else next = t('It downloads by itself once it can be streamed or bought.');
+    if (!requested) next = t("Request it and it arrives as soon as it's out.");
+    else if (n.kind === 'cinemas' && date) next = t("Arrives as soon as it's out, expected {date}.", { date });
+    else next = t("Arrives as soon as it's out.");
   } else if (n.kind === 'airing') {
     next = t('It downloads by itself after it airs.');
   } else {
-    next = requested ? t('Episodes download by themselves as they air.') : t('Request it now and episodes download by themselves as they air.');
+    next = requested ? t('New episodes arrive as they air.') : t('Request it and new episodes arrive as they air.');
   }
   return [now, next].filter(Boolean).join(' ');
 }

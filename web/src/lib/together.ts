@@ -98,6 +98,24 @@ export function useTick(ms: number) {
 /** An id for this open player (crypto.randomUUID needs https, which a home server often isn't). */
 const newClientId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
+/**
+ * This tab's id in a room: the same one when it comes back (away from the film for a moment, a
+ * reload, the app reopening the page), so the room doesn't list it twice. A remote has its own.
+ */
+function clientIdFor(roomId: string | undefined, controller?: boolean) {
+  if (!roomId) return newClientId();
+  const key = `netfish.together.${roomId}.${controller ? 'remote' : 'player'}`;
+  try {
+    const kept = sessionStorage.getItem(key);
+    if (kept && /^[a-z0-9-]{8,40}$/i.test(kept)) return kept;
+    const id = newClientId();
+    sessionStorage.setItem(key, id);
+    return id;
+  } catch {
+    return newClientId();
+  }
+}
+
 export interface Together {
   room?: TogetherRoom;
   /** The room closed (ended by its host, or gone). */
@@ -120,7 +138,7 @@ export interface Together {
 export function useTogether(roomId: string | undefined, options: { controller?: boolean; onCommand?: (command: TogetherCommand) => void } = {}): Together {
   const onCommand = useRef(options.onCommand);
   onCommand.current = options.onCommand;
-  const clientId = useMemo(newClientId, []);
+  const clientId = useMemo(() => clientIdFor(roomId, options.controller), [roomId, options.controller]);
   const [room, setRoom] = useState<TogetherRoom>();
   const [ended, setEnded] = useState(false);
   const roomRef = useRef<TogetherRoom | undefined>(undefined);

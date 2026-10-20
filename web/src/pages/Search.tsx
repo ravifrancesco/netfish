@@ -37,7 +37,7 @@ export default function Search() {
       </label>
       {q.trim().length < 2 ? (
         <div className="empty">
-          <p>{t('Search your library and everything you could add to it, or a director or actor to see their work.')}</p>
+          <p>{t('Films, shows and people.')}</p>
         </div>
       ) : results.isError ? (
         <ErrorState error={results.error} retry={() => void results.refetch()} />
@@ -61,13 +61,13 @@ export default function Search() {
                   {results.data.person.title}
                 </Link>
               </h2>
-              <Grid cards={results.data.person.items} />
+              <Grid cards={results.data.person.items} markAvailable />
             </section>
           )}
           {results.data.items.length > 0 && (
             <section className="search-block">
               {(results.data.people.length > 0 || results.data.person) && <h2>{t('Movies & shows')}</h2>}
-              <Grid cards={results.data.items} />
+              <Grid cards={results.data.items} markAvailable />
             </section>
           )}
         </>

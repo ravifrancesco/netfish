@@ -577,6 +577,8 @@ export interface RequestItem {
   notOut?: NotOut;
   /** SuggestArr asked for it: because of what someone watched (who, for admins; the title, when it's yours or you're an admin). */
   suggested?: { because?: string; forName?: string };
+  /** Deleted from disk since (not coming back by itself). */
+  removed?: boolean;
 }
 
 export interface RequestsResponse {

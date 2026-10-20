@@ -89,8 +89,8 @@ function Downloads() {
 
 /** SuggestArr asked for it: because of what (and whose) viewing, when the server can say. */
 function suggestedText(s: NonNullable<RequestItem['suggested']>): string {
-  if (s.because && s.forName) return t('Suggested by SuggestArr, because {name} watched {title}', { name: s.forName, title: s.because });
-  if (s.because) return t('Suggested by SuggestArr, because you watched {title}', { title: s.because });
+  if (s.because && s.forName) return t('Because {name} watched {title}', { name: s.forName, title: s.because });
+  if (s.because) return t('Because you watched {title}', { title: s.because });
   return t('Suggested by SuggestArr');
 }
 
@@ -106,7 +106,7 @@ function Requests({ scope }: { scope: 'mine' | 'all' }) {
   const q = useQuery({ queryKey: ['requests', scope], queryFn: () => api.requests(scope), refetchInterval: 10_000 });
   if (q.isError) return <ErrorState error={q.error} retry={() => void q.refetch()} />;
   if (!q.data) return <PageLoader />;
-  if (!q.data.items.length) return <Empty>{t('No requests yet. Find something and hit Request.')}</Empty>;
+  if (!q.data.items.length) return <Empty>{t('No requests yet.')}</Empty>;
   return (
     <ul className="items">
       {q.data.items.map((r) => (
@@ -118,7 +118,9 @@ function Requests({ scope }: { scope: 'mine' | 'all' }) {
                 <span className="item__title">
                   {r.title} {r.year && <span className="muted">({r.year})</span>}
                 </span>
-                {r.status === 'available' ? (
+                {r.removed ? (
+                  <span className="state">{t('Not on disk')}</span>
+                ) : r.status === 'available' ? (
                   <span className="state state--done">{AVAILABILITY_LABEL.available}</span>
                 ) : r.requestStatus === 'pending' || r.requestStatus === 'declined' ? (
                   <span className={`state state--${r.requestStatus}`}>{REQUEST_LABEL[r.requestStatus]}</span>
@@ -133,7 +135,7 @@ function Requests({ scope }: { scope: 'mine' | 'all' }) {
                 {r.mine ? t('You') : r.requestedBy} · {ago(r.createdAt)}
               </div>
               {r.suggested && <div className="item__suggested small">{suggestedText(r.suggested)}</div>}
-              {r.notOut && !r.download && notOutShort(r.notOut) && (
+              {r.notOut && !r.download && !r.removed && notOutShort(r.notOut) && (
                 <div className="item__notout small">
                   <CalendarClock size={14} /> {notOutShort(r.notOut)}
                 </div>

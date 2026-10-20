@@ -7,11 +7,9 @@ export default {
   Stop: 'Ferma',
   'Stop downloading {title}?': 'Fermare il download di {title}?',
   'Try another release': 'Prova un’altra versione',
-  'Throws this one away and looks for a different copy by itself. Good when it is stuck or looks wrong.':
-    'Scarta questa e ne cerca da solo un’altra. Utile quando è bloccata o sembra sbagliata.',
+  'Drops this download and finds another copy.': "Scarta questo download e cerca un'altra copia.",
   'Stop for good': 'Ferma del tutto',
-  'Cancels the download and stops looking for it. It can be requested again later.':
-    'Annulla il download e smette di cercarlo. Potrai richiederlo di nuovo più avanti.',
+  'Cancels the download and stops looking for it.': 'Annulla il download e smette di cercarlo.',
   'Cancels the download and stops looking for these episodes.': 'Annulla il download e smette di cercare questi episodi.',
 
   // Deleting from disk, and getting it back
@@ -21,10 +19,8 @@ export default {
   'Delete {size}': 'Elimina {size}',
   Specials: 'Speciali',
   'Season {n}': 'Stagione {n}',
-  'The episodes are deleted from your server. The show stays in your library, and you can download them again any time.':
-    'Gli episodi vengono eliminati dal server. La serie resta nella tua libreria e puoi riscaricarli quando vuoi.',
-  'The file is deleted from your server. The movie stays in your library as Not on disk, and you can download it again any time.':
-    'Il file viene eliminato dal server. Il film resta nella tua libreria come Non sul disco e puoi riscaricarlo quando vuoi.',
+  'Deletes the episodes from your server. You can download them again anytime.': 'Elimina gli episodi dal server. Puoi riscaricarli quando vuoi.',
+  'Deletes the file from your server. You can download it again anytime.': 'Elimina il file dal server. Puoi riscaricarlo quando vuoi.',
   'Looking for {title} again.': 'Cerco di nuovo {title}.',
   'Download again': 'Scarica di nuovo',
   '{seasons} deleted from disk {when}': '{seasons} eliminate dal disco {when}',
@@ -74,8 +70,7 @@ export default {
   'Cancel the request for {title}?': 'Annullare la richiesta di {title}?',
   'Keep it': 'Mantienila',
   'Request cancelled.': 'Richiesta annullata.',
-  "Radarr and Sonarr stop looking for it, and it's no longer requested. You can request it again any time.":
-    'Radarr e Sonarr smettono di cercarlo e non risulta più richiesto. Puoi richiederlo di nuovo quando vuoi.',
+  'Stops looking for it and withdraws the request.': 'Smette di cercarlo e ritira la richiesta.',
 
   // The round download button on a title's page
   'Downloaded to {device}': 'Scaricato su {device}',
@@ -85,7 +80,7 @@ export default {
   'Delete the download': 'Elimina il download',
   'Show downloads': 'Mostra i download',
   'Delete the download of {title}?': 'Eliminare il download di {title}?',
-  'Only the copy on {device} goes; the film stays on your server.': 'Viene eliminata solo la copia su {device}; il film resta sul tuo server.',
+  'Removes it from {device} only.': 'Lo rimuove solo da {device}.',
   'Locked with a PIN': 'Bloccato con un PIN',
   'Sign {name} out on this device?': 'Disconnettere {name} da questo dispositivo?',
   Remove: 'Rimuovi',
@@ -103,8 +98,8 @@ export default {
   'Delete a digit': 'Cancella una cifra',
   "Who's watching?": 'Chi guarda?',
   'Add profile': 'Aggiungi profilo',
-  'Add a profile: sign in with another Jellyfin account.': 'Aggiungi un profilo: accedi con un altro account Jellyfin.',
-  '{name}, sign in again: this device’s sign-in has run out.': '{name}, accedi di nuovo: l’accesso su questo dispositivo è scaduto.',
+  'Sign in to add a profile.': 'Accedi per aggiungere un profilo.',
+  '{name}, sign in again.': '{name}, accedi di nuovo.',
   "Back to who's watching": 'Torna a chi guarda',
   'Profiles on this device': 'Profili su questo dispositivo',
 

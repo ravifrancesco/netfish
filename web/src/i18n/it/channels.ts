@@ -3,7 +3,6 @@ export default {
   // The guide and Home
   Channels: 'Canali',
   'On now': 'In onda ora',
-  'No channels yet. Add some in Settings → Channels.': 'Ancora nessun canale. Aggiungine in Impostazioni → Canali.',
   'No channels yet.': 'Ancora nessun canale.',
   'Nothing to play yet': 'Ancora niente in programma',
   Now: 'Ora',
@@ -75,9 +74,8 @@ export default {
 
   // New titles (Settings → Channels, and on the channels)
   New: 'Nuovo',
-  'New on this channel: brought in for it, deleted after it airs unless someone keeps it':
-    'Nuovo su questo canale: scaricato apposta, cancellato dopo la messa in onda se nessuno lo tiene',
-  'Keep it: it isn’t deleted after it airs, and joins the library': 'Tienilo: non viene cancellato dopo la messa in onda ed entra nella libreria',
+  'New on this channel. Leaves after it airs unless someone keeps it.': 'Nuovo su questo canale. Va via dopo la messa in onda, se nessuno lo tiene.',
+  'Keep it in the library': 'Tienilo nella libreria',
   'Kept: {title} is in the library now': 'Tenuto: {title} ora è nella libreria',
   'New titles': 'Titoli nuovi',
   'Needs Seerr (to find them), and Radarr or Sonarr.': 'Servono Seerr (per trovarli) e Radarr o Sonarr.',
@@ -134,9 +132,8 @@ export default {
   Today: 'Oggi',
   'Watch channel {n} now': 'Guarda ora il canale {n}',
   'Requested: {title} is in the library now': 'Richiesto: {title} ora è nella libreria',
-  'Requested: {title} joins the library once it’s downloaded': 'Richiesto: {title} entra nella libreria appena è scaricato',
-  'Requested: it stays, and joins the library.': 'Richiesto: resta, ed entra nella libreria.',
-  'New on this channel: deleted after it airs, unless someone requests it.': 'Nuovo su questo canale: viene cancellato dopo la messa in onda, a meno che qualcuno non lo richieda.',
+  'Requested. It stays in the library.': 'Richiesto. Resta nella libreria.',
+  'New on this channel. Leaves after it airs unless requested.': 'Nuovo su questo canale. Va via dopo la messa in onda, se nessuno lo richiede.',
   'Requested by {name}': 'Richiesto da {name}',
   When: 'Quando',
   'always channel 1': 'sempre il canale 1',

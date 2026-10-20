@@ -139,7 +139,7 @@ export default function Home() {
           <Row key={row.id} row={row} />
         ))}
         {rows.length === 0 && (
-          <Empty>{t('Your library is empty for now. Search for something and request it.')}</Empty>
+          <Empty>{t('Your library is empty.')}</Empty>
         )}
       </div>
     </div>

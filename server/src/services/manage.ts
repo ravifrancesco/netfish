@@ -77,6 +77,7 @@ function forget(mediaType: MediaType, tmdbId: number, tvdbId?: number) {
   storageCache.clear();
   goneCache.clear();
   empties.clear();
+  goneKeyCache.clear();
   forgetCleanup();
 }
 
@@ -422,6 +423,20 @@ export function emptyShows(user: SessionUser): Promise<string[]> {
   return empties.wrap(user.id, MINUTE, async () => {
     const list = await Promise.race([settle(goneFor(user, 'tv'), []), new Promise<[]>((resolve) => setTimeout(() => resolve([]), 4000))]);
     return list.flatMap((g) => (g.empty ? [g.empty] : []));
+  });
+}
+
+/**
+ * `${mediaType}-${tmdbId}` of every title not on disk (deleted to save space, and not coming back
+ * by itself): a request for one isn't on its way. Quickly or not at all, like emptyShows.
+ */
+const goneKeyCache = new TTLCache<Set<string>>(200);
+export function goneKeys(user: SessionUser): Promise<Set<string>> {
+  if (!has.radarr() && !has.sonarr() && !Object.keys(removed).length) return Promise.resolve(new Set());
+  return goneKeyCache.wrap(user.id, MINUTE, async () => {
+    const both = Promise.all([settle(goneFor(user, 'movie'), []), settle(goneFor(user, 'tv'), [])]);
+    const lists = await Promise.race([both, new Promise<[]>((resolve) => setTimeout(() => resolve([]), 4000))]);
+    return new Set(lists.flat().map((g) => keyOf(g.mediaType, g.tmdbId)));
   });
 }
 

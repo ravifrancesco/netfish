@@ -155,12 +155,12 @@ function StatusPanel({ d }: { d: TitleDetail }) {
       )}
       {!d.downloads.length && d.status === 'processing' && !waitingForRelease && (
         <p className="statusbox__note">
-          <Clock size={16} /> {t("Requested — looking for a good release. It'll start downloading as soon as one turns up.")}
+          <Clock size={16} /> {t('Requested. Looking for a copy.')}
         </p>
       )}
       {d.status === 'pending' && (
         <p className="statusbox__note">
-          <Clock size={16} /> {t('Waiting for an admin to approve the request.')}
+          <Clock size={16} /> {t('Waiting for approval')}
         </p>
       )}
       {latest && (

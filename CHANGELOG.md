@@ -7,6 +7,23 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.15 (2026-10-19)
+
+### New
+- **Search shows what's already on the server.** In search results, a director's or actor's films in a search, and their own pages, titles on the server carry an **In library** chip. Elsewhere the poster says *Requested*, *On its way*, *Partial* or how far a download has got. Movies and Shows don't get the chip, since everything there is on the server.
+
+### Changed
+- **Watch together has the two fish everywhere:** the *Just you* / *2 watching* chip in the player, the player's Watch together button, Watch together in a title's ⋯ menu, and the little pills that say who pressed play, paused or skipped. Before, these showed a generic people icon while Home's row had the fish.
+- **The two fish are outlines** instead of filled shapes, everywhere including Home's row. The front fish cuts the lines of the one behind it, so the pair reads clearly on any background, a film's picture included. They swim in the chip, since the room is live, and stay still in buttons. In a title's ⋯ menu and among the player's buttons they're white like the icons beside them; elsewhere they keep the accent colour.
+- **Shorter, plainer text** outside Settings. Instructions people don't need once they've used something are gone: the Watch together panel's explanation, the hint under *Play on*, the note in the subtitles sheet, the season picker's line, and *Download more from…* on the downloads page. Other messages are shorter, for example *Downloading to this Mac.*, *Requested Dune.*, *Waiting for approval*, *Your library is empty.*, *Removes it from this iPhone only.* and *You're offline · Your downloads still play.*
+- **Your requests on Home leaves out titles deleted from disk.** After an admin deletes something, Seerr may call it *processing* again, so it looked like it was on its way. In Activity's request list it now says *Not on disk*.
+
+### Fixed
+- **Watch together listed you twice** after you left the film for a moment, reloaded, or the app reopened the page: your earlier visit stayed as *Away* for two minutes. A device coming back to a room now keeps its place. The panel lists each person once, even on two devices; the chip counts people, not devices; and *joined*/*left* pills are about people, not devices.
+
+### Update
+- **Server.** The downloads page's shorter text needs the **Mac, Windows, iPhone/iPad and Android** apps' next version.
+
 ## 0.7.14 (2026-10-19)
 
 ### New

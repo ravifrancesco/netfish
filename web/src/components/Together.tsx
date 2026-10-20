@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Check, Copy, LogOut, Play, Users, X } from 'lucide-react';
+import { Check, Copy, LogOut, Play, X } from 'lucide-react';
 import type { TogetherMember, TogetherRoom } from '@netfish/shared';
 import { api } from '../api';
 import { clock } from '../lib/format';
@@ -31,7 +31,7 @@ export function WatchTogetherButton({ itemId, menu }: { itemId: string; menu?: b
       onClick={() => start.mutate()}
       title={t('Watch in sync with others on this server')}
     >
-      {start.isPending ? <Spinner size={16} /> : <Users size={menu ? 18 : 20} />} {t('Watch together')}
+      {start.isPending ? <Spinner size={16} /> : <FishPair size={menu ? 24 : 26} still />} {t('Watch together')}
     </button>
   );
 }
@@ -42,6 +42,19 @@ const peopleIn = (room: TogetherRoom, exceptId?: string) => {
   for (const m of room.members) if (m.here && m.userId !== exceptId && !seen.has(m.userId)) seen.set(m.userId, m);
   return [...seen.values()];
 };
+
+/**
+ * Everyone in a room, here or away, once each: someone on two devices (or back from a moment
+ * away) counts as here, and ready rather than loading if either is.
+ */
+function everyoneIn(room: TogetherRoom) {
+  const byPerson = new Map<string, TogetherMember>();
+  for (const m of room.members) {
+    const seen = byPerson.get(m.userId);
+    if (!seen || (m.here && (!seen.here || (seen.waiting && !m.waiting)))) byPerson.set(m.userId, m);
+  }
+  return [...byPerson.values()];
+}
 
 /** "ravi", "ravi and sam", "ravi and 2 others". */
 function whoText(people: TogetherMember[]) {
@@ -152,7 +165,7 @@ export function TogetherPill() {
         <div className="menu together-menu" role="menu">
           {rooms.map((room) => (
             <Link key={room.id} to={roomHref(room)} className="together-menu__item" role="menuitem" onClick={() => setOpen(false)}>
-              <Img src={room.image} className="together-menu__art" fallback={<Users size={18} />} />
+              <Img src={room.image} className="together-menu__art" fallback={<FishPair size={22} still />} />
               <span className="together-menu__text">
                 <strong>{room.title}</strong>
                 <span className="muted small">{[room.subtitle, whoText(peopleIn(room, me?.id))].filter(Boolean).join(' · ')}</span>
@@ -219,10 +232,10 @@ export function JoinRoom() {
 
 /** The player's top bar: who's in the room. */
 export function TogetherChip({ together, open, onToggle }: { together: Together; open: boolean; onToggle: () => void }) {
-  const here = together.room?.members.filter((m) => m.here).length ?? 0;
+  const here = together.room ? peopleIn(together.room).length : 0;
   return (
     <button className={`together-chip${open ? ' is-active' : ''}`} onClick={onToggle} aria-expanded={open} aria-label={t('Watch together')}>
-      <Users size={18} />
+      <FishPair size={26} />
       {together.ended ? t('Room ended') : together.room ? (here > 1 ? t('{n} watching', { n: here }) : t('Just you')) : <Spinner size={14} />}
     </button>
   );
@@ -270,15 +283,14 @@ export function TogetherPanel({ together, onLeave, onClose }: { together: Togeth
           <X size={16} />
         </button>
       </div>
-      <p className="muted small">{t('Play, pause and skipping happen for everyone. Anyone on this server can join from Home or with this link.')}</p>
       <CopyLink id={room.id} />
       <ul className="together-panel__members">
-        {room.members.map((m) => (
-          <li key={m.clientId} className={m.here ? '' : 'is-away'}>
+        {everyoneIn(room).map((m) => (
+          <li key={m.userId} className={m.here ? '' : 'is-away'}>
             <Img src={m.avatar} className="together-panel__avatar" fallback={<Initial name={m.name} />} />
             <span>
               {m.name}
-              {m.clientId === together.clientId && <span className="muted"> · {t('you')}</span>}
+              {m.userId === me?.id && <span className="muted"> · {t('you')}</span>}
             </span>
             <span className="spacer" />
             <span className="muted small">{!m.here ? t('Away') : m.waiting ? t('Loading…') : t('Here')}</span>
@@ -308,6 +320,7 @@ export function TogetherPanel({ together, onLeave, onClose }: { together: Togeth
 
 /** Says what others did ("Sam paused"), and who came and went, for a few seconds. */
 export function TogetherNotes({ together }: { together: Together }) {
+  const me = useMe().data;
   const [note, setNote] = useState<string>();
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const lastRev = useRef<number | undefined>(undefined);
@@ -333,7 +346,9 @@ export function TogetherNotes({ together }: { together: Together }) {
     }
     lastRev.current = p.rev;
 
-    const here = new Map(room.members.filter((m) => m.here && m.clientId !== together.clientId).map((m) => [m.clientId, m.name]));
+    // Per person, not per device: someone switching devices (or you on another) isn't news.
+    if (!me) return;
+    const here = new Map(peopleIn(room, me.id).map((m) => [m.userId, m.name]));
     if (lastHere.current) {
       for (const [id, name] of here) if (!lastHere.current.has(id)) say(t('{name} joined', { name }));
       for (const [id, name] of lastHere.current) if (!here.has(id)) say(t('{name} left', { name }));
@@ -342,13 +357,13 @@ export function TogetherNotes({ together }: { together: Together }) {
   }, [room]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (together.ended) say(t("The room has ended. You're watching on your own now."));
+    if (together.ended) say(t('Room ended. Still playing for you.'));
   }, [together.ended]);
 
   if (!note) return null;
   return (
     <div className="together-note" role="status">
-      <Users size={16} /> {note}
+      <FishPair size={22} still /> {note}
     </div>
   );
 }

@@ -100,7 +100,6 @@ export function SubtitlesSheet({ title, onClose, seasonNumber }: { title: TitleD
           <input type="checkbox" checked={hi} onChange={(e) => setHi(e.target.checked)} />
           <span>{t('Hearing-impaired (SDH) subtitles')}</span>
         </label>
-        <p className="muted small">{t('Bazarr searches your subtitle providers; Netfish refreshes the library when they arrive.')}</p>
 
         {(jobs.data?.items.length ?? 0) > 0 && (
           <ul className="jobs">

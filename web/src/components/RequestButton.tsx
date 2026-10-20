@@ -23,7 +23,7 @@ export function RequestButton({ title, className = 'btn btn--accent' }: { title:
         'ok',
         res.status === 'pending'
           ? t('Requested {title}. Waiting for approval.', { title: title.title })
-          : t("Requested {title}. It'll start downloading shortly.", { title: title.title }),
+          : t('Requested {title}.', { title: title.title }),
       );
       refresh(title.mediaType, title.tmdbId);
     },
@@ -58,7 +58,6 @@ export function RequestButton({ title, className = 'btn btn--accent' }: { title:
             </>
           }
         >
-          <p className="muted">{t("Pick the seasons you want. Ones you already have aren't listed.")}</p>
           <div className="season-picks">
             <label className="check">
               <input

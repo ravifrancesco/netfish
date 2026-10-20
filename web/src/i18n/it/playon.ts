@@ -12,8 +12,6 @@ export default {
   'the TV': 'la TV',
   'Connected to {screen}': 'Connesso a {screen}',
   'This device': 'Questo dispositivo',
-  'Play sends films to {screen}; this device is the remote.': 'Riproduci invia i film a {screen}; questo dispositivo fa da telecomando.',
-  'Pick a device, then Play plays there.': 'Scegli un dispositivo: Riproduci farà partire lì.',
   "Couldn't play on {screen} ({reason}). Playing here instead.": 'Impossibile riprodurre su {screen} ({reason}). Riproduco qui.',
   'Sending to {screen}…': 'Invio a {screen}…',
   'Watch here instead': 'Guarda qui',

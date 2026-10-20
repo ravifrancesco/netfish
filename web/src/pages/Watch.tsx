@@ -2,11 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import Hls from 'hls.js';
-import { Cast, Play, Users } from 'lucide-react';
+import { Cast, Play } from 'lucide-react';
 import type { PlaybackSession, ProgressReport, StreamTrack, TogetherCommand } from '@netfish/shared';
 import { api } from '../api';
 import { useToast } from '../components/ui';
-import { SwimmingFish } from '../components/Logo';
+import { FishPair, SwimmingFish } from '../components/Logo';
 import { getPrefs, usePrefs } from '../lib/prefs';
 import { rememberSubtitle } from '../lib/playbackPrefs';
 import { desktop, type CastDevice } from '../lib/desktop';
@@ -866,7 +866,7 @@ function Player() {
                 );
               }}
             >
-              <Users size={24} />
+              <FishPair size={30} still />
             </button>
           )}
           {!roomId && d && (
@@ -930,7 +930,7 @@ function Player() {
     >
       {roomId && !remote && <TogetherNotes together={together} />}
       {roomId && !remote && together.room?.playback.action === 'start' && !playing && !together.ended && (
-        <div className="together-hint">{t("Everyone's player starts together: press play when you're all here.")}</div>
+        <div className="together-hint">{t("Press play when everyone's here.")}</div>
       )}
     </PlayerView>
   );

@@ -119,7 +119,6 @@ export function CastButton() {
               </button>
             );
           })}
-          <p className="play-on__hint muted small">{target ? t('Play sends films to {screen}; this device is the remote.', { screen: target.name }) : t('Pick a device, then Play plays there.')}</p>
         </div>
       )}
     </div>

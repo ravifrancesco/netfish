@@ -45,8 +45,8 @@ function DeleteBig({ item, onDone }: { item: Big; onDone: () => void }) {
         >
           <p className="muted">
             {item.mediaType === 'movie'
-              ? t("The file is deleted from your server. The movie stays in your library as Not on disk, and you can download it again any time.")
-              : t('The episodes are deleted from your server. The show stays in your library, and you can download them again any time.')}
+              ? t("Deletes the file from your server. You can download it again anytime.")
+              : t('Deletes the episodes from your server. You can download them again anytime.')}
           </p>
         </Modal>
       )}
