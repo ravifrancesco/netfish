@@ -2932,6 +2932,29 @@ html.is-tv .switch:focus {
   gap: 10px;
   width: min(380px, calc(100vw - 40px));
 }
+/* TV: the first Back on Netfish's first page only says the next one closes the app. */
+.tv-exit {
+  position: fixed;
+  left: 50%;
+  bottom: 48px;
+  z-index: 200;
+  padding: 14px 22px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow);
+  font-size: 1.05rem;
+  transform: translate(-50%, 12px);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+.tv-exit.is-on {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
 .toast {
   display: flex;
   align-items: flex-start;
@@ -3171,6 +3194,17 @@ html.is-overlay-video body,
 .seek:hover .seek__thumb {
   transform: scale(1);
 }
+/* TV: the timeline chosen with the remote (left/right move along it). */
+html.is-tv .seek:focus {
+  outline: none;
+}
+html.is-tv .seek:focus .seek__track {
+  height: 8px;
+  box-shadow: 0 0 0 3px rgba(54, 226, 198, 0.35);
+}
+html.is-tv .seek:focus .seek__thumb {
+  transform: scale(1.4);
+}
 .seek__tip {
   position: absolute;
   bottom: 26px;
@@ -3180,6 +3214,20 @@ html.is-overlay-video body,
   background: rgba(0, 0, 0, 0.85);
   font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
+}
+/* While scrubbing (or a mouse over the timeline): the frame there, above the time. */
+.seek__tip--frame {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 4px 4px 3px;
+  pointer-events: none;
+}
+.seek__frame {
+  display: block;
+  border-radius: 3px;
+  background-color: #000;
+  background-repeat: no-repeat;
 }
 .player__controls {
   display: flex;
@@ -4036,6 +4084,32 @@ html.is-ios-app {
 }
 .player__top .play-on__menu {
   top: calc(100% + 8px);
+}
+.play-on__section {
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+  padding-top: 12px;
+}
+.play-on__current {
+  cursor: default;
+}
+.play-on__current:hover {
+  background: none;
+}
+.icon-btn.is-on {
+  color: var(--accent);
+}
+/* Casting: what the screen shows instead of the film. */
+.player__casting {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 18px 26px;
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--text);
+  font-size: 1.05rem;
+  text-align: center;
 }
 
 /* The bar at the bottom while a film plays elsewhere from here. */

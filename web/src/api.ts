@@ -1,4 +1,5 @@
 import type {
+  PlaybackPrefs,
   AppConfig,
   Card,
   ChannelAdmin,
@@ -176,6 +177,9 @@ export const api = {
   freshKeep: (key: string) => call<FreshStatus>('/admin/channels/fresh/keep', { body: { key } }),
   freshRemove: (key: string) => call<FreshStatus>('/admin/channels/fresh/remove', { body: { key } }),
 
+  /** Audio and subtitle settings: the person's Jellyfin ones. */
+  playbackPrefs: () => call<PlaybackPrefs>('/me/playback'),
+  setPlaybackPrefs: (patch: Partial<PlaybackPrefs>) => call<PlaybackPrefs>('/me/playback', { method: 'PUT', body: patch }),
   setWatched: (itemId: string, watched: boolean) => call<{ ok: true }>(`/items/${enc(itemId)}/watched`, { body: { watched } }),
   /** From a title's page, by its TMDB id (one Jellyfin has no item for too: deleted from disk). */
   setTitleWatched: (type: MediaType, tmdbId: number, watched: boolean) => call<{ ok: true }>(`/title/${type}/${tmdbId}/watched`, { body: { watched } }),

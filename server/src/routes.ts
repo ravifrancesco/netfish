@@ -4,6 +4,7 @@ import type {
   AppConfig,
   CreateRequest,
   GrabRequest,
+  PlaybackPrefs,
   LoginRequest,
   MediaType,
   PlaybackRequest,
@@ -57,6 +58,7 @@ import { channelAdmin, channelsEnabled, keyOfItem, listChannels, resetChannels, 
 import { freshRequested, freshStatus, keepFresh, noteChosen, removeFresh, runFresh } from './services/fresh';
 import { catalog } from './services/catalog';
 import { cleanupSuggestions, keepForGood } from './services/cleanup';
+import { playbackPrefs, setPlaybackPrefs } from './services/playbackPrefs';
 import { cancelRequest, deleteFromDisk, downloadAgain, removedTitles, stopDownload, storage } from './services/manage';
 import { createRequest, listRequests, myRequestKeys } from './services/requests';
 import { scrobble, setScrobble, startImport, startLink, traktStatus, unlink } from './services/trakt';
@@ -208,6 +210,9 @@ export async function apiRoutes(app: FastifyInstance) {
     api.addHook('preHandler', requireUser);
 
     api.get('/auth/me', async (req) => publicUser(userOf(req)));
+    // Audio and subtitle settings: the person's Jellyfin ones.
+    api.get('/me/playback', async (req) => playbackPrefs(userOf(req)));
+    api.put<{ Body: Partial<PlaybackPrefs> }>('/me/playback', async (req) => setPlaybackPrefs(userOf(req), req.body ?? {}));
     // This person's PIN on this device, and whether the device asks who's watching.
     api.put<{ Body: { pin?: string | null; ask?: boolean } }>('/profiles/me', async (req) => {
       const device = deviceOf(req);
@@ -328,9 +333,9 @@ export async function apiRoutes(app: FastifyInstance) {
       return downloadAgain(userOf(req), mediaType, tmdbId, seasonsOf(req.body));
     });
     api.get<{ Querystring: { type?: string; sort?: string } }>('/library/removed', async (req) => ({
-      items: await removedTitles(req.query.type === 'tv' ? 'tv' : 'movie', clean(req.query.sort, 20) || 'added'),
+      items: await removedTitles(userOf(req), req.query.type === 'tv' ? 'tv' : 'movie', clean(req.query.sort, 20) || 'added'),
     }));
-    api.get('/admin/storage', { preHandler: requireAdmin }, async () => storage());
+    api.get('/admin/storage', { preHandler: requireAdmin }, async (req) => storage(userOf(req)));
     api.get('/admin/cleanup', { preHandler: requireAdmin }, async (req) => ({ items: await cleanupSuggestions(userOf(req)) }));
     api.post<{ Body: { key?: string } }>('/admin/cleanup/keep', { preHandler: requireAdmin }, async (req) => {
       const key = clean(req.body?.key, 40);

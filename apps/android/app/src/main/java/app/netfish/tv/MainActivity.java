@@ -65,6 +65,8 @@ public class MainActivity extends Activity {
     private VideoEngine video;
     private OfflineStore offline;
     private Updater updater;
+    private CastEngine cast;
+    private boolean castReady;
     private SharedPreferences prefs;
     private boolean tv;
     private volatile String currentUrl = "";
@@ -106,6 +108,10 @@ public class MainActivity extends Activity {
             offline.setListener(list -> web.evaluateJavascript("window.__netfishOfflineChanged&&window.__netfishOfflineChanged(" + list + ")", null));
         }
         updater = new Updater(this, tv, event -> web.evaluateJavascript("window.__netfishUpdate&&window.__netfishUpdate(" + event + ")", null));
+        // Chromecast (phones and tablets with Google Play services).
+        cast = new CastEngine(this, state -> runOnUiThread(() ->
+                web.evaluateJavascript("window.__netfishCast&&window.__netfishCast(" + state + ")", null)));
+        castReady = !tv && cast.start();
 
         WebSettings settings = web.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -365,6 +371,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         video.release();
+        cast.release();
         web.destroy();
         super.onDestroy();
     }
@@ -452,6 +459,39 @@ public class MainActivity extends Activity {
         public void notify(String notice) {
             if (!fromServer() || tv) return;
             runOnUiThread(() -> showNotice(notice));
+        }
+
+        // ---------- Chromecast (the page draws the devices and the controls) ----------
+
+        @JavascriptInterface
+        public boolean castAvailable() {
+            return castReady && fromServer();
+        }
+
+        /** Look for Chromecasts while the player is open (on), not otherwise (off). */
+        @JavascriptInterface
+        public void castWatch(boolean on) {
+            if (castReady && fromServer()) cast.watch(on);
+        }
+
+        @JavascriptInterface
+        public void castConnect(String id) {
+            if (castReady && fromServer()) cast.connect(id);
+        }
+
+        @JavascriptInterface
+        public void castDisconnect() {
+            if (castReady && fromServer()) cast.disconnect();
+        }
+
+        @JavascriptInterface
+        public void castLoad(String request) {
+            if (castReady && fromServer()) cast.load(request);
+        }
+
+        @JavascriptInterface
+        public void castCommand(String name, String value) {
+            if (castReady && fromServer()) cast.command(name, value);
         }
 
         /** firetv (TVs: remote control, no downloads) or android (phones and tablets). */

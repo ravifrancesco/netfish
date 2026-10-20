@@ -765,6 +765,8 @@ export interface PlaybackRequest {
   maxBitrate?: number;
   /** Set false to force a remux/transcode (e.g. to switch audio track). */
   allowDirectPlay?: boolean;
+  /** For a Chromecast: the session comes with a castToken for its links. */
+  cast?: boolean;
 }
 
 export interface PlaybackSession {
@@ -780,7 +782,42 @@ export interface PlaybackSession {
   subtitleTracks: StreamTrack[];
   audioStreamIndex?: number;
   subtitleStreamIndex?: number;
+  /**
+   * subtitleStreamIndex is Jellyfin's choice for this person (their subtitle settings, and what it
+   * remembers per show): follow it, -1 (none) included.
+   */
+  subtitleChosen?: boolean;
+  /** Pictures to show while scrubbing (Jellyfin's trickplay), when Jellyfin has made them. */
+  trickplay?: Trickplay;
+  /** Asked for a Chromecast: add it to this session's links as nfcast=… (it can't sign in). */
+  castToken?: string;
   transcodeReasons: string[];
+}
+
+/**
+ * A title's scrubbing previews: pictures each holding `columns`×`rows` frames of `width`×`height`,
+ * one frame every `interval` seconds; `url` with {index} for the picture's number.
+ */
+export interface Trickplay {
+  url: string;
+  width: number;
+  height: number;
+  columns: number;
+  rows: number;
+  count: number;
+  interval: number;
+}
+
+/** Jellyfin's subtitle modes: as the file says, always, only forced ones, never, or when the audio isn't your language. */
+export type SubtitleMode = 'Default' | 'Always' | 'OnlyForced' | 'None' | 'Smart';
+
+/** A person's audio and subtitle settings: Jellyfin's own (the same on every device, and in Jellyfin's apps). */
+export interface PlaybackPrefs {
+  /** ISO 639-1; empty: the file's own. */
+  audioLanguage: string;
+  subtitleMode: SubtitleMode;
+  /** ISO 639-1; empty: any. */
+  subtitleLanguage: string;
 }
 
 /**

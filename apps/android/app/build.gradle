@@ -3,7 +3,7 @@ plugins {
 }
 
 // Version shown in Settings; keep in step with the root package.json.
-def netfishVersion = '0.7.12'
+def netfishVersion = '0.7.13'
 
 android {
     namespace 'app.netfish.tv'
@@ -65,5 +65,9 @@ dependencies {
     implementation "androidx.media3:media3-exoplayer-hls:$media3"
     implementation "androidx.media3:media3-ui:$media3"
     implementation "org.jellyfin.media3:media3-ffmpeg-decoder:$media3+1"
+    // Chromecast (phones and tablets with Google Play services): Google's Cast library, and
+    // MediaRouter to find the devices.
+    implementation 'com.google.android.gms:play-services-cast-framework:21.5.0'
+    implementation 'androidx.mediarouter:mediarouter:1.7.0'
     compileOnly 'androidx.annotation:annotation:1.6.0'
 }

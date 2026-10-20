@@ -2,13 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import Hls from 'hls.js';
-import { Play, Users } from 'lucide-react';
+import { Cast, Play, Users } from 'lucide-react';
 import type { PlaybackSession, ProgressReport, StreamTrack, TogetherCommand } from '@netfish/shared';
 import { api } from '../api';
 import { useToast } from '../components/ui';
 import { SwimmingFish } from '../components/Logo';
-import { getPrefs, rememberSubtitle, usePrefs } from '../lib/prefs';
-import { desktop } from '../lib/desktop';
+import { getPrefs, usePrefs } from '../lib/prefs';
+import { rememberSubtitle } from '../lib/playbackPrefs';
+import { desktop, type CastDevice } from '../lib/desktop';
+import { CastVideo, CHROMECAST_PROFILE } from '../player/cast';
 import { startVolume } from '../lib/systemVolume';
 import { buildDeviceProfile } from '../player/profile';
 import { OverlayVideo, trackPositions } from '../player/overlay';
@@ -127,6 +129,17 @@ function Player() {
   const fallbackAt = useRef<number | undefined>(undefined);
   const [pictureShown, setPictureShown] = useState(false);
 
+  // Chromecast (the Android app on a phone or tablet): while casting, the film plays there, and
+  // these controls drive it (through CastVideo, as they drive mpv or ExoPlayer).
+  const cast = useMemo(() => desktop()?.cast, []);
+  const [castDevices, setCastDevices] = useState<CastDevice[]>([]);
+  /** The Chromecast in use (its name), while casting. */
+  const [castingTo, setCastingTo] = useState<string>();
+  const castingRef = useRef(false);
+  const castVideo = useRef<CastVideo | null>(null);
+  /** The page's own <video>, kept while the cast one stands in for it. */
+  const pageVideo = useRef<HTMLVideoElement | null>(null);
+
   const info = useQuery({ queryKey: ['play', itemId], queryFn: () => api.playInfo(itemId), gcTime: 0, staleTime: 0 });
   const infoRef = useRef(info.data);
   infoRef.current = info.data;
@@ -190,7 +203,8 @@ function Player() {
           isPaused: v?.paused ?? true,
           method: s.method,
           audioStreamIndex: s.audioStreamIndex,
-          subtitleStreamIndex: s.subtitleStreamIndex,
+          // What's showing now (Jellyfin remembers it per show, when the person has it do so).
+          subtitleStreamIndex: subtitleRef.current?.index ?? -1,
         },
         keepalive,
       )
@@ -201,7 +215,7 @@ function Player() {
 
   // mpv's events reach the same handlers <video>'s do (they change every render, so look them up late).
   const handlers = useRef<Record<string, () => void>>({});
-  const wireEvents = (ov: OverlayVideo) => {
+  const wireEvents = (ov: EventTarget) => {
     const map: Record<string, string> = {
       playing: 'onPlaying', pause: 'onPause', waiting: 'onWaiting', canplay: 'onCanPlay', timeupdate: 'onTimeUpdate',
       durationchange: 'onDurationChange', ended: 'onEnded', error: 'onVideoError', volumechange: 'onVolumeChange', loadedmetadata: 'onLoaded',
@@ -209,7 +223,44 @@ function Player() {
     for (const [event, key] of Object.entries(map)) ov.addEventListener(event, () => handlers.current[key]?.());
   };
 
+  /** Sends the film to the Chromecast, with links it can open by itself (they carry a token for this film). */
+  const attachCast = (s: PlaybackSession, start: number) => {
+    let cv = castVideo.current;
+    if (!cv) {
+      cv = new CastVideo(cast!);
+      castVideo.current = cv;
+      wireEvents(cv);
+    }
+    if (video.current instanceof HTMLVideoElement) pageVideo.current = video.current;
+    video.current = cv as unknown as HTMLVideoElement;
+    setPictureShown(false);
+    const linked = (url: string) => {
+      const link = new URL(url, location.origin);
+      if (s.castToken) link.searchParams.set('nfcast', s.castToken);
+      return link.toString();
+    };
+    const url = linked(s.url);
+    cv.loadingNext(url);
+    const d = infoRef.current;
+    const episode = d?.type === 'Episode';
+    const sub = pickSubtitle(s, subtitleRef.current, false);
+    cast!.load({
+      url,
+      contentType: s.isHls ? 'application/x-mpegURL' : 'video/mp4',
+      startSeconds: start,
+      durationSeconds: s.durationSeconds,
+      title: (episode ? d?.seriesTitle : d?.title) ?? '',
+      subtitle: episode ? `S${d?.seasonNumber}:E${d?.episodeNumber} · ${d?.title}` : undefined,
+      image: d?.backdrop ? absolute(d.backdrop) : undefined,
+      episode,
+      subtitles: s.subtitleTracks.filter((tr) => tr.vttUrl).map((tr) => ({ id: tr.index, url: linked(tr.vttUrl!), label: tr.label, language: tr.code })),
+      subtitleId: sub?.vttUrl ? sub.index : null,
+    });
+  };
+
   const attach = useCallback((s: PlaybackSession, start: number) => {
+    // Casting: a stream asked for before it connected has no links the Chromecast can open.
+    if (castingRef.current && cast) return s.castToken ? attachCast(s, start) : void latestLoad.current?.({ start, audio: s.audioStreamIndex });
     if (overlayActive.current && overlay) {
       let ov = overlayVideo.current;
       if (!ov) {
@@ -280,9 +331,11 @@ function Player() {
       togetherRef.current.setWaiting(true);
       if (sessionRef.current) report('stop');
       try {
-        if (overlayActive.current && overlay) overlayProfile.current ??= await overlay.profile();
+        const casting = castingRef.current;
+        if (!casting && overlayActive.current && overlay) overlayProfile.current ??= await overlay.profile();
         const s = await api.playSession(itemId, {
-          deviceProfile: overlayActive.current ? overlayProfile.current : buildDeviceProfile(getPrefs().maxBitrate),
+          cast: casting || undefined,
+          deviceProfile: casting ? CHROMECAST_PROFILE : overlayActive.current ? overlayProfile.current : buildDeviceProfile(getPrefs().maxBitrate),
           maxBitrate: getPrefs().maxBitrate || undefined,
           startSeconds: opts.start,
           audioStreamIndex: opts.audio,
@@ -300,6 +353,72 @@ function Player() {
     },
     [itemId, attach, report],
   );
+  const latestLoad = useRef(load);
+  latestLoad.current = load;
+
+  // ---------- Chromecast ----------
+
+  /** Connected to a Chromecast: the film carries on there, from here. */
+  const startCasting = (device?: string) => {
+    setCastingTo(device ?? '');
+    if (castingRef.current) return;
+    const at = video.current?.currentTime ?? 0;
+    if (overlayVideo.current) {
+      // Stops the app's player.
+      overlayVideo.current.destroy();
+      overlayVideo.current = null;
+    } else if (video.current) {
+      pageVideo.current = video.current;
+      hls.current?.destroy();
+      hls.current = null;
+      video.current.pause();
+      video.current.removeAttribute('src');
+      video.current.load();
+    }
+    video.current = null;
+    castingRef.current = true;
+    if (sessionRef.current) void load({ start: at, audio: audioIndex });
+  };
+  /** Not casting any more: back on this device, from where the Chromecast got to. */
+  const stopCasting = () => {
+    setCastingTo(undefined);
+    if (!castingRef.current) return;
+    const at = castVideo.current?.currentTime ?? 0;
+    castVideo.current?.destroy();
+    castVideo.current = null;
+    castingRef.current = false;
+    video.current = overlayActive.current ? null : pageVideo.current;
+    if (sessionRef.current) void load({ start: at, audio: audioIndex });
+  };
+  const casting = useRef({ startCasting, stopCasting });
+  casting.current = { startCasting, stopCasting };
+  useEffect(() => {
+    if (!cast) return;
+    cast.watch(true);
+    let first = true;
+    const stop = cast.onState((state) => {
+      const already = first;
+      first = false;
+      if (state.devices) setCastDevices(state.devices);
+      // Watch together and Play on TV: the room runs this player, not a Chromecast.
+      if (roomIdRef.current) return;
+      if (state.connected === true) {
+        if (already) {
+          // Already connected when the player opened: the film starts there.
+          castingRef.current = true;
+          setCastingTo(state.device ?? '');
+        } else casting.current.startCasting(state.device);
+      } else if (state.connected === false && castingRef.current) {
+        casting.current.stopCasting();
+      }
+      // Not about a film (connecting, a device gone): said once.
+      if (state.error && state.time === undefined && !already) toast('error', t(state.error));
+    });
+    return () => {
+      stop();
+      cast.watch(false);
+    };
+  }, [cast]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // First load (and whenever the item changes, e.g. next episode). In a room, from where the room is.
   const roomKnown = !roomId || Boolean(together.room) || together.ended;
@@ -322,11 +441,16 @@ function Player() {
   // Pick an initial subtitle once tracks are known.
   useEffect(() => {
     if (!session) return;
-    setSubtitle((current) => pickSubtitle(session, current, overlayActive.current && appDrawsSubtitles));
+    setSubtitle((current) => pickSubtitle(session, current, !castingRef.current && overlayActive.current && appDrawsSubtitles));
   }, [session]);
 
   // Make the chosen text track visible (mpv: switch to it; it draws every kind, pictures too).
   useEffect(() => {
+    if (castingRef.current) {
+      // On the Chromecast: its WebVTT tracks, by Jellyfin's numbers.
+      if (session) cast?.command('subtitle', subtitle?.vttUrl ? subtitle.index : null);
+      return;
+    }
     if (overlayActive.current) {
       // The app's player draws them (mpv, ExoPlayer), or the page does (PageSubtitles below).
       if (appDrawsSubtitles && session && overlayLoaded.current) overlay?.command('subtitle', trackPositions(session).subtitle(subtitle) ?? null);
@@ -351,12 +475,19 @@ function Player() {
         overlayVideo.current = null;
         video.current = null;
       }
+      // Casting: the film carries on on the Chromecast (Jellyfin has been told where it got to).
+      castVideo.current?.destroy();
+      castVideo.current = null;
     };
   }, [itemId, report]);
 
   // ---------- video events ----------
 
   const onVideoError = () => {
+    if (castingRef.current) {
+      setError(video.current?.error?.message ?? t("The Chromecast couldn't play this"));
+      return;
+    }
     if (overlayActive.current) {
       // mpv couldn't play it: fall back to the page's own player (the server converts what it must).
       fallbackAt.current = video.current?.currentTime ?? 0;
@@ -408,7 +539,8 @@ function Player() {
   const onVolumeChange = volume.onVolumeChange;
   const onLoaded = () => {
     overlayLoaded.current = true;
-    setPictureShown(true);
+    // On a Chromecast the picture is there, not here: the artwork stays.
+    if (!castingRef.current) setPictureShown(true);
   };
 
   const onPlaying = () => {
@@ -566,17 +698,18 @@ function Player() {
 
   // TV app: no screensaver in the middle of a film.
   useEffect(() => {
-    desktop()?.keepAwake?.(playing);
+    // Casting, the phone can sleep.
+    desktop()?.keepAwake?.(playing && castingTo === undefined);
     return () => desktop()?.keepAwake?.(false);
-  }, [playing]);
+  }, [playing, castingTo]);
 
   // The app's player keeps its subtitles above the controls while they show (like the web player does).
-  const onControls = useCallback((showing: boolean) => useOverlay && overlay?.command('controls', showing), [useOverlay, overlay]);
+  const onControls = useCallback((showing: boolean) => useOverlay && !castingRef.current && overlay?.command('controls', showing), [useOverlay, overlay]);
 
   const chooseAudio = (track: StreamTrack) => {
     if (track.index === audioIndex) return;
     const s = sessionRef.current;
-    if (overlayActive.current && appSwitchesTracks && s) {
+    if (!castingRef.current && overlayActive.current && appSwitchesTracks && s) {
       // mpv/ExoPlayer switch tracks inside the file instantly: no new stream needed.
       const position = trackPositions(s).audio(track.index);
       if (position) overlay?.command('audio', position);
@@ -591,7 +724,7 @@ function Player() {
     const wasBurned = subtitle?.burnIn;
     setSubtitle(track);
     rememberSubtitle(track);
-    if (overlayActive.current && appDrawsSubtitles) return; // the app's player draws every kind itself
+    if (!castingRef.current && overlayActive.current && appDrawsSubtitles) return; // the app's player draws every kind itself
     if (track?.burnIn || wasBurned) {
       void load({ start: video.current?.currentTime ?? 0, audio: audioIndex, subtitle: track?.burnIn ? track.index : undefined, allowDirectPlay: !track?.burnIn });
     }
@@ -623,6 +756,11 @@ function Player() {
       .catch(() => {});
   }, [remote, roomId, session, joined, audioIndex, subtitle]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // While casting, the page's own <video> (stopped) has nothing to say.
+  const fromPage = (handler: () => void) => () => {
+    if (!castingRef.current) handler();
+  };
+
   const d = info.data;
   const heading = d?.type === 'Episode' ? d.seriesTitle : d?.title;
   const subheading = d?.type === 'Episode' ? `S${d.seasonNumber}:E${d.episodeNumber} · ${d.title}` : undefined;
@@ -633,16 +771,16 @@ function Player() {
       overlay={useOverlay}
       videoProps={{
         // In a paused room nothing starts it, so it's ready as soon as it knows the film.
-        onLoadedMetadata: () => startPaused.current && (setWaiting(false), readyToSync()),
-        onPlaying,
-        onPause,
-        onWaiting,
-        onCanPlay,
-        onTimeUpdate,
-        onDurationChange,
-        onEnded,
-        onError: onVideoError,
-        onVolumeChange,
+        onLoadedMetadata: fromPage(() => startPaused.current && (setWaiting(false), readyToSync())),
+        onPlaying: fromPage(onPlaying),
+        onPause: fromPage(onPause),
+        onWaiting: fromPage(onWaiting),
+        onCanPlay: fromPage(onCanPlay),
+        onTimeUpdate: fromPage(onTimeUpdate),
+        onDurationChange: fromPage(onDurationChange),
+        onEnded: fromPage(onEnded),
+        onError: fromPage(onVideoError),
+        onVolumeChange: fromPage(onVolumeChange),
         // TV browsers (Samsung's, LG's) don't draw a video's subtitle tracks: the page does (below).
         children: subtitle?.vttUrl && !browserTV() && <track key={subtitle.vttUrl} kind="subtitles" src={subtitle.vttUrl} srcLang={subtitle.code} label={subtitle.label} default />,
       }}
@@ -656,6 +794,7 @@ function Player() {
       time={time}
       duration={duration}
       buffered={buffered}
+      trickplay={session?.trickplay}
       toggle={toggle}
       seekTo={seekTo}
       volume={volume}
@@ -666,7 +805,12 @@ function Player() {
           : undefined
       }
       center={
-        needsTap && !error ? (
+        castingTo !== undefined && !error ? (
+          <div className="player__casting">
+            <Cast size={40} />
+            <span>{castingTo ? t('Playing on {device}', { device: castingTo }) : t('Playing on the Chromecast')}</span>
+          </div>
+        ) : needsTap && !error ? (
           <button className="btn btn--primary btn--lg" onClick={() => (setNeedsTap(false), follow(true))}>
             <Play size={22} fill="currentColor" /> {t('Join in')}
           </button>
@@ -700,11 +844,11 @@ function Player() {
           </Link>
         )
       }
-      pageSubtitles={(useOverlay && !appDrawsSubtitles) || browserTV() ? subtitle?.vttUrl : undefined}
+      pageSubtitles={castingTo === undefined && ((useOverlay && !appDrawsSubtitles) || browserTV()) ? subtitle?.vttUrl : undefined}
       onControls={onControls}
       actions={
         <>
-          {!roomId && d && (
+          {!roomId && d && castingTo === undefined && (
             // Watch together, from here: this film becomes a room, from where it is now.
             <button
               className="icon-btn icon-btn--lg"
@@ -734,6 +878,7 @@ function Player() {
               onSent={() => video.current?.pause()}
               className="icon-btn icon-btn--lg"
               iconOnly
+              chromecast={cast && { devices: castDevices, casting: castingTo, connect: cast.connect, disconnect: cast.disconnect }}
             />
           )}
           {roomId && !remote && (

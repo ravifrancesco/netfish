@@ -3,6 +3,7 @@
  * remote's arrow keys move focus to the nearest thing in that direction,
  * Select presses it, and Back closes whatever is open, then goes back a page.
  */
+import { t } from '../i18n';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea, [tabindex]:not([tabindex="-1"])';
 const OVERLAYS = '.modal, .trailer, .menu, .player__menu';
@@ -62,7 +63,10 @@ function onRemoteKey(e: KeyboardEvent) {
   if (name === 'Back') {
     e.preventDefault();
     e.stopImmediatePropagation();
-    if (!back()) history.back();
+    if (back()) return;
+    // Netfish's first page: going back closes the app, so the first press only says so.
+    if (((history.state as { idx?: number } | null)?.idx ?? 0) === 0 && !confirmedExit()) return;
+    history.back();
     return;
   }
   // Media keys: hand them on under their standard names, which the player understands.
@@ -70,6 +74,24 @@ function onRemoteKey(e: KeyboardEvent) {
   e.preventDefault();
   e.stopImmediatePropagation();
   document.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true }));
+}
+
+/** "Press Back again to close Netfish", for a moment; true when that's the second press. */
+let exitArmedUntil = 0;
+function confirmedExit(): boolean {
+  if (Date.now() < exitArmedUntil) return true;
+  exitArmedUntil = Date.now() + 3000;
+  let note = document.querySelector<HTMLElement>('.tv-exit');
+  if (!note) {
+    note = document.createElement('div');
+    note.className = 'tv-exit';
+    note.setAttribute('role', 'status');
+    document.body.append(note);
+  }
+  note.textContent = t('Press Back again to close Netfish');
+  note.classList.add('is-on');
+  window.setTimeout(() => note!.classList.remove('is-on'), 3000);
+  return false;
 }
 
 function visible(el: HTMLElement) {
@@ -170,6 +192,8 @@ function onKey(e: KeyboardEvent) {
   const player = document.querySelector('.player');
   if (player && !(player.classList.contains('show-ui') && active && player.contains(active) && active.matches(FOCUSABLE))) return;
 
+  // A slider (the player's timeline): left/right move along it.
+  if ((dir === 'left' || dir === 'right') && active?.getAttribute('role') === 'slider') return;
   // Text fields: left/right move the cursor until it reaches the edge.
   if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) {
     const atStart = active.selectionStart === 0 && active.selectionEnd === 0;
@@ -188,7 +212,8 @@ function onKey(e: KeyboardEvent) {
  * something). False: the app should go back a page, or leave on the home screen.
  */
 function back(): boolean {
-  if (document.querySelector(OVERLAYS)) {
+  // Only what's open: some menus stay in the page, hidden, while closed (a title's "⋯").
+  if ([...document.querySelectorAll<HTMLElement>(OVERLAYS)].some(visible)) {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     return true;
   }

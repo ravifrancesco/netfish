@@ -27,4 +27,11 @@ export default {
   "This device's name": 'Nome di questo dispositivo',
   'Shown when you or someone at home picks where to play something, like "Living room TV".':
     'Compare quando tu o qualcuno in casa sceglie dove guardare qualcosa, ad esempio "TV del soggiorno".',
+  // Chromecast (the Android app)
+  'Playing on {device}': 'In riproduzione su {device}',
+  'Playing on the Chromecast': 'In riproduzione sul Chromecast',
+  'Stop casting': 'Interrompi la trasmissione',
+  "The Chromecast couldn't play this": 'Il Chromecast non è riuscito a riprodurlo',
+  "Couldn't connect to the Chromecast": 'Impossibile connettersi al Chromecast',
+  "That device isn't there any more": 'Quel dispositivo non è più disponibile',
 } as Record<string, string>;

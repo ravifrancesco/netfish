@@ -9,7 +9,8 @@ import { t } from '../lib/i18n';
 import { jfToCard, seerrCards, type ProgressMap } from './cards';
 import { catalog } from './catalog';
 import { allDownloads, progressByTitle } from './downloads';
-import { hiddenIds, libraryIndex, type LibraryIndex } from './library';
+import { hiddenIds, type LibraryIndex } from './library';
+import { playableIndex } from './manage';
 
 /**
  * Directors, actors and writers: a person's films and shows, and finding them
@@ -107,7 +108,7 @@ async function jellyfinSections(user: SessionUser, personId: string, index: Libr
 export async function personDetail(user: SessionUser, id: string): Promise<PersonDetail> {
   if (id.startsWith('jf-')) {
     const personId = id.slice(3);
-    const [person, index] = await Promise.all([jellyfin.item(user.token, user.id, personId), libraryIndex(user)]);
+    const [person, index] = await Promise.all([jellyfin.item(user.token, user.id, personId), playableIndex(user)]);
     if (person.Type !== 'Person') throw new HttpError(404, t("Couldn't find that person"));
     return {
       id,
@@ -123,7 +124,7 @@ export async function personDetail(user: SessionUser, id: string): Promise<Perso
   const [person, credits, index, downloads] = await Promise.all([
     catalog.person(tmdbId),
     catalog.personCredits(tmdbId),
-    libraryIndex(user),
+    playableIndex(user),
     settle(allDownloads(), []),
   ]);
   return {

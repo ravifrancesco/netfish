@@ -5,6 +5,7 @@ import type { FastifyInstance } from 'fastify';
 import { tokenFrom } from '../auth';
 import { authHeader } from '../clients/jellyfin';
 import { config } from '../config';
+import { castAuth } from '../services/cast';
 import { cachedImage } from './imageCache';
 import { JF_PREFIX } from './images';
 import { t } from './i18n';
@@ -20,7 +21,22 @@ import { t } from './i18n';
 const PASS_REQUEST = ['range', 'if-range', 'if-none-match', 'if-modified-since', 'accept', 'user-agent'];
 const HOP_BY_HOP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'upgrade', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'set-cookie']);
 
+const CAST_HEADERS = {
+  'access-control-allow-origin': '*',
+  'access-control-expose-headers': 'content-length, content-range, accept-ranges, content-type',
+};
+
 export function registerJellyfinProxy(app: FastifyInstance) {
+  // A Chromecast's player asks first before fetching across origins (with a Range, say).
+  app.route({
+    method: 'OPTIONS',
+    url: `${JF_PREFIX}/*`,
+    handler: async (_req, reply) =>
+      reply
+        .code(204)
+        .headers({ ...CAST_HEADERS, 'access-control-allow-methods': 'GET, HEAD', 'access-control-allow-headers': 'range, content-type', 'access-control-max-age': '600' })
+        .send(),
+  });
   app.route({
     method: ['GET', 'HEAD'],
     url: `${JF_PREFIX}/*`,
@@ -47,8 +63,13 @@ export function registerJellyfinProxy(app: FastifyInstance) {
         const value = req.headers[name];
         if (typeof value === 'string') headers[name] = value;
       }
-      const token = tokenFrom(req);
+      // A Chromecast's link: its token stands for the person, for that title (and its player
+      // fetches across origins, so it's told it may).
+      const castToken = new URL(rest, 'http://x').searchParams.get('nfcast') ?? undefined;
+      const forCast = castAuth(castToken, rest.split('?')[0]);
+      const token = forCast ?? tokenFrom(req);
       if (token) headers.authorization = authHeader(token);
+      if (forCast) for (const [name, value] of Object.entries(CAST_HEADERS)) reply.header(name, value);
 
       return new Promise<void>((resolve) => {
         // Answered once Jellyfin's reply is on its way: a later error belongs to that stream (Fastify
@@ -63,7 +84,10 @@ export function registerJellyfinProxy(app: FastifyInstance) {
           reply.send(res);
           resolve();
         });
-        upstream.setTimeout(30_000, () => upstream.destroy(new Error('timed out')));
+        // Subtitles inside the file: the first time, Jellyfin pulls them out with ffmpeg, which on a
+        // Pi can take minutes for a big file (then it keeps them). Waiting that out, not the usual
+        // half minute (giving up made Jellyfin stop too, so they never came).
+        upstream.setTimeout(/\/Subtitles\//i.test(rest) ? 5 * 60_000 : 30_000, () => upstream.destroy(new Error('timed out')));
         upstream.on('error', (err) => {
           // Nobody to tell when the viewer has already gone (seeked, closed the player).
           if (!answered && !reply.sent && !reply.raw.destroyed) {

@@ -14,7 +14,7 @@ import { HttpError } from '../lib/upstream';
 import { forgetRadarrMovie, forgetSonarrSeries, radarrMovie, sonarrSeries } from './arrLookup';
 import { catalog } from './catalog';
 import { allDownloads, forgetDownloads } from './downloads';
-import { findInLibrary, invalidateLibrary, libraryIndex } from './library';
+import { findInLibrary, hiddenIds, invalidateLibrary, libraryIndex, showHasEpisodes, type LibraryIndex } from './library';
 import { noteWatchedBeforeDelete } from './watched';
 import { grabbedKeys, seriesFor } from './releases';
 import { myRequestKeys } from './requests';
@@ -76,6 +76,7 @@ function forget(mediaType: MediaType, tmdbId: number, tvdbId?: number) {
   forgetDownloads();
   storageCache.clear();
   goneCache.clear();
+  empties.clear();
   forgetCleanup();
 }
 
@@ -295,6 +296,7 @@ export async function downloadAgain(user: SessionUser, mediaType: MediaType, tmd
 interface Gone {
   mediaType: MediaType;
   tmdbId: number;
+  tvdbId?: number;
   title: string;
   year?: number;
   /** When its last file was deleted. */
@@ -329,7 +331,7 @@ function arrGone(mediaType: MediaType): Promise<Map<string, Gone>> {
       const at = latest(deletions, (h) => h.seriesId);
       for (const x of series) {
         const when = at.get(x.id);
-        if (when && !x.monitored && !(x.statistics?.episodeFileCount ?? 0) && x.tmdbId) out.set(keyOf('tv', x.tmdbId), { mediaType, tmdbId: x.tmdbId, title: x.title, year: x.year, at: when });
+        if (when && !x.monitored && !(x.statistics?.episodeFileCount ?? 0) && x.tmdbId) out.set(keyOf('tv', x.tmdbId), { mediaType, tmdbId: x.tmdbId, tvdbId: x.tvdbId, title: x.title, year: x.year, at: when });
       }
     }
     return out;
@@ -374,12 +376,8 @@ export async function removedInfo(mediaType: MediaType, tmdbId?: number): Promis
   return deletion && { at: deletion.date };
 }
 
-/**
- * "Not on disk": titles deleted to save space (the whole of them: a show with a season or two
- * left is still in the library), shown after the library in the same order it's sorted by
- * ("Recently added": the most recently deleted first).
- */
-export async function removedTitles(mediaType: MediaType, sort = 'added'): Promise<Card[]> {
+/** Off the disk as a whole: what Netfish deleted (and still is), then what Radarr/Sonarr say was. */
+async function goneTitles(mediaType: MediaType): Promise<Gone[]> {
   const entries = Object.entries(removed).filter(([, e]) => e.mediaType === mediaType);
   const [checked, fromArr] = await Promise.all([
     Promise.all(entries.map(async ([key, e]) => ((await stillGone(e)) ? e : key))),
@@ -393,7 +391,65 @@ export async function removedTitles(mediaType: MediaType, sort = 'added'): Promi
   }
   const ours = checked.filter((x): x is Removed => typeof x !== 'string' && !x.seasons?.length);
   const known = new Set(ours.map((e) => keyOf(e.mediaType, e.tmdbId)));
-  const list: Gone[] = [...ours, ...[...fromArr.values()].filter((g) => !known.has(keyOf(g.mediaType, g.tmdbId)))].sort((a, b) => b.at.localeCompare(a.at));
+  return [...ours, ...[...fromArr.values()].filter((g) => !known.has(keyOf(g.mediaType, g.tmdbId)))].sort((a, b) => b.at.localeCompare(a.at));
+}
+
+/**
+ * Gone as Jellyfin sees it too. What it has on disk isn't (Netfish's or Sonarr's word for it is
+ * old news), except a show it lists with nothing in it: its files deleted, its folder left
+ * behind. That one is gone, and `empty` is Jellyfin's id for it, to leave it out of the library.
+ */
+async function goneFor(user: SessionUser, mediaType: MediaType): Promise<Array<Gone & { empty?: string }>> {
+  const [list, index] = await Promise.all([goneTitles(mediaType), libraryIndex(user)]);
+  const checked = await Promise.all(
+    list.map(async (g) => {
+      const entry = findInLibrary(index, g.mediaType, g.tmdbId, g.tvdbId);
+      if (!entry) return g;
+      if (g.mediaType === 'tv' && !(await showHasEpisodes(user, entry.id))) return { ...g, empty: entry.id };
+      return undefined;
+    }),
+  );
+  return checked.filter((g) => g !== undefined);
+}
+
+/**
+ * Jellyfin's ids for the shows it lists with nothing in them (deleted, their folders left):
+ * they're under "Not on disk", not in Shows. Quickly or not at all (Sonarr may be slow).
+ */
+const empties = new TTLCache<string[]>(200);
+export function emptyShows(user: SessionUser): Promise<string[]> {
+  if (!has.sonarr() && !Object.values(removed).some((e) => e.mediaType === 'tv')) return Promise.resolve([]);
+  return empties.wrap(user.id, MINUTE, async () => {
+    const list = await Promise.race([settle(goneFor(user, 'tv'), []), new Promise<[]>((resolve) => setTimeout(() => resolve([]), 4000))]);
+    return list.flatMap((g) => (g.empty ? [g.empty] : []));
+  });
+}
+
+/** The library as people can play it: without the shows Jellyfin lists with nothing in them. */
+export async function playableIndex(user: SessionUser): Promise<LibraryIndex> {
+  const [index, empty] = await Promise.all([libraryIndex(user), emptyShows(user)]);
+  if (!empty.length) return index;
+  const drop = new Set(empty);
+  const keep = <K,>(map: Map<K, { id: string }>) => new Map([...map].filter(([, entry]) => !drop.has(entry.id)));
+  return { byKey: keep(index.byKey), byId: keep(index.byId), byTvdb: keep(index.byTvdb) } as LibraryIndex;
+}
+
+/**
+ * Jellyfin's ids to leave out of lists (`excludeItemIds`): the new titles brought in for
+ * channels, and (with `shows`) the shows with nothing in them. Undefined when there are none.
+ */
+export async function leftOut(user: SessionUser, shows = true): Promise<string | undefined> {
+  const [hidden, empty] = await Promise.all([hiddenIds(user), shows ? emptyShows(user) : []]);
+  return [hidden, ...empty].filter(Boolean).join(',') || undefined;
+}
+
+/**
+ * "Not on disk": titles deleted to save space (the whole of them: a show with a season or two
+ * left is still in the library), shown after the library in the same order it's sorted by
+ * ("Recently added": the most recently deleted first).
+ */
+export async function removedTitles(user: SessionUser, mediaType: MediaType, sort = 'added'): Promise<Card[]> {
+  const list = await goneFor(user, mediaType);
   const cards = await Promise.all(
     list.map(async (e): Promise<Card> => {
       const [basics, details] = has.seerr()
@@ -482,7 +538,7 @@ function disksFor(roots: ArrRootFolder[], disks: ArrDisk[], mediaType: MediaType
   });
 }
 
-export function storage(): Promise<StorageInfo> {
+export function storage(user: SessionUser): Promise<StorageInfo> {
   return storageCache.wrap('all', MINUTE, async () => {
     const empty = <T,>(): T[] => [];
     const [rRoots, rDisks, sRoots, sDisks, movies, series] = await Promise.all([
@@ -536,8 +592,8 @@ export function storage(): Promise<StorageInfo> {
       shows: series ? { count: showSizes.length, size: sum(showSizes.map((s) => s.statistics?.sizeOnDisk)) } : undefined,
       biggest,
       removed: {
-        movies: (await settle(removedTitles('movie'), [])).length,
-        shows: (await settle(removedTitles('tv'), [])).length,
+        movies: (await settle(goneFor(user, 'movie'), [])).length,
+        shows: (await settle(goneFor(user, 'tv'), [])).length,
       },
     };
   });

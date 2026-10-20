@@ -20,6 +20,7 @@ export default {
   Versions: 'Versioni',
   Audio: 'Audio',
   Subtitles: 'Sottotitoli',
+  'Press Back again to close Netfish': 'Premi di nuovo Indietro per chiudere Netfish',
   Season: 'Stagione',
   Episode: 'Episodio',
   Episodes: 'Episodi',

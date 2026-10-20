@@ -102,8 +102,22 @@ export function findInLibrary(index: LibraryIndex, mediaType: MediaType, tmdbId?
   );
 }
 
+/**
+ * Whether Jellyfin has anything to play of a show. It keeps listing a show whose files were all
+ * deleted while its folder is still there (Sonarr leaves it): a show with nothing in it.
+ */
+const filled = new TTLCache<boolean>(500);
+export function showHasEpisodes(user: SessionUser, seriesId: string): Promise<boolean> {
+  return filled.wrap(seriesId, 2 * MINUTE, async () => {
+    const res = await jellyfin.episodes(user.token, user.id, seriesId, { isMissing: false, limit: 1 }).catch(() => undefined);
+    // Jellyfin not answering: as it lists it.
+    return !res || res.Items.length > 0;
+  });
+}
+
 /** Call after something lands in the library so cards flip to "Play" quickly. */
 export function invalidateLibrary() {
+  filled.clear();
   indexes.clear();
   shown.clear();
 }

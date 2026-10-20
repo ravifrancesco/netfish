@@ -6,6 +6,7 @@ import type { Screen, ScreenKind } from '@netfish/shared';
 import { api } from '../api';
 import { screenId, screenKind, setCastTarget, useCastTarget, useOtherScreens, type CastTarget } from '../lib/screens';
 import { useTogether } from '../lib/together';
+import type { CastDevice } from '../lib/desktop';
 import { Spinner, useToast } from './ui';
 import { t } from '../i18n';
 
@@ -157,18 +158,29 @@ export function SendToScreen({ target, itemId, position, onFailed }: { target: C
   );
 }
 
+/** Chromecasts nearby (the Android app's player), listed under the screens. */
+export interface ChromecastChoice {
+  devices: CastDevice[];
+  /** The one in use (its name), while casting. */
+  casting?: string;
+  connect: (id: string) => void;
+  disconnect: () => void;
+}
+
 /**
  * "Play on…": the other places Netfish is open (your devices, and the household's TVs).
  * Picking one plays the film there, and this device becomes its remote.
- * `position` and `onSent` let the player hand over a film it's already playing.
+ * `position` and `onSent` let the player hand over a film it's already playing; `chromecast`
+ * adds the Chromecasts it can play on.
  */
-export function PlayOnButton({ itemId, title, position, onSent, className = 'btn btn--ghost btn--lg', iconOnly }: {
+export function PlayOnButton({ itemId, title, position, onSent, className = 'btn btn--ghost btn--lg', iconOnly, chromecast }: {
   itemId: string;
   title: string;
   position?: () => number;
   onSent?: () => void;
   className?: string;
   iconOnly?: boolean;
+  chromecast?: ChromecastChoice;
 }) {
   const screens = useOtherScreens();
   const navigate = useNavigate();
@@ -198,19 +210,31 @@ export function PlayOnButton({ itemId, title, position, onSent, className = 'btn
       window.removeEventListener('keydown', onKey);
     };
   }, [open]);
-  if (!screens.length) return null;
+  const casting = chromecast?.casting !== undefined;
+  // While casting, only the Chromecast's part (stop it); otherwise the screens, then the Chromecasts.
+  const shown = casting ? [] : screens;
+  const chromecasts = chromecast && (casting || chromecast.devices.length > 0);
+  if (!shown.length && !chromecasts) return null;
 
   return (
     <div className="play-on" ref={ref}>
-      <button className={className} onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label={t('Play on another device')} title={t('Play on another device')}>
+      <button
+        className={`${className}${casting ? ' is-on' : ''}`}
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-label={t('Play on another device')}
+        title={casting ? t('Playing on {device}', { device: chromecast?.casting || 'Chromecast' }) : t('Play on another device')}
+      >
         <Cast size={iconOnly ? 24 : 20} /> {!iconOnly && t('Play on…')}
       </button>
       {open && (
         <div className="menu play-on__menu" role="menu">
-          <div className="menu__head">
-            <strong>{t('Play on')}</strong>
-          </div>
-          {screens.map((screen) => {
+          {shown.length > 0 && (
+            <div className="menu__head">
+              <strong>{t('Play on')}</strong>
+            </div>
+          )}
+          {shown.map((screen) => {
             const Icon = ICONS[screen.kind];
             return (
               <button key={screen.id} className="menu__item" role="menuitem" disabled={send.isPending} onClick={() => send.mutate(screen)}>
@@ -222,6 +246,33 @@ export function PlayOnButton({ itemId, title, position, onSent, className = 'btn
               </button>
             );
           })}
+          {chromecasts && (
+            <>
+              <div className={`menu__head${shown.length ? ' play-on__section' : ''}`}>
+                <strong>Chromecast</strong>
+              </div>
+              {casting ? (
+                <>
+                  <div className="menu__item play-on__current">
+                    <Tv size={18} />
+                    <span className="play-on__name">{chromecast.casting || 'Chromecast'}</span>
+                    <Check size={16} className="play-on__tick" />
+                  </div>
+                  <button className="menu__item" role="menuitem" onClick={() => (setOpen(false), chromecast.disconnect())}>
+                    <X size={18} />
+                    <span className="play-on__name">{t('Stop casting')}</span>
+                  </button>
+                </>
+              ) : (
+                chromecast.devices.map((device) => (
+                  <button key={device.id} className="menu__item" role="menuitem" onClick={() => (setOpen(false), chromecast.connect(device.id))}>
+                    <Tv size={18} />
+                    <span className="play-on__name">{device.name}</span>
+                  </button>
+                ))
+              )}
+            </>
+          )}
         </div>
       )}
     </div>

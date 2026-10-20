@@ -41,6 +41,16 @@ if (/NetfishiOS|NetfishAndroid/.test(navigator.userAgent)) {
 // The Fire TV app (or ?tv=1 in a browser): remote-control navigation.
 if (isTV()) startTV();
 
+// TVs that lay pages out 1920 px wide (Samsung's, LG's): everything a size up, for the sofa, as
+// on a 1280 px screen (Fire TV's is already about half that). A browser that keeps its own width
+// gets the page zoomed instead.
+if (isTV() && window.innerWidth >= 1800) {
+  document.querySelector('meta[name="viewport"]')?.setAttribute('content', 'width=1280, viewport-fit=cover');
+  requestAnimationFrame(() => {
+    if (window.innerWidth >= 1800) document.documentElement.style.setProperty('zoom', String(window.innerWidth / 1280));
+  });
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>

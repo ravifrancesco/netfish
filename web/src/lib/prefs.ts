@@ -38,15 +38,6 @@ function read(): Prefs {
 let current = read();
 const listeners = new Set<() => void>();
 
-/**
- * Subtitles chosen while watching (or turned off): from then on the default, for films and
- * channels alike (Settings shows the same switch). Forced ones (signs, foreign lines) don't
- * count as turning them on.
- */
-export function rememberSubtitle(track: { code?: string; forced?: boolean } | undefined) {
-  setPrefs(track ? { subtitlesByDefault: !track.forced, ...(track.code ? { subtitleLanguage: track.code } : {}) } : { subtitlesByDefault: false });
-}
-
 export function setPrefs(patch: Partial<Prefs>) {
   current = { ...current, ...patch };
   try {
@@ -74,13 +65,31 @@ export function deviceId(): string {
   try {
     let id = localStorage.getItem('netfish.deviceId');
     if (!id) {
-      id = crypto.randomUUID();
+      id = randomId();
       localStorage.setItem('netfish.deviceId', id);
     }
     return id;
   } catch {
-    return 'netfish-web';
+    // Can't be kept (private mode): this page's own, never one every device shares (Jellyfin
+    // ends a person's older session on "the same device" when they sign in again).
+    return (unkept ??= randomId());
   }
+}
+let unkept: string | undefined;
+
+/**
+ * A random id that works on plain http too: crypto.randomUUID only exists on https pages, and a
+ * home server often isn't one.
+ */
+function randomId(): string {
+  const bytes = new Uint8Array(16);
+  try {
+    crypto.getRandomValues(bytes);
+  } catch {
+    for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 export function deviceName(): string {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { desktop, type OfflineItem } from '../lib/desktop';
-import { getPrefs, rememberSubtitle } from '../lib/prefs';
+import { getPrefs } from '../lib/prefs';
+import { rememberSubtitle } from '../lib/playbackPrefs';
 import { startVolume } from '../lib/systemVolume';
 import { OverlayVideo } from './overlay';
 import { PlayerView, useVolume, type MenuTrack } from './PlayerView';

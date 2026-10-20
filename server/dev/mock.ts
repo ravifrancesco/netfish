@@ -9,6 +9,7 @@
  * real services (checked against their source).
  */
 import crypto from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import Fastify, { type FastifyRequest } from 'fastify';
 import fastifyStatic from '@fastify/static';
@@ -97,7 +98,12 @@ function audioOf(t: Title) {
   return audio.get(`${t.type}-${t.tmdbId}`) ?? [t.lang === 'fr' ? 'fre' : 'eng'];
 }
 
+/** Which device (Jellyfin's DeviceId) and person each Jellyfin token was given to. */
+const tokenDevices = new Map<string, { device: string; userId: string }>();
+
 /** Radarr's and Sonarr's history of deleted files, newest first. */
+/** Shows Jellyfin still lists with nothing in them (MOCK_EMPTY_SHOWS). */
+const emptyShows = new Set<number>();
 const fileHistory: { radarr: Array<{ movieId?: number } & Record<string, unknown>>; sonarr: Array<{ seriesId?: number } & Record<string, unknown>> } = { radarr: [], sonarr: [] };
 
 const containerOf = (item: Item) => (item.kind === 'movie' && item.title.n === 4 ? 'mkv' : 'mp4');
@@ -161,6 +167,48 @@ function userDataDto(userId: string | undefined, item: Item) {
 /** Lengths as they'd be in a real library (the sample video every title plays is 3 minutes). */
 const nominalMinutes = (t: Title) => (t.type === 'movie' ? 84 + ((t.n * 37) % 70) : 24 + ((t.n * 11) % 36));
 
+/** Scrubbing previews (Jellyfin's trickplay): 320×180 frames, every 10 s, 10×10 to a picture, made from the sample with ffmpeg. */
+const TRICKPLAY = (id: string) => ({ [id]: { '320': { Width: 320, Height: 180, TileWidth: 10, TileHeight: 10, ThumbnailCount: Math.ceil(DURATION_SECONDS / 10), Interval: 10_000, Bandwidth: 0 } } });
+
+/** Each person's Jellyfin settings (audio and subtitles), as /Users/Me gives them and /Users/Configuration saves them. */
+const userConfig = new Map<string, Record<string, unknown>>();
+function configOf(user: { id: string; name: string }): Record<string, unknown> {
+  if (!userConfig.has(user.id)) {
+    // Their own audio language: sam's is Italian, demo's French, admin's any.
+    const audio = ({ sam: 'ita', demo: 'fre' } as Record<string, string>)[user.name] ?? '';
+    userConfig.set(user.id, { AudioLanguagePreference: audio, SubtitleLanguagePreference: '', SubtitleMode: 'Default', PlayDefaultAudioTrack: true, RememberAudioSelections: true, RememberSubtitleSelections: true, DisplayMissingEpisodes: false });
+  }
+  return userConfig.get(user.id)!;
+}
+
+/**
+ * The subtitle Jellyfin would show this person (its MediaStreamSelector, simply): by their
+ * subtitle mode and language. -1: none.
+ */
+function subtitleChoice(userId: string | undefined, item: Item): number {
+  const user = USERS.find((u) => u.id === userId);
+  if (!user) return -1;
+  const c = configOf(user);
+  const streams = streamsFor(item) as Array<{ Type: string; Index: number; Language?: string; IsDefault?: boolean; IsForced?: boolean }>;
+  const subs = streams.filter((x) => x.Type === 'Subtitle');
+  const want = String(c.SubtitleLanguagePreference ?? '');
+  const audio = streams.find((x) => x.Type === 'Audio' && x.IsDefault)?.Language;
+  const inMine = (x: { Language?: string }) => !want || x.Language === want;
+  const pick = (...found: Array<{ Index: number } | undefined>) => found.find(Boolean)?.Index ?? -1;
+  switch (c.SubtitleMode) {
+    case 'None':
+      return -1;
+    case 'OnlyForced':
+      return pick(subs.find((x) => x.IsForced && inMine(x)), subs.find((x) => x.IsForced));
+    case 'Always':
+      return pick(subs.find((x) => !x.IsForced && inMine(x)), subs.find((x) => x.IsDefault), subs[0]);
+    case 'Smart':
+      return want && audio !== want ? pick(subs.find((x) => !x.IsForced && inMine(x)), subs.find((x) => x.IsForced)) : pick(subs.find((x) => x.IsForced && inMine(x)));
+    default:
+      return pick(subs.find((x) => (x.IsDefault || x.IsForced) && inMine(x)), subs.find((x) => x.IsDefault || x.IsForced));
+  }
+}
+
 function dto(item: Item, userId?: string, full = false): Record<string, unknown> {
   const t = item.title;
   const seriesId = ids.series(t);
@@ -172,7 +220,7 @@ function dto(item: Item, userId?: string, full = false): Record<string, unknown>
         ProviderIds: { Tmdb: String(t.tmdbId) }, ImageTags: { Primary: 'p1', Thumb: 't1' }, BackdropImageTags: ['b1'],
         DateCreated: date(titleAdded(t)), UserData: userDataDto(userId, item), Taglines: [],
         People: jfPeople(t),
-        ...(full ? { MediaStreams: streamsFor(item), MediaSources: [{ Id: item.id, Container: containerOf(item), Size: SAMPLE_SIZE, Bitrate: 400_000, MediaStreams: streamsFor(item) }] } : {}),
+        ...(full ? { MediaStreams: streamsFor(item), MediaSources: [{ Id: item.id, Container: containerOf(item), Size: SAMPLE_SIZE, Bitrate: 400_000, MediaStreams: streamsFor(item), DefaultSubtitleStreamIndex: subtitleChoice(userId, item) }], Trickplay: TRICKPLAY(item.id) } : {}),
       };
     case 'series':
       return {
@@ -190,7 +238,7 @@ function dto(item: Item, userId?: string, full = false): Record<string, unknown>
         Overview: `${t.title}, season ${item.s} episode ${item.e}. Things get choppy.`, PremiereDate: `${t.year + item.s - 1}-0${Math.min(9, item.e)}-10T00:00:00.0000000Z`,
         ImageTags: { Primary: 'p1' }, SeriesPrimaryImageTag: 'p1', ParentBackdropItemId: seriesId, ParentBackdropImageTags: ['b1'],
         UserData: userDataDto(userId, item),
-        ...(full ? { MediaStreams: streamsFor(item), MediaSources: [{ Id: item.id, Container: containerOf(item), Size: SAMPLE_SIZE, Bitrate: 400_000, MediaStreams: streamsFor(item) }] } : {}),
+        ...(full ? { MediaStreams: streamsFor(item), MediaSources: [{ Id: item.id, Container: containerOf(item), Size: SAMPLE_SIZE, Bitrate: 400_000, MediaStreams: streamsFor(item), DefaultSubtitleStreamIndex: subtitleChoice(userId, item) }], Trickplay: TRICKPLAY(item.id) } : {}),
       };
   }
 }
@@ -241,7 +289,11 @@ void app.register(
       const user = USERS.find((u) => u.name === req.body?.Username?.toLowerCase() && u.password === req.body?.Pw);
       if (!user) return reply.code(401).send('Error processing request.');
       const token = crypto.randomBytes(16).toString('hex');
+      // Like Jellyfin: signing in again on the same device (same DeviceId) ends that person's older session there.
+      const device = /DeviceId="([^"]*)"/.exec(String(req.headers.authorization ?? ''))?.[1] ?? '';
+      for (const [old, d] of tokenDevices) if (d.device === device && d.userId === user.id) (sessions.delete(old), tokenDevices.delete(old));
       sessions.set(token, user);
+      tokenDevices.set(token, { device, userId: user.id });
       return { User: { Id: user.id, Name: user.name, Policy: { IsAdministrator: user.admin } }, AccessToken: token, ServerId: 'mock' };
     });
     jf.addHook('preHandler', async (req, reply) => {
@@ -252,9 +304,15 @@ void app.register(
     jf.get('/System/Info', async () => ({ ServerName: 'Mock Jellyfin', Version: '12.0.0-mock', Id: 'mock' }));
     jf.get('/Users/Me', async (req) => {
       const u = jfUser(req)!;
-      // Their own audio language in Jellyfin: sam's is Italian, demo's French, admin's any.
-      const audio = { sam: 'ita', demo: 'fre' }[u.name] ?? '';
-      return { Id: u.id, Name: u.name, PrimaryImageTag: 'a1', Policy: { IsAdministrator: u.admin }, Configuration: { AudioLanguagePreference: audio, SubtitleLanguagePreference: '' } };
+      return { Id: u.id, Name: u.name, PrimaryImageTag: 'a1', Policy: { IsAdministrator: u.admin }, Configuration: { ...configOf(u) } };
+    });
+    // A person's settings, saved whole (their own, or anyone's for an admin).
+    jf.post<{ Querystring: Q; Body: Record<string, unknown> }>('/Users/Configuration', async (req, reply) => {
+      const me = jfUser(req)!;
+      const target = USERS.find((u) => u.id === (req.query.userId ?? me.id));
+      if (!target || (target.id !== me.id && !me.admin)) return reply.code(403).send();
+      userConfig.set(target.id, { ...configOf(target), ...req.body });
+      return reply.code(204).send();
     });
     jf.get('/Users', async (req, reply) =>
       jfUser(req)?.admin ? USERS.map((u) => ({ Id: u.id, Name: u.name, Policy: { IsAdministrator: u.admin } })) : reply.code(403).send(),
@@ -287,13 +345,16 @@ void app.register(
     });
 
     const endedEncodings: Array<{ deviceId: string; playSessionId: string }> = [];
+    // MOCK_EMPTY_SHOWS=1: like Jellyfin with the show's folder left behind (Sonarr leaves it), a
+    // show whose episode files were all deleted is still listed, with nothing in it.
+    const listed = (t: Title) => inLibrary(t) || (t.type === 'tv' && emptyShows.has(t.tmdbId));
     jf.get<{ Querystring: Q }>('/Items', async (req) => {
       const q = req.query;
       const userId = q.userId;
       const types = (q.includeItemTypes ?? 'Movie,Series').split(',');
       let items: Item[] = [];
       for (const t of TITLES) {
-        if (!inLibrary(t)) continue;
+        if (!listed(t)) continue;
         if (t.type === 'movie' && types.includes('Movie')) items.push(itemsById.get(ids.movie(t))!);
         if (t.type === 'tv' && types.includes('Series')) items.push(itemsById.get(ids.series(t))!);
         if (t.type === 'tv' && types.includes('Episode')) items.push(...libraryEpisodes(t));
@@ -445,17 +506,37 @@ void app.register(
       reply.header('content-disposition', `attachment; filename="${fileOf(req.params.id)}"`).sendFile(fileOf(req.params.id)),
     );
     jf.get('/Videos/:id/stream.:ext', async (_req, reply) => reply.sendFile('sample.mp4'));
+    // Like Jellyfin, the playlists repeat the request's query on every link they give (that's how a
+    // token in it reaches the segments).
+    const queryOf = (url: string) => (url.includes('?') ? url.slice(url.indexOf('?')) : '');
     jf.get<{ Querystring: Q }>('/Videos/:id/master.m3u8', async (req, reply) => {
       const a = req.query.AudioStreamIndex === '2' ? 2 : 1;
       return reply
         .header('content-type', 'application/vnd.apple.mpegurl')
-        .send(`#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1500000,RESOLUTION=1280x720,CODECS="avc1.64001f,mp4a.40.2"\nhls-${a}/index.m3u8\n`);
+        .send(`#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1500000,RESOLUTION=1280x720,CODECS="avc1.64001f,mp4a.40.2"\nhls-${a}/index.m3u8${queryOf(req.url)}\n`);
     });
     jf.get<{ Params: { a: string; file: string } }>('/Videos/:id/hls-:a/:file', async (req, reply) => {
       const file = req.params.file.replace(/[^\w.]/g, '');
-      return reply.sendFile(`hls-${req.params.a === '2' ? 2 : 1}/${file}`);
+      const dir = `hls-${req.params.a === '2' ? 2 : 1}`;
+      if (file.endsWith('.m3u8')) {
+        const query = queryOf(req.url);
+        const list = fs.readFileSync(`${MEDIA_DIR}/${dir}/${file}`, 'utf8').replace(/^(?!#)(\S+)$/gm, (line) => line + query);
+        return reply.header('content-type', 'application/vnd.apple.mpegurl').send(list);
+      }
+      return reply.sendFile(`${dir}/${file}`);
+    });
+    jf.get<{ Params: { id: string; width: string; index: string } }>('/Videos/:id/Trickplay/:width/:index.jpg', async (req, reply) => {
+      if (req.params.width !== '320' || req.params.index !== '0') return reply.code(404).send();
+      const file = `${MEDIA_DIR}/trickplay-320-0.jpg`;
+      if (!fs.existsSync(file)) {
+        execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', `${MEDIA_DIR}/sample.mp4`, '-vf', 'fps=1/10,scale=320:180,tile=10x10', '-frames:v', '1', file]);
+      }
+      return reply.type('image/jpeg').send(fs.readFileSync(file));
     });
     jf.get<{ Params: { id: string; idx: string } }>('/Videos/:id/:ms/Subtitles/:idx/0/Stream.vtt', async (req, reply) => {
+      // MOCK_SUBTITLE_DELAY_MS: like Jellyfin pulling subtitles out of a big file on a Pi the first time.
+      const delay = Number(process.env.MOCK_SUBTITLE_DELAY_MS) || 0;
+      if (delay) await sleep(delay);
       const item = itemsById.get(req.params.id);
       const stream = item ? streamsFor(item).find((s) => s.Index === Number(req.params.idx)) : undefined;
       const code = Object.entries(ISO1_TO_3).find(([, v]) => v === (stream as { Language?: string })?.Language)?.[0] ?? 'en';
@@ -1063,6 +1144,7 @@ void app.register(
         const t = TITLES.find((x) => x.type === 'tv' && x.n === Math.floor(id / 100));
         if (!t) continue;
         library.delete(`tv-${t.tmdbId}-${id % 100}`);
+        if (process.env.MOCK_EMPTY_SHOWS === '1' && !inLibrary(t)) emptyShows.add(t.tmdbId);
         arrKnown.add(`tv-${t.tmdbId}`);
         fileHistory.sonarr.unshift({ id: newId(), seriesId: t.n, eventType: 'episodeFileDeleted', date: new Date().toISOString(), data: { reason: 'Manual' } });
       }

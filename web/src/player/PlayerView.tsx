@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject, type VideoHTMLAttributes } from 'react';
 import { ArrowLeft, Captions, Check, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, SkipForward, Volume2, VolumeX } from 'lucide-react';
-import type { MediaSegment } from '@netfish/shared';
+import type { MediaSegment, Trickplay } from '@netfish/shared';
 import { SwimmingFish } from '../components/Logo';
 import { clock } from '../lib/format';
 import { getPrefs, setPrefs } from '../lib/prefs';
@@ -45,6 +45,8 @@ export interface PlayerViewProps {
   time: number;
   duration: number;
   buffered: number;
+  /** Jellyfin's scrubbing previews, when it has made them for this file. */
+  trickplay?: Trickplay;
   toggle: () => void;
   seekTo: (seconds: number) => void;
   volume: Volume;
@@ -146,18 +148,53 @@ export function useVolume(video: RefObject<HTMLVideoElement | null>): Volume {
     : { volume, muted, setVol, toggleMute, pressMute, onVolumeChange };
 }
 
+/** How wide the preview frame is shown, whatever size Jellyfin made them. */
+const FRAME_WIDTH = 200;
+
+/** The frame at `at` seconds, from Jellyfin's scrubbing previews (pictures that each hold a grid of frames). */
+function ScrubFrame({ trick, at }: { trick: Trickplay; at: number }) {
+  const n = Math.min(trick.count - 1, Math.max(0, Math.floor(at / trick.interval)));
+  const perPicture = trick.columns * trick.rows;
+  const cell = n % perPicture;
+  // Whole pixels, so no sliver of the next frame shows.
+  const height = Math.round((trick.height * FRAME_WIDTH) / trick.width);
+  return (
+    <span
+      className="seek__frame"
+      aria-hidden="true"
+      style={{
+        width: FRAME_WIDTH,
+        height,
+        backgroundImage: `url("${trick.url.replace('{index}', String(Math.floor(n / perPicture)))}")`,
+        backgroundSize: `${trick.columns * FRAME_WIDTH}px ${trick.rows * height}px`,
+        backgroundPosition: `-${(cell % trick.columns) * FRAME_WIDTH}px -${Math.floor(cell / trick.columns) * height}px`,
+      }}
+    />
+  );
+}
+
 /** Subtitles drawn by the page over the film, for players that can't draw them (Apple's, downloads in the page). */
 export function PageSubtitles({ url, time, raised }: { url: string; time: number; raised: boolean }) {
   const [cues, setCues] = useState<Cue[]>([]);
   useEffect(() => {
     let alive = true;
+    let retry: ReturnType<typeof setTimeout> | undefined;
     setCues([]);
-    fetch(url)
-      .then((r) => r.text())
-      .then((text) => alive && setCues(parseVtt(text)))
-      .catch(() => {});
+    // The first time, Jellyfin may need a while to pull subtitles out of the file: a failure gets a few more tries.
+    const load = (tries: number) =>
+      fetch(url)
+        .then((r) => {
+          if (!r.ok) throw new Error(String(r.status));
+          return r.text();
+        })
+        .then((text) => alive && setCues(parseVtt(text)))
+        .catch(() => {
+          if (alive && tries < 4) retry = setTimeout(() => void load(tries + 1), 5000);
+        });
+    void load(0);
     return () => {
       alive = false;
+      clearTimeout(retry);
     };
   }, [url]);
   const showing = cues.filter((c) => time >= c.start && time <= c.end);
@@ -311,6 +348,18 @@ export function PlayerView(props: PlayerViewProps) {
           seekTo((v?.currentTime ?? 0) - 30);
           return;
       }
+      if (isTV() && target?.classList?.contains('seek')) {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          e.preventDefault();
+          stepScrub(e.key === 'ArrowRight' ? 1 : -1, e.repeat);
+          return;
+        }
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          commitScrub();
+          return;
+        }
+      }
       if (isTV()) {
         // Remote: with the controls hidden (or nothing chosen), Select pauses, left/right
         // skip 10 s, and up/down bring up the controls on the most useful button.
@@ -380,12 +429,45 @@ export function PlayerView(props: PlayerViewProps) {
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     setScrub(fractionAt(e.clientX) * duration);
   };
-  const onBarMove = (e: ReactPointerEvent) => scrub !== undefined && setScrub(fractionAt(e.clientX) * duration);
+  // A mouse over the timeline: where it points, with the preview (like Jellyscrub).
+  const [hoverAt, setHoverAt] = useState<number>();
+  const onBarMove = (e: ReactPointerEvent) => {
+    if (scrub !== undefined) setScrub(fractionAt(e.clientX) * duration);
+    else if (e.pointerType === 'mouse' && props.trickplay) setHoverAt(fractionAt(e.clientX) * duration);
+  };
   const onBarUp = () => {
     if (scrub !== undefined) seekTo(scrub);
     setScrub(undefined);
   };
   const shownTime = scrub ?? time;
+
+  // TV: the timeline, chosen with the remote: left/right move along it (further each step the
+  // longer they're held), and the film goes there on Select, or a moment after the last press.
+  const tvScrub = useRef<{ to?: number; held: number; timer?: number }>({ held: 0 });
+  const durationRef = useRef(duration);
+  durationRef.current = duration;
+  const seekRef = useRef(seekTo);
+  seekRef.current = seekTo;
+  const commitScrub = useCallback(() => {
+    const s = tvScrub.current;
+    window.clearTimeout(s.timer);
+    if (s.to !== undefined) seekRef.current(s.to);
+    s.to = undefined;
+    setScrub(undefined);
+  }, []);
+  const stepScrub = useCallback(
+    (dir: 1 | -1, repeat: boolean) => {
+      const s = tvScrub.current;
+      s.held = repeat ? s.held + 1 : 0;
+      const step = s.held < 4 ? 10 : s.held < 12 ? 30 : 60;
+      const from = s.to ?? video.current?.currentTime ?? 0;
+      s.to = Math.max(0, Math.min(Math.max(0, durationRef.current - 1), from + dir * step));
+      setScrub(s.to);
+      window.clearTimeout(s.timer);
+      s.timer = window.setTimeout(commitScrub, 1200);
+    },
+    [video, commitScrub],
+  );
 
   const choose = (pick: () => void) => {
     setMenu(false);
@@ -496,7 +578,10 @@ export function PlayerView(props: PlayerViewProps) {
           onPointerDown={onBarDown}
           onPointerMove={onBarMove}
           onPointerUp={onBarUp}
+          onPointerLeave={() => setHoverAt(undefined)}
           role="slider"
+          tabIndex={isTV() ? 0 : undefined}
+          onBlur={() => tvScrub.current.to !== undefined && commitScrub()}
           aria-label={t('Seek')}
           aria-valuemin={0}
           aria-valuemax={Math.round(duration)}
@@ -512,9 +597,18 @@ export function PlayerView(props: PlayerViewProps) {
               ))}
           </div>
           <div className="seek__thumb" style={{ left: `${duration ? (shownTime / duration) * 100 : 0}%` }} />
-          {scrub !== undefined && (
-            <div className="seek__tip" style={{ left: `${(scrub / duration) * 100}%` }}>
-              {clock(scrub)}
+          {(scrub ?? hoverAt) !== undefined && (
+            <div
+              className={`seek__tip${props.trickplay ? ' seek__tip--frame' : ''}`}
+              style={{
+                // Kept on screen at either end (the preview is wider than the time).
+                left: props.trickplay
+                  ? `clamp(${FRAME_WIDTH / 2 + 8}px, ${(((scrub ?? hoverAt)!) / duration) * 100}%, calc(100% - ${FRAME_WIDTH / 2 + 8}px))`
+                  : `${(((scrub ?? hoverAt)!) / duration) * 100}%`,
+              }}
+            >
+              {props.trickplay && <ScrubFrame trick={props.trickplay} at={(scrub ?? hoverAt)!} />}
+              {clock((scrub ?? hoverAt)!)}
             </div>
           )}
         </div>

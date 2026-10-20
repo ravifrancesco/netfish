@@ -7,7 +7,8 @@ import { settle } from '../lib/async';
 import { jfPlayableCard, jfToCard, seerrCards, type ProgressMap } from './cards';
 import { catalog } from './catalog';
 import { allDownloads, progressByTitle } from './downloads';
-import { hiddenIds, libraryIndex, type LibraryIndex } from './library';
+import type { LibraryIndex } from './library';
+import { leftOut, playableIndex } from './manage';
 import { listRequests } from './requests';
 import { traktPicks } from './trakt';
 import { isHidden } from './watched';
@@ -56,11 +57,11 @@ function continueWatching(userId: string, resume: JfItem[], nextUp: JfItem[], in
 
 export async function buildHome(user: SessionUser): Promise<HomeResponse> {
   const { token, id: userId } = user;
-  const index = await libraryIndex(user);
+  const index = await playableIndex(user);
   const downloads = await settle(allDownloads(), []);
   const progress: ProgressMap = progressByTitle(downloads);
-  // New titles brought in for channels aren't in anyone's library.
-  const excludeItemIds = await hiddenIds(user);
+  // New titles brought in for channels aren't in anyone's library; nor are shows with nothing in them.
+  const excludeItemIds = await leftOut(user);
   const fresh = new Set(excludeItemIds?.split(',') ?? []);
   const jfQuery = (q: Record<string, string | number | boolean>) =>
     settle(jellyfin.items(token, { userId, recursive: true, fields: CARD_FIELDS, enableImageTypes: 'Primary,Backdrop,Thumb', excludeItemIds, ...q }), EMPTY);

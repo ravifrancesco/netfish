@@ -40,8 +40,8 @@ export interface JfUser {
   Name: string;
   PrimaryImageTag?: string;
   Policy?: { IsAdministrator?: boolean; EnableContentDownloading?: boolean };
-  /** The person's own playback settings ("ita", "eng"…; empty for any). */
-  Configuration?: { AudioLanguagePreference?: string; SubtitleLanguagePreference?: string };
+  /** The person's own settings: playback ones in languages "ita", "eng"… (empty for any), and the rest as they are. */
+  Configuration?: { AudioLanguagePreference?: string; SubtitleLanguagePreference?: string; SubtitleMode?: string } & Record<string, unknown>;
 }
 
 export interface JfAuthResult {
@@ -91,6 +91,16 @@ export interface JfMediaSource {
   DefaultSubtitleStreamIndex?: number;
 }
 
+/** One size of a title's scrubbing previews: frames `Width`×`Height`, `TileWidth`×`TileHeight` to a picture, one every `Interval` ms. */
+export interface JfTrickplay {
+  Width: number;
+  Height: number;
+  TileWidth: number;
+  TileHeight: number;
+  ThumbnailCount: number;
+  Interval: number;
+}
+
 export interface JfItem {
   Id: string;
   Name: string;
@@ -119,6 +129,8 @@ export interface JfItem {
   IndexNumber?: number;
   UserData?: JfUserData;
   MediaSources?: JfMediaSource[];
+  /** Jellyfin's scrubbing previews (10.9+): per media source, per width, the grids of frames it made. */
+  Trickplay?: Record<string, Record<string, JfTrickplay>>;
   MediaStreams?: JfMediaStream[];
   DateCreated?: string;
   LocationType?: string;
@@ -143,6 +155,9 @@ export const jellyfin = {
     });
   },
   me: (token: string) => jfRequest<JfUser>(token, '/Users/Me'),
+  /** Saves the person's settings (the whole of them, as /Users/Me gave them, with the changes). */
+  setConfiguration: (token: string, userId: string, configuration: Record<string, unknown>) =>
+    jfRequest<void>(token, '/Users/Configuration', { method: 'POST', query: { userId }, body: configuration }),
   /** Every account on the server. Needs admin rights. */
   users: (token: string) => jfRequest<JfUser[]>(token, '/Users'),
   logout: (token: string) => jfRequest<void>(token, '/Sessions/Logout', { method: 'POST' }),

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CircleArrowUp, LogOut, MonitorCog } from 'lucide-react';
 import { useLocation } from 'react-router';
-import type { DownloadDetail, ServerSettings } from '@netfish/shared';
+import type { DownloadDetail, PlaybackPrefs, ServerSettings, SubtitleMode } from '@netfish/shared';
 import { api } from '../api';
 import { Connections } from '../components/Connections';
 import { Storage } from '../components/Storage';
@@ -12,6 +12,7 @@ import { ChannelSettings } from '../components/ChannelSettings';
 import { notifySupport } from '../lib/notify';
 import { DeviceProfiles } from '../components/DeviceProfiles';
 import { LanguageSelect } from '../components/LanguageSelect';
+import { usePlaybackPrefs, useSetPlaybackPrefs } from '../lib/playbackPrefs';
 import { Mark } from '../components/Logo';
 import { Spinner, StorageWarning, useToast } from '../components/ui';
 import { useConfig, useMe } from '../lib/hooks';
@@ -208,6 +209,49 @@ function ServerUpdateNotice() {
   );
 }
 
+const SUBTITLE_MODES: Array<{ value: SubtitleMode; label: string }> = [
+  { value: 'Default', label: t('When the file says so (default and forced ones)') },
+  { value: 'Always', label: t('Always') },
+  { value: 'Smart', label: t('When the audio isn’t in my language') },
+  { value: 'OnlyForced', label: t('Only forced ones (signs, foreign lines)') },
+  { value: 'None', label: t('Never') },
+];
+
+/** Audio and subtitles: the person's Jellyfin settings (the same everywhere, Jellyfin's own apps included). */
+function PlaybackLanguages() {
+  const q = usePlaybackPrefs();
+  const set = useSetPlaybackPrefs();
+  const toast = useToast();
+  const p = q.data;
+  const change = (patch: Partial<PlaybackPrefs>) => set.mutate(patch, { onError: (err) => toast('error', (err as Error).message) });
+  if (q.isError) return <p className="muted small">{t("Couldn't load your audio and subtitle settings from Jellyfin.")}</p>;
+  if (!p) return <Spinner size={18} />;
+  return (
+    <>
+      <label className="field">
+        <span>{t('Preferred audio language')}</span>
+        <LanguageSelect value={p.audioLanguage} onChange={(audioLanguage) => change({ audioLanguage })} anyLabel={t('Original / file default')} />
+      </label>
+      <label className="field">
+        <span>{t('Subtitles')}</span>
+        <select className="select" value={p.subtitleMode} onChange={(e) => change({ subtitleMode: e.target.value as SubtitleMode })}>
+          {SUBTITLE_MODES.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+        <small className="muted">{t('Follows what you last chose while watching, films and channels alike.')}</small>
+      </label>
+      <label className="field">
+        <span>{t('Subtitle language')}</span>
+        <LanguageSelect value={p.subtitleLanguage} onChange={(subtitleLanguage) => change({ subtitleLanguage })} anyLabel={t('No preference')} />
+      </label>
+      <p className="muted small">{t('These are your Jellyfin settings: the same on every device, and in Jellyfin’s own apps.')}</p>
+    </>
+  );
+}
+
 export default function Settings() {
   const prefs = usePrefs();
   const { hash } = useLocation();
@@ -279,21 +323,7 @@ export default function Settings() {
           </select>
           <small className="muted">{t('Lower it when watching away from home. Anything the Pi has to shrink costs it CPU.')}</small>
         </label>
-        <label className="field">
-          <span>{t('Preferred audio language')}</span>
-          <LanguageSelect value={prefs.audioLanguage} onChange={(audioLanguage) => setPrefs({ audioLanguage })} anyLabel={t('Original / file default')} />
-        </label>
-        <label className="check">
-          <input type="checkbox" checked={prefs.subtitlesByDefault} onChange={(e) => setPrefs({ subtitlesByDefault: e.target.checked })} />
-          <span>
-            {t('Turn subtitles on automatically')}
-            <small className="muted check__note">{t('Follows what you last chose while watching, films and channels alike.')}</small>
-          </span>
-        </label>
-        <label className="field">
-          <span>{t('Subtitle language')}</span>
-          <LanguageSelect value={prefs.subtitleLanguage} onChange={(subtitleLanguage) => setPrefs({ subtitleLanguage })} />
-        </label>
+        <PlaybackLanguages />
         <label className="check">
           <input type="checkbox" checked={prefs.autoplayNext} onChange={(e) => setPrefs({ autoplayNext: e.target.checked })} />
           <span>{t('Play the next episode automatically')}</span>

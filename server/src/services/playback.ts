@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import type { MediaSegment, OfflineDescriptor, PlayInfo, PlaybackRequest, PlaybackSession, ProgressReport, StreamTrack } from '@netfish/shared';
+import type { Trickplay, MediaSegment, OfflineDescriptor, PlayInfo, PlaybackRequest, PlaybackSession, ProgressReport, StreamTrack } from '@netfish/shared';
 import type { SessionUser } from '../auth';
-import { jellyfin, secondsToTicks, ticksToSeconds, type JfMediaSource, type JfMediaStream } from '../clients/jellyfin';
+import { jellyfin, secondsToTicks, ticksToSeconds, type JfItem, type JfMediaSource, type JfMediaStream } from '../clients/jellyfin';
 import { settle } from '../lib/async';
+import { castToken } from './cast';
 import { JF_PREFIX, jfImage } from '../lib/images';
 import { findLanguage, languageLabel } from '../lib/languages';
 import { HttpError, buildQuery } from '../lib/upstream';
@@ -138,6 +139,31 @@ function reasonsOf(source: JfMediaSource): string[] {
   return fromUrl ? decodeURIComponent(fromUrl).split(',') : [];
 }
 
+/** The scrubbing previews Jellyfin made for this file: the smallest at least 160 px wide (else the biggest). */
+function trickplayOf(item: JfItem | undefined, itemId: string, sourceId: string): Trickplay | undefined {
+  const sizes = Object.values(item?.Trickplay?.[sourceId] ?? item?.Trickplay?.[itemId] ?? Object.values(item?.Trickplay ?? {})[0] ?? {});
+  if (!sizes.length) return undefined;
+  const pick = [...sizes].sort((a, b) => a.Width - b.Width).find((s) => s.Width >= 160) ?? sizes.sort((a, b) => b.Width - a.Width)[0];
+  return {
+    url: proxied(`/Videos/${itemId}/Trickplay/${pick.Width}/{index}.jpg?MediaSourceId=${sourceId}`),
+    width: pick.Width,
+    height: pick.Height,
+    columns: pick.TileWidth,
+    rows: pick.TileHeight,
+    count: pick.ThumbnailCount,
+    interval: pick.Interval / 1000,
+  };
+}
+
+/** The subtitle to start with: the one asked for, else Jellyfin's choice for this person (none: -1). */
+async function subtitleFor(asTheySee: Promise<JfItem | undefined>, source: JfMediaSource, asked: number | undefined) {
+  if (asked !== undefined) return { subtitleStreamIndex: asked };
+  const theirs = (await asTheySee)?.MediaSources;
+  const mine = theirs?.find((s) => s.Id === source.Id) ?? theirs?.[0];
+  if (!mine) return { subtitleStreamIndex: source.DefaultSubtitleStreamIndex };
+  return { subtitleStreamIndex: mine.DefaultSubtitleStreamIndex ?? -1, subtitleChosen: true };
+}
+
 export async function startPlayback(user: SessionUser, itemId: string, body: PlaybackRequest): Promise<PlaybackSession> {
   if (!body?.deviceProfile) throw new HttpError(400, 'deviceProfile is required');
   const allowDirectPlay = body.allowDirectPlay !== false;
@@ -159,6 +185,9 @@ export async function startPlayback(user: SessionUser, itemId: string, body: Pla
       AllowAudioStreamCopy: true,
       AutoOpenLiveStream: true,
     });
+  // What Jellyfin would show this person (their subtitle settings, and what it remembers per show):
+  // the item as they see it. (The request above says "none", so it never burns subtitles in itself.)
+  const asTheySee = settle(jellyfin.item(user.token, user.id, itemId), undefined);
   let info = await ask(body.audioStreamIndex);
   if (info.ErrorCode) throw new HttpError(415, t("Jellyfin can't play this here ({code})", { code: info.ErrorCode }));
   let source = info.MediaSources.find((s) => s.Id === body.mediaSourceId) ?? info.MediaSources[0];
@@ -206,7 +235,9 @@ export async function startPlayback(user: SessionUser, itemId: string, body: Pla
     durationSeconds: ticksToSeconds(source.RunTimeTicks) || undefined,
     ...tracks(itemId, source),
     audioStreamIndex: body.audioStreamIndex ?? source.DefaultAudioStreamIndex,
-    subtitleStreamIndex: body.subtitleStreamIndex ?? source.DefaultSubtitleStreamIndex,
+    ...(await subtitleFor(asTheySee, source, body.subtitleStreamIndex)),
+    trickplay: trickplayOf(await asTheySee, itemId, source.Id),
+    castToken: body.cast ? castToken(user, itemId) : undefined,
     transcodeReasons: reasons,
   };
 }

@@ -9,7 +9,7 @@ import { HttpError } from '../lib/upstream';
 import { jfToCard, seerrCards } from './cards';
 import { catalog } from './catalog';
 import { allDownloads, progressByTitle } from './downloads';
-import { hiddenIds, libraryIndex } from './library';
+import { leftOut, playableIndex } from './manage';
 import { searchPeople } from './people';
 import { t } from '../lib/i18n';
 
@@ -24,9 +24,9 @@ const EMPTY_PAGE: SeerrPage = { page: 1, totalPages: 0, totalResults: 0, results
 export async function search(user: SessionUser, query: string): Promise<SearchResponse> {
   const q = query.trim();
   if (!q) return { items: [], people: [] };
-  const excludeItemIds = await hiddenIds(user);
+  const excludeItemIds = await leftOut(user);
   const [index, local, remote, downloads] = await Promise.all([
-    libraryIndex(user),
+    playableIndex(user),
     settle(
       jellyfin.items(user.token, {
         userId: user.id,
@@ -64,9 +64,10 @@ const ASCENDING = new Set(['name', 'shortest']);
 
 export async function libraryPage(user: SessionUser, mediaType: MediaType, sort: string, start: number, limit: number) {
   const sortBy = SORTS[sort] ?? SORTS.added;
-  const excludeItemIds = await hiddenIds(user);
+  // Left out: new titles brought in for channels, and shows with nothing in them (under "Not on disk").
+  const excludeItemIds = await leftOut(user, mediaType === 'tv');
   const [index, res] = await Promise.all([
-    libraryIndex(user),
+    playableIndex(user),
     jellyfin.items(user.token, {
       userId: user.id,
       includeItemTypes: mediaType === 'tv' ? 'Series' : 'Movie',
@@ -95,7 +96,7 @@ export async function discoverPage(user: SessionUser, kind: string, page: number
   const target = DISCOVER[kind];
   if (!target) throw new HttpError(404, t('Unknown list "{kind}"', { kind }));
   const [index, res, downloads] = await Promise.all([
-    libraryIndex(user),
+    playableIndex(user),
     catalog.discover(target, page),
     settle(allDownloads(), []),
   ]);

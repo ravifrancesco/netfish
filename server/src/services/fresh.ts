@@ -693,6 +693,19 @@ async function startDue(s: FreshSettings, go: boolean, lowDisk: boolean, now: nu
   return undefined;
 }
 
+/**
+ * A channel's turn (Netfish's own takes a documentary on odd ones): a documentary when its last
+ * new title wasn't one, so it alternates from what came before (not from a count started when
+ * Netfish was updated); which kind of documentary, series or film, still goes by the count.
+ */
+function turnOf(channelId: string): number {
+  const count = stored.turns[channelId] ?? 0;
+  const last = stored.titles.filter((f) => f.channelId === channelId).sort((a, b) => b.addedAt - a.addedAt)[0];
+  if (!last) return count;
+  const documentaryNext = !last.genres.some((g) => TMDB_GENRES[g.toLowerCase()] === DOCUMENTARY);
+  return count % 2 === (documentaryNext ? 1 : 0) ? count : count + 1;
+}
+
 /** Picks something new for a channel's guide, if its week has room (`perWeek` is each channel's). */
 async function planOne(s: FreshSettings, defs: ChannelDef[], now: number): Promise<FreshStatus['waiting']> {
   if (!s.enabled) return 'off';
@@ -709,7 +722,7 @@ async function planOne(s: FreshSettings, defs: ChannelDef[], now: number): Promi
     // Spread over the channel's week, each far enough ahead to download in good time.
     const last = Math.max(0, ...mine(def.id).map((f) => f.notBefore));
     const notBefore = Math.max(now + s.aheadDays * DAY, last + WEEK / s.perWeek);
-    const turn = stored.turns[def.id] ?? 0;
+    const turn = turnOf(def.id);
     for (const want of wantsOf(def.source, turn)) {
       if ((want.mediaType === 'movie' && !has.radarr()) || (want.mediaType === 'tv' && !has.sonarr())) continue;
       const need = guess(want.mediaType);

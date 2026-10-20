@@ -66,6 +66,57 @@ export interface SystemVolumeState {
   muted?: boolean;
 }
 
+/** A Chromecast on the network. */
+export interface CastDevice {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+/** What the Android app says about Chromecasts: any of these, as they change. */
+export interface CastState {
+  devices?: CastDevice[];
+  connected?: boolean;
+  /** The one in use. */
+  device?: string;
+  time?: number;
+  duration?: number;
+  paused?: boolean;
+  playing?: boolean;
+  buffering?: boolean;
+  ended?: boolean;
+  error?: string;
+  volume?: number;
+  muted?: boolean;
+  /** The film the rest is about (as it was sent). */
+  url?: string;
+}
+
+/** A film on a Chromecast: links it can open by itself (they carry their own token). */
+export interface CastLoad {
+  url: string;
+  contentType: string;
+  startSeconds: number;
+  durationSeconds?: number;
+  title: string;
+  subtitle?: string;
+  image?: string;
+  episode?: boolean;
+  subtitles: Array<{ id: number; url: string; label: string; language?: string }>;
+  subtitleId: number | null;
+}
+
+/** Chromecast, through the Android app. */
+export interface CastBridge {
+  /** Look for devices (only while the player is open). */
+  watch: (on: boolean) => void;
+  connect: (id: string) => void;
+  disconnect: () => void;
+  load: (request: CastLoad) => void;
+  command: (name: 'play' | 'pause' | 'seek' | 'volume' | 'mute' | 'subtitle' | 'stop', value?: number | boolean | null) => void;
+  onState: (cb: (state: CastState) => void) => () => void;
+}
+
 export interface DesktopBridge {
   /** darwin / win32 / linux (desktop), ios, or firetv. */
   platform: string;
@@ -84,6 +135,8 @@ export interface DesktopBridge {
   /** TV: keep the screen from dimming while a film plays. */
   keepAwake?: (on: boolean) => void;
   videoOverlay?: VideoOverlay;
+  /** Chromecast (the Android app on phones and tablets with Google Play services). */
+  cast?: CastBridge;
   /** The whole app window (the Mac app), rather than one element of the page. */
   toggleFullscreen?: () => void;
   /**
@@ -176,6 +229,13 @@ interface AndroidNative {
   /** Updates (apps from 0.6.3 on): both answer through window.__netfishUpdate. */
   updateCheck?(): void;
   updateInstall?(): void;
+  /** Chromecast (phones and tablets with Google Play services, apps from 0.7.13 on): state through window.__netfishCast. */
+  castAvailable?(): boolean;
+  castWatch?(on: boolean): void;
+  castConnect?(id: string): void;
+  castDisconnect?(): void;
+  castLoad?(request: string): void;
+  castCommand?(name: string, value: string): void;
 }
 
 declare global {
@@ -185,6 +245,8 @@ declare global {
     NetfishTV?: AndroidNative;
     /** The Fire TV app reports its player's state here. */
     __netfishVideo?: (state: Record<string, unknown>) => void;
+    /** The Android app reports Chromecasts, and what the one in use is doing, here. */
+    __netfishCast?: (state: CastState) => void;
   }
 }
 
@@ -294,7 +356,32 @@ function androidBridge(): DesktopBridge | undefined {
           onState: videoStateViaWindow,
         }
       : undefined,
+    cast: native.castAvailable?.() ? castBridge(native) : undefined,
   });
+}
+
+/** Chromecast through the Android app: one set of listeners for everything it reports (the last state kept, for whoever asks later). */
+const castListeners = new Set<(state: CastState) => void>();
+let castLast: CastState = {};
+function castBridge(native: AndroidNative): CastBridge {
+  window.__netfishCast = (state) => {
+    // Kept for whoever listens later: what lasts, not what just happened.
+    const { ended, error, ...lasting } = state; // eslint-disable-line @typescript-eslint/no-unused-vars
+    castLast = { ...castLast, ...lasting };
+    castListeners.forEach((cb) => cb(state));
+  };
+  return {
+    watch: (on) => native.castWatch?.(on),
+    connect: (id) => native.castConnect?.(id),
+    disconnect: () => native.castDisconnect?.(),
+    load: (request) => native.castLoad?.(JSON.stringify(request)),
+    command: (name, value) => native.castCommand?.(name, JSON.stringify(value ?? null)),
+    onState: (cb) => {
+      castListeners.add(cb);
+      cb(castLast);
+      return () => void castListeners.delete(cb);
+    },
+  };
 }
 
 /** The app around this page, if any (desktop, iPhone/iPad or Fire TV). */

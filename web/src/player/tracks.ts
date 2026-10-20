@@ -9,6 +9,11 @@ import { getPrefs } from '../lib/prefs';
 export function pickSubtitle(s: PlaybackSession, current: StreamTrack | undefined, anyKind: boolean) {
   const usable = (t: StreamTrack) => anyKind || Boolean(t.vttUrl);
   if (current) return s.subtitleTracks.find((t) => t.index === current.index) ?? current;
+  // Jellyfin's choice for this person (their settings, what it remembers per show): as it is, none included.
+  if (s.subtitleChosen) {
+    const theirs = s.subtitleTracks.find((t) => t.index === s.subtitleStreamIndex);
+    return theirs && usable(theirs) ? theirs : undefined;
+  }
   const fromServer = s.subtitleTracks.find((t) => t.index === s.subtitleStreamIndex);
   if (fromServer) return fromServer;
   if (!getPrefs().subtitlesByDefault) return s.subtitleTracks.find((t) => t.forced && usable(t));

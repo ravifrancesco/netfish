@@ -19,11 +19,11 @@ import { HttpError } from '../lib/upstream';
 import { radarrMovie, sonarrSeries } from './arrLookup';
 import { canChooseVersion } from './releases';
 import { movieNotOut, showNotOut } from './notOut';
-import { diskOf, removedInfo } from './manage';
+import { diskOf, playableIndex, removedInfo } from './manage';
 import { availabilityFromSeerr, episodeLabel, resolveAvailability, seerrCards } from './cards';
 import { catalog } from './catalog';
 import { allDownloads, detailsFor, downloadsFor, progressByTitle } from './downloads';
-import { findInLibrary, libraryIndex } from './library';
+import { findInLibrary, libraryIndex, showHasEpisodes } from './library';
 import { handOverWatched, markOffDisk, offDiskWatched } from './watched';
 import { toSummary } from './requests';
 import { maybeSeerrUserId } from './seerrUsers';
@@ -131,7 +131,7 @@ function requestsOf(mediaInfo: SeerrMediaInfo | undefined, mySeerrId: number | u
 // ---------- Movies ----------
 
 export async function movieDetail(user: SessionUser, tmdbId: number): Promise<TitleDetail> {
-  const index = await libraryIndex(user);
+  const index = await playableIndex(user);
   const entry = findInLibrary(index, 'movie', tmdbId);
   if (!has.seerr()) {
     if (!entry) throw new HttpError(404, t('Not in your library'));
@@ -185,7 +185,8 @@ export async function movieDetail(user: SessionUser, tmdbId: number): Promise<Ti
     managed: Boolean(managed),
     notOut: status === 'available' ? undefined : movieNotOut(movie, managed),
     disk: user.isAdmin ? diskOf('movie', managed) : undefined,
-    removed,
+    // Back on disk: no longer "deleted".
+    removed: entry ? undefined : removed,
     canManage: user.isAdmin && Boolean(managed),
     canChooseVersion: Boolean(managed) && canChooseVersion(user),
     canRequest: status === 'none',
@@ -201,7 +202,7 @@ function seasonStatus(tv: SeerrTv, seasonNumber: number, inJellyfin: boolean): A
 }
 
 export async function tvDetail(user: SessionUser, tmdbId: number): Promise<TitleDetail> {
-  const index = await libraryIndex(user);
+  const index = await playableIndex(user);
   if (!has.seerr()) {
     const entry = findInLibrary(index, 'tv', tmdbId);
     if (!entry) throw new HttpError(404, t('Not in your library'));
@@ -210,7 +211,9 @@ export async function tvDetail(user: SessionUser, tmdbId: number): Promise<Title
 
   const tv = await catalog.tv(tmdbId);
   const tvdbId = tv.externalIds?.tvdbId;
-  const entry = findInLibrary(index, 'tv', tmdbId, tvdbId);
+  const listed = findInLibrary(index, 'tv', tmdbId, tvdbId);
+  // A show Jellyfin lists with nothing in it (deleted, its folder left behind) isn't in the library.
+  const entry = listed && (await showHasEpisodes(user, listed.id)) ? listed : undefined;
   const [downloads, mySeerrId, jfSeasons, playItem, recs, managed, series] = await Promise.all([
     settle(allDownloads(), []),
     maybeSeerrUserId(user),
@@ -273,7 +276,8 @@ export async function tvDetail(user: SessionUser, tmdbId: number): Promise<Title
     managed: Boolean(managed),
     notOut: showNotOut(tv, managed),
     disk: user.isAdmin ? diskOf('tv', managed) : undefined,
-    removed,
+    // The whole show back on disk: no longer "deleted" (deleted seasons stay noted).
+    removed: removed && (removed.seasons || !entry) ? removed : undefined,
     canManage: user.isAdmin && Boolean(managed),
     canChooseVersion: Boolean(managed) && canChooseVersion(user),
     canRequest: seasons.some((s) => s.seasonNumber > 0 && s.status === 'none'),
