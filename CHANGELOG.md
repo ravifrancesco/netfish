@@ -7,6 +7,18 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.17 (2026-10-20)
+
+### Fixed
+- **Skip intro did nothing when clicked or tapped** (Mac, iPhone, browsers, everywhere). The controls bar along the bottom reaches up behind the button, invisibly, and caught the click. The **Next episode** card had the same problem. Both now sit above it.
+- **Subtitles with Jellyfin 12, on Samsung TVs and in browsers.** Jellyfin 12 hands a subtitle out in its own format (SRT) whenever the device can take that format, where it used to send WebVTT. The TV page and browsers draw only WebVTT, so subtitles didn't appear. Netfish now always asks Jellyfin for WebVTT, and reads SRT-style times too, just in case. Found by running Jellyfin 12.2 itself against Netfish.
+
+### Changed
+- **Trailers: English and your profile's language only.** The switch offers just those two (your profile's language from **Settings → Playback on this device**, when there's a trailer in it). 0.7.16 also always added Italian; that's gone, as is the film's own language and the device's.
+
+### Update
+- **Server.**
+
 ## 0.7.16 (2026-10-20)
 
 ### New

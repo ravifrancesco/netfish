@@ -102,9 +102,11 @@ function tracks(itemId: string, source: JfMediaSource) {
         default: s.IsDefault || undefined,
         forced: s.IsForced || undefined,
         external: s.IsExternal || undefined,
+        // Always as WebVTT. Jellyfin 12 hands out each subtitle in the first format the device
+        // profile lists for it (SRT for a Samsung TV), but the page draws WebVTT only.
         vttUrl: text
           ? s.DeliveryMethod === 'External' && s.DeliveryUrl
-            ? proxied(s.DeliveryUrl)
+            ? proxied(s.DeliveryUrl.replace(/\/Stream\.[a-z0-9]+(?=\?|$)/i, '/Stream.vtt'))
             : `${JF_PREFIX}/Videos/${itemId}/${source.Id}/Subtitles/${s.Index}/0/Stream.vtt`
           : undefined,
         burnIn: !text || undefined,

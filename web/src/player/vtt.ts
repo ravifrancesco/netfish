@@ -6,7 +6,8 @@ export interface Cue {
 }
 
 const time = (s: string) => {
-  const parts = s.trim().split(':').map(Number);
+  // "00:01:02.500", or SRT's "00:01:02,500" should a subtitle come in that format.
+  const parts = s.trim().replace(',', '.').split(':').map(Number);
   return parts.reduce((total, n) => total * 60 + n, 0);
 };
 

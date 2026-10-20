@@ -172,6 +172,20 @@ const nominalMinutes = (t: Title) => (t.type === 'movie' ? 84 + ((t.n * 37) % 70
 /** Scrubbing previews (Jellyfin's trickplay): 320×180 frames, every 10 s, 10×10 to a picture, made from the sample with ffmpeg. */
 const TRICKPLAY = (id: string) => ({ [id]: { '320': { Width: 320, Height: 180, TileWidth: 10, TileHeight: 10, ThumbnailCount: Math.ceil(DURATION_SECONDS / 10), Interval: 10_000, Bandwidth: 0 } } });
 
+/**
+ * Like Jellyfin 12: a text subtitle is handed out in its own format whenever the device profile
+ * lists that format at all (an SRT as Stream.subrip), WebVTT only otherwise.
+ */
+function deliveredAs<T extends { Codec?: string; DeliveryUrl?: string }>(streams: T[], profiles?: Array<{ Format: string; Method: string }>): T[] {
+  const external = new Set((profiles ?? []).filter((p) => p.Method === 'External').map((p) => p.Format.toLowerCase()));
+  return streams.map((st) => {
+    const codec = st.Codec?.toLowerCase();
+    if (!st.DeliveryUrl || !codec || codec === 'vtt' || codec === 'webvtt') return st;
+    const own = external.has(codec) || (codec === 'subrip' && external.has('srt'));
+    return own ? { ...st, DeliveryUrl: st.DeliveryUrl.replace('/Stream.vtt', `/Stream.${codec}`) } : st;
+  });
+}
+
 /** Each person's Jellyfin settings (audio and subtitles), as /Users/Me gives them and /Users/Configuration saves them. */
 const userConfig = new Map<string, Record<string, unknown>>();
 function configOf(user: { id: string; name: string }): Record<string, unknown> {
@@ -496,7 +510,7 @@ void app.register(
         MediaSources: [
           {
             Id: item.id, Container: containerOf(item), RunTimeTicks: RUNTIME_TICKS, SupportsDirectPlay: direct, SupportsDirectStream: direct,
-            SupportsTranscoding: true, MediaStreams: streams, DefaultAudioStreamIndex: audioIndex, DefaultSubtitleStreamIndex: subIndex,
+            SupportsTranscoding: true, MediaStreams: deliveredAs(streams, profile?.SubtitleProfiles), DefaultAudioStreamIndex: audioIndex, DefaultSubtitleStreamIndex: subIndex,
             ...(direct
               ? {}
               : {
