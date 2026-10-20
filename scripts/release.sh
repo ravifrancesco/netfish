@@ -21,6 +21,9 @@ if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
   exit 1
 fi
 grep -q "netfishVersion = '$VERSION'" apps/android/app/build.gradle || { echo "Set netfishVersion to '$VERSION' in apps/android/app/build.gradle." >&2; exit 1; }
+# The release page opens with this version's entry in CHANGELOG.md ("## X.Y.Z (date)" up to the next "## ").
+WHATS_NEW=$(awk -v v="$VERSION" 'index($0, "## " v " ") == 1 || $0 == "## " v { on = 1; next } on && /^## / { exit } on { print }' CHANGELOG.md)
+[ -n "$(echo "$WHATS_NEW" | tr -d '[:space:]')" ] || { echo "Write the entry for $VERSION in CHANGELOG.md first (\"## $VERSION ($(date +%F))\")." >&2; exit 1; }
 # The app versions Netfish asks devices to update to can't be newer than this release.
 node -e '
 const [file, version] = process.argv.slice(1);
@@ -46,7 +49,15 @@ STAGE=$(mktemp -d)
 for kind in server.tar.gz mac.dmg mac.zip windows.exe android.apk samsung.wgt ios.ipa; do
   cp "release/Netfish-$VERSION-$kind" "$STAGE/Netfish-$kind"
 done
-cat > "$STAGE/notes.md" <<NOTES
+{
+  echo "## What's new"
+  echo
+  echo "$WHATS_NEW"
+  echo
+  echo "Every version: [CHANGELOG.md](https://github.com/$OWNER/netfish/blob/main/CHANGELOG.md)"
+  echo
+} > "$STAGE/notes.md"
+cat >> "$STAGE/notes.md" <<NOTES
 ## Install
 
 | For | Get |

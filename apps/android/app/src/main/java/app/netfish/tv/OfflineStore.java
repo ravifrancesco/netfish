@@ -208,6 +208,12 @@ final class OfflineStore {
                     subs.put(new JSONObject().put("label", s.optString("label")).put("code", s.optString("code")).put("url", ORIGIN + "/media/" + id + "/sub/" + n));
                 }
                 item.put("subtitles", subs);
+                JSONObject trick = e.optJSONObject("trickplay");
+                if (trick != null) {
+                    JSONObject shown = new JSONObject(trick.toString());
+                    shown.remove("files");
+                    item.put("trickplay", shown.put("url", ORIGIN + "/media/" + id + "/trick/{index}"));
+                }
                 list.put(item);
             }
         } catch (JSONException ignored) {
@@ -293,6 +299,7 @@ final class OfflineStore {
                             .put("file", e.optString("folder") + "/" + file.getName()));
                 }
             }
+            keepTrickplay(d.optJSONObject("trickplay"), e, dir, origin, cookie);
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(origin + d.optString("url")))
                     .setTitle(d.optString("title"))
                     .setDescription(context.getString(R.string.download_notification_description))
@@ -388,6 +395,28 @@ final class OfflineStore {
 
     // ---------- Deleting ----------
 
+    /**
+     * The scrubbing previews (Jellyfin's trickplay pictures) beside the film, when the server
+     * lists them: all of them or none (a gap would show the wrong frames).
+     */
+    private void keepTrickplay(JSONObject trick, JSONObject e, File dir, String origin, String cookie) throws JSONException {
+        JSONArray sheets = trick == null ? null : trick.optJSONArray("sheets");
+        if (sheets == null || sheets.length() == 0) return;
+        String itemId = e.optString("itemId");
+        JSONArray files = new JSONArray();
+        for (int n = 0; n < sheets.length(); n++) {
+            File file = new File(dir, "." + itemId + ".trick." + n + ".jpg");
+            if (fetch(origin + sheets.getString(n), cookie, file) == null) {
+                for (int k = 0; k <= n; k++) delete(new File(dir, "." + itemId + ".trick." + k + ".jpg"));
+                return;
+            }
+            files.put(e.optString("folder") + "/" + file.getName());
+        }
+        JSONObject kept = new JSONObject();
+        for (String key : new String[] {"width", "height", "columns", "rows", "count", "interval"}) kept.put(key, trick.get(key));
+        e.put("trickplay", kept.put("files", files));
+    }
+
     String remove(String itemId) {
         JSONObject e = entry(itemId);
         if (e != null) {
@@ -396,6 +425,8 @@ final class OfflineStore {
             if (e.has("posterFile")) delete(new File(root, e.optString("posterFile")));
             JSONArray subs = e.optJSONArray("subtitles");
             for (int n = 0; subs != null && n < subs.length(); n++) delete(new File(root, subs.optJSONObject(n).optString("file")));
+            JSONArray tricks = e.has("trickplay") ? e.optJSONObject("trickplay").optJSONArray("files") : null;
+            for (int n = 0; tricks != null && n < tricks.length(); n++) delete(new File(root, tricks.optString(n)));
             File dir = new File(root, e.optString("folder"));
             String[] left = dir.list();
             if (left != null && left.length == 0) delete(dir);
@@ -484,6 +515,10 @@ final class OfflineStore {
                     JSONArray subs = e.optJSONArray("subtitles");
                     int n = parts.size() > 3 ? Integer.parseInt(parts.get(3)) : -1;
                     return subs != null && n >= 0 && n < subs.length() ? file(new File(root, subs.getJSONObject(n).optString("file")), "text/vtt", headers) : notFound();
+                case "trick":
+                    JSONArray tricks = e.has("trickplay") ? e.getJSONObject("trickplay").optJSONArray("files") : null;
+                    int t = parts.size() > 3 ? Integer.parseInt(parts.get(3)) : -1;
+                    return tricks != null && t >= 0 && t < tricks.length() ? file(new File(root, tricks.getString(t)), "image/jpeg", headers) : notFound();
                 default: return notFound();
             }
         } catch (IOException | JSONException | NumberFormatException ex) {

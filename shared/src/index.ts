@@ -896,6 +896,8 @@ export interface OfflineDescriptor {
   backdrop?: string;
   durationSeconds?: number;
   subtitles: Array<{ label: string; code?: string; url: string }>;
+  /** Scrubbing previews to keep with it (Jellyfin's trickplay): the pictures to fetch, in order, for `url`'s {index}. */
+  trickplay?: Trickplay & { sheets: string[] };
   detailHref?: string;
 }
 

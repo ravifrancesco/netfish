@@ -14,19 +14,21 @@ A Netflix-style front door for a home media server. One app to browse, discover,
 - [Playback: who does the work?](#playback-who-does-the-work)
 - Apps: [Mac](#mac-app) · [Windows](#windows-app) · [Android, Fire TV, Android TV](#android-app-phones-tablets-fire-tv-android-tv) · [Samsung TV](#samsung-tv-app) · [iPhone & iPad](#iphone--ipad-app)
 - [Developing](#developing) · [Building and releasing](#building-the-apps-and-releasing)
-- [Good to know](#good-to-know) · [Licence](#licence) · [Roadmap](#roadmap)
+- [Good to know](#good-to-know) · [Changelog](CHANGELOG.md) · [Licence](#licence) · [Roadmap](#roadmap)
 
 ## Features
 
 ### Watching
 - **Home like a streaming service:** Continue Watching, *Ready to watch*, *Top picks for you*, *Because you watched…*, new arrivals, trending and coming soon.
-- **A real player:** plays the file as it is when it can; otherwise Jellyfin repackages it (cheap on a Pi) and only transcodes as a last resort. Audio and subtitle switching, resume, skip intro, next episode, keyboard shortcuts.
+- **A real player:** plays the file as it is when it can; otherwise Jellyfin repackages it (cheap on a Pi) and only transcodes as a last resort. Audio and subtitle switching, resume, skip intro, next episode, keyboard shortcuts, and a preview picture as you scrub the timeline (from Jellyfin's trickplay images, see *Good to know*).
+- **Your languages, as in Jellyfin:** films start with the audio and subtitles your Jellyfin settings and Jellyfin's memory of each title ask for, the same tracks Jellyfin's own apps pick. Change those settings in **Settings → Playback on this device**; subtitles you pick while watching become your default.
 - **Play on TV:** connect to the TV (or any device with Netfish open) with the cast button next to your profile picture, like YouTube; then Play plays there and your phone becomes the remote: pause, skip, audio and subtitles. A film you're already watching can be handed over mid-way.
+- **Chromecast:** in the Android app on phones and tablets, the player's cast button also lists the Chromecasts on your network. The film carries on there from the same spot, the phone is the remote, and **Stop casting** brings it back.
 - **Watch together:** turn what you're watching into a room from the player (or from a title's **⋯** menu). Play, pause, skipping and the next episode stay in step on every device, and the room shows up for everyone on your server right away.
 - **Channels:** your library as TV, when an admin turns them on. Each channel plays around the clock and everyone on it sees the same minute; there's no pausing, a short fish-and-net break between programmes with a look at what's next, and a guide up to three days ahead. Netfish's own channel keeps a real timetable: cartoons in the morning, sitcoms in the afternoon, The Simpsons at half six, then a film at nine (a documentary on some nights).
 - **New on the channels (optional):** Netfish can bring in well-liked films and shows nobody here has for the channels you pick. They're in the guide a week ahead marked *New*, downloaded a few days before they air, and deleted afterwards unless someone presses **Keep**.
 - **Mark as watched:** a film, an episode or a whole season; take anything off *Continue Watching* with one click.
-- **Offline:** download movies and episodes in the Mac, Windows, iPhone/iPad and Android phone apps. Play then always uses the downloaded copy, and where you stop still counts on the server. When the server can't be reached, the apps switch to offline mode: your downloads first, the rest of your Home greyed out.
+- **Offline:** download movies and episodes in the Mac, Windows, iPhone/iPad and Android phone apps, with their subtitles and scrubbing previews. Play then always uses the downloaded copy, and where you stop still counts on the server. When the server can't be reached, the apps switch to offline mode: your downloads first, the rest of your Home greyed out.
 
 ### Finding something
 - **One search for everything:** your library and all of TMDB, with clear badges (in library, requested, downloading 45%).
@@ -48,13 +50,14 @@ A Netflix-style front door for a home media server. One app to browse, discover,
 
 ### For the admin
 - **Set up from the app:** a first-run screen, then **Settings → Connections** for every service, with a test button.
-- **Disk space:** stop or replace downloads, delete a movie or some seasons from disk (it stays in the library, ready to download again), see how full each disk is and what could go.
+- **Disk space:** stop or replace downloads, delete a movie or some seasons from disk, see how full each disk is and what could go. Titles deleted from disk stay at the end of Movies and Shows, greyed out under *Not on disk*, ready to download again, with who deleted them and the space freed. That follows Radarr and Sonarr, so it holds wherever a title was deleted. Watched marks are kept for when it's back.
 - **Trakt, optional:** one Trakt account for the whole server: history, scrobbling and its recommendations on Home (needs Trakt VIP, see *Good to know*).
 - **SuggestArr, optional:** what [SuggestArr](https://github.com/giuseppe99barchetta/SuggestArr) (2.11 or newer) requested from each person's viewing shows on their Home ("Because you watched…") and is marked in Activity; admins see its jobs and can run them now.
 - **Download details:** Activity shows each download's custom formats and score, indexer and client from Radarr/Sonarr; admins choose which details everyone else sees.
 
 ### Apps
 - **Everywhere:** the web app at `http://<pi>:7777` (phones too), plus apps for Mac, Windows, iPhone/iPad, Android (phones, tablets, Fire TV, Android TV) and Samsung TVs.
+- **TV mode** (Fire TV, Android TV, Samsung TVs): a big, remote-friendly interface. The arrows move between rows and buttons, the timeline scrubs with left and right (with previews), and Back goes back, asking before it closes Netfish.
 - **Up to date by themselves:** the TV and phone apps get new features from the server. When an app itself has something new worth having, Netfish says so on that device, and the Mac, Windows and Android apps (Fire TV too) update in one click; the Mac and Windows apps can also do it on their own with **Auto-update**. Admins see every open device and its version in **Settings → Devices**, and an iPhone installed from a Mac warns before its 7 days run out.
 
 Sign-in uses your Jellyfin accounts. Jellyfin keeps doing the heavy lifting (library, streaming, users) behind the scenes; nobody needs to open it.
@@ -131,7 +134,7 @@ The apps show the interface from your server, so most new features arrive by upd
 
 **1. Portainer → Stacks → Add stack**, name it `netfish`, paste [`docker-compose.yml`](docker-compose.yml), and **Deploy**. No variables are needed: Portainer pulls the ready-made image `ghcr.io/ravifrancesco/netfish:latest` (built by GitHub for Raspberry Pi and PCs).
 
-**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.7.13`.
+**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.7.14`.
 
 <details>
 <summary>Or build the image on the Pi yourself</summary>
@@ -179,6 +182,8 @@ A native Mac app (`apps/mac/`) built the way Jellyfin Media Player works: **mpv 
 
 **Install:** open [Netfish-mac.dmg](https://github.com/ravifrancesco/netfish/releases/latest/download/Netfish-mac.dmg) and drag Netfish to Applications (macOS 15 or later; mpv is inside the app, nothing else to install). The app isn't notarized yet, so the first time allow it in **System Settings → Privacy & Security → Open Anyway** ([Mac guide](docs/install/mac.md)). On first launch, enter your server address (e.g. `192.168.1.50`).
 
+**Volume:** the player's volume is the Mac's own: the volume keys move the player's slider, and the slider moves the Mac's volume.
+
 **Downloads:** the **Download** button, the Offline tabs and the downloads page (⇧⌘D) work as before; files live in `~/Library/Application Support/app.netfish.mac` and are saved as MP4.
 
 Build it yourself: `npm run build:mac` (Xcode command-line tools, and `brew install mpv dylibbundler`: the build copies libmpv and its libraries into the app).
@@ -191,7 +196,7 @@ Build it yourself: `npm run build:mac` (Xcode command-line tools, and `brew inst
 
 **Downloads:** the **Download** button, the Offline tabs and the downloads page (Ctrl+Shift+D) work like on the Mac. Files are saved **exactly as they are on the server** (mpv plays them all, with every audio and subtitle track), so downloading costs the Pi nothing. They live in `%LOCALAPPDATA%\Netfish\Offline`. Interrupted downloads continue where they stopped.
 
-**Keys:** F11 full screen, Ctrl+Shift+H home, Ctrl+Shift+D downloads, plus the player's own keys.
+**Keys:** F11 full screen, Ctrl+Shift+H home, Ctrl+Shift+D downloads, plus the player's own keys. The player's volume is the PC's own, so the volume keys and the slider move together.
 
 Build it yourself, on a Mac or PC: `npm run build:windows`. It needs the .NET 8 SDK and, on a Mac, `brew install makensis sevenzip`. It downloads a pinned libmpv build (shinchiro's, the one mpv.io links to) and checks its checksum.
 
@@ -200,6 +205,8 @@ Build it yourself, on a Mac or PC: `npm run build:windows`. It needs the .NET 8 
 One app (`apps/android/`) for every Android device (step by step: [Android phones](docs/install/android.md), [Fire TV & Android TV](docs/install/fire-tv.md)). On a **TV** (Fire TV, Android TV) it shows the Netfish interface in **TV mode**: the remote's arrows move between rows and buttons, Select opens or plays, Back closes menus and then goes back; no downloads on TV. On a **phone or tablet** it's the touch interface, with **downloads**: the Download button, Offline tabs and the downloads page work like on the Mac, files are saved as MP4 in the app's storage, and away from home the app opens your downloads.
 
 Films play like on the Mac: **ExoPlayer draws the picture underneath Netfish's own player**, with Jellyfin's FFmpeg audio decoders (the same engine as Jellyfin's Android TV app). The device's hardware decodes the picture and the app decodes any sound format (DTS, TrueHD, Dolby), so the server sends files untouched; ExoPlayer draws every kind of subtitle, picture ones too, and lifts them above the controls when they show. The app tells the server exactly which video formats this device's decoders handle, so only what it truly can't play gets converted. On a phone a film turns to landscape full screen.
+
+**Chromecast** (phones and tablets with Google Play services, app 0.7.13 or newer): while a film plays, the cast button at the top of the player lists the Chromecasts nearby, under any Netfish screens. Pick one and the film continues there from the same spot. The phone is the remote (pause, skip, the timeline, volume, subtitles and audio), and Android's notification has play and pause too. **Stop casting** brings it back to the phone, from where the Chromecast got to. The Chromecast fetches the film from your server itself, with a link that only opens that film and expires after 12 hours, so the server address the app uses must be reachable from the Chromecast (the Pi's LAN address works; `localhost` doesn't). What a Chromecast can't play as it is, Jellyfin converts to H.264 and AAC.
 
 The app is [Netfish-android.apk](https://github.com/ravifrancesco/netfish/releases/latest/download/Netfish-android.apk) (the same file for every device).
 
@@ -225,7 +232,7 @@ Build it yourself: `npm run build:android` (JDK 17+ and the Android SDK; set `sd
 
 ## Samsung TV app
 
-`apps/tizen/` is a small Samsung TV (Tizen) app: it asks for your server's address once, then opens Netfish in **TV mode**, like the Fire TV app (arrows, OK and Back on the remote; Back on the home screen closes it). Films play with the **TV's own player**, as in Jellyfin's Samsung app: MKV, HEVC, AV1 (2020+ TVs) and Dolby sound play as-is, so the server just sends the file; DTS and TrueHD sound get converted. Netfish declares exactly this to the server when it detects a Samsung TV, and the web interface is built to run on the TVs' browsers from 2022 (Chromium 85) onwards.
+`apps/tizen/` is a small Samsung TV (Tizen) app: it asks for your server's address once, then opens Netfish in **TV mode**, like the Fire TV app: arrows, OK and Back on the remote, with the timeline scrubbing on left and right. Back on Netfish's first page asks before closing it, and on a Full HD or 4K TV everything is drawn about 1.5× bigger. Subtitles are drawn by Netfish itself, since the TV's browser doesn't draw them. The first time a film's subtitles are asked for, Jellyfin has to pull them out of the file, which can take a little while on a Pi. Films play with the **TV's own player**, as in Jellyfin's Samsung app: MKV, HEVC, AV1 (2020+ TVs) and Dolby sound play as-is, so the server just sends the file; DTS and TrueHD sound get converted. Netfish declares exactly this to the server when it detects a Samsung TV, and the web interface is built to run on the TVs' browsers from 2022 (Chromium 85) onwards.
 
 Samsung only installs apps outside its store in Developer Mode, signed for your TV: use the community TizenBrew Installer or Samsung's Tizen Studio, step by step in the [Samsung TV guide](docs/install/samsung-tv.md). Build the package yourself with `npm run build:samsung` (it makes the unsigned `release/Netfish-<version>-samsung.wgt`).
 
@@ -270,7 +277,7 @@ Against real services: copy `.env.example` to `server/.env`, swap `host.docker.i
 
 The Android and Windows builds run from a copy in `~/Library/Caches/netfish-build` (newer macOS won't let their tools copy files out of iCloud Drive). Every push to `main` makes GitHub build the server image `ghcr.io/ravifrancesco/netfish:latest`.
 
-**To publish a version:** raise `version` in `package.json` (and `netfishVersion` in `apps/android/app/build.gradle`), commit, then run `scripts/release.sh`. It builds everything, tags `v<version>` (GitHub then builds the image `:<version>`), and creates the GitHub release with all the files under fixed names, so the download links above always point at the newest one.
+**To publish a version:** raise `version` in `package.json` (and `netfishVersion` in `apps/android/app/build.gradle`), turn *Unreleased* in [CHANGELOG.md](CHANGELOG.md) into `## <version> (<date>)` with everything the version brings, commit, then run `scripts/release.sh`. It builds everything, tags `v<version>` (GitHub then builds the image `:<version>`), and creates the GitHub release with all the files under fixed names, so the download links above always point at the newest one. The release page opens with the version's changelog entry; the script stops if there isn't one.
 
 ## Good to know
 
@@ -280,6 +287,8 @@ The Android and Windows builds run from a copy in `~/Library/Caches/netfish-buil
 - **Trakt needs VIP.** Since August 2026 Trakt only lets VIP accounts create the API app whose Client ID and secret Netfish needs, and a free account can connect only one outside app. Netfish works the same without Trakt: its own suggestions (*Top picks*, *Because you watched…*) come from TMDB through Seerr.
 - **Play on TV** lists your own devices (signed in as you) and every TV on your server, since a TV is usually the household's. The film plays under the profile signed in on that TV. Name each device in **Settings → Playback on this device**. While you're connected, the cast button shows the device's name; pick **This device** to play here again.
 - **Watch together** keeps a live connection to the server open while you watch (server-sent events). Behind a reverse proxy that buffers responses, turn buffering off for `/api/together/`; Netfish already tells nginx not to.
+- **Scrubbing previews** come from Jellyfin's trickplay pictures (Jellyfin 10.9 or newer). Turn them on per library in Jellyfin's dashboard: **Libraries → ⋮ on the library → Manage library → Trickplay → Enable trickplay image extraction** (and *Extract trickplay images during the library scan* for new titles), then run **Scheduled Tasks → Generate Trickplay Images**. On a Raspberry Pi, tick *Only generate images from key frames* in **Dashboard → Playback → Trickplay**: it's much faster. The first run takes hours for a big library, and titles fill in as it goes. Downloads keep their previews when they were made before downloading.
+- **Audio and subtitle settings are Jellyfin's.** **Settings → Playback on this device** shows your Jellyfin audio language, subtitle mode and subtitle language, and changing them there changes them in Jellyfin and its apps too.
 - **Letterboxd** has no public API; its score comes from MDBList when a key is set, otherwise Netfish links to the film's page.
 - **Artwork cache:** Netfish keeps a copy of every poster it has shown (and fetches library posters ahead of time) in `/config/cache/images`, up to 1 GB by default (`IMAGE_CACHE_MB` to change). Covers load instantly after the first time, and apps keep them too.
 

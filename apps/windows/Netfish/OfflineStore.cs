@@ -22,6 +22,18 @@ sealed class OfflineStore
         public string File { get; set; } = ""; // relative to the root folder
     }
 
+    /// <summary>Scrubbing previews (Jellyfin's trickplay pictures): frames of Width×Height, Columns×Rows to a picture, one every Interval seconds.</summary>
+    sealed class Trickplay
+    {
+        public double Width { get; set; }
+        public double Height { get; set; }
+        public int Columns { get; set; }
+        public int Rows { get; set; }
+        public int Count { get; set; }
+        public double Interval { get; set; }
+        public List<string> Files { get; set; } = new(); // relative to the root folder
+    }
+
     sealed class Entry
     {
         public string ItemId { get; set; } = "";
@@ -46,6 +58,7 @@ sealed class OfflineStore
         public string? PosterFile { get; set; }
         public string? PosterType { get; set; }
         public List<Subtitle> Subtitles { get; set; } = new();
+        public Trickplay? Trickplay { get; set; }
         /// <summary>What the server described, kept so an interrupted download can be retried.</summary>
         public string Source { get; set; } = "{}";
     }
@@ -167,6 +180,12 @@ sealed class OfflineStore
                 }).ToArray()),
             };
             if (e.PosterFile != null) item["poster"] = $"{media}/poster";
+            if (e.Trickplay is { } t)
+                item["trickplay"] = new JsonObject
+                {
+                    ["url"] = $"{media}/trick/{{index}}", ["width"] = t.Width, ["height"] = t.Height,
+                    ["columns"] = t.Columns, ["rows"] = t.Rows, ["count"] = t.Count, ["interval"] = t.Interval,
+                };
             if (e.SeriesId != null) item["seriesId"] = e.SeriesId;
             if (e.SeriesTitle != null) item["seriesTitle"] = e.SeriesTitle;
             if (e.Subtitle != null) item["subtitle"] = e.Subtitle;
@@ -192,12 +211,13 @@ sealed class OfflineStore
         return null;
     }
 
-    /// <summary>Artwork and subtitles for the downloads page.</summary>
+    /// <summary>Artwork, subtitles and scrubbing previews for the downloads page.</summary>
     public (string Path, string Type)? Asset(string itemId, string kind, string? n)
     {
         if (Find(itemId) is not { } e) return null;
         if (kind == "poster" && e.PosterFile != null) return (Path.Combine(root, e.PosterFile), e.PosterType is { Length: > 0 } t ? t : "image/jpeg");
         if (kind == "sub" && int.TryParse(n, out var i) && i >= 0 && i < e.Subtitles.Count) return (Path.Combine(root, e.Subtitles[i].File), "text/vtt; charset=utf-8");
+        if (kind == "trick" && e.Trickplay is { } trick && int.TryParse(n, out var k) && k >= 0 && k < trick.Files.Count) return (Path.Combine(root, trick.Files[k]), "image/jpeg");
         return null;
     }
 
@@ -212,6 +232,33 @@ sealed class OfflineStore
 
     static string? Str(JsonObject d, string key) => d[key] is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
     static T? Num<T>(JsonObject d, string key) where T : struct => d[key] is JsonValue v && v.TryGetValue<T>(out var n) ? n : null;
+
+    /// <summary>The scrubbing previews beside the film, when the server lists them: all of them or none (a gap would show the wrong frames).</summary>
+    async Task<Trickplay?> KeepTrickplay(JsonObject? t, string itemId, string folder, string dir, Uri origin, string cookie)
+    {
+        if (t?["sheets"] is not JsonArray sheets || sheets.Count == 0) return null;
+        try
+        {
+            var kept = new Trickplay
+            {
+                Width = t["width"]!.GetValue<double>(), Height = t["height"]!.GetValue<double>(),
+                Columns = t["columns"]!.GetValue<int>(), Rows = t["rows"]!.GetValue<int>(),
+                Count = t["count"]!.GetValue<int>(), Interval = t["interval"]!.GetValue<double>(),
+            };
+            for (var n = 0; n < sheets.Count; n++)
+            {
+                var name = $".{itemId}.trick.{n}.jpg";
+                kept.Files.Add(Path.Combine(folder, name));
+                await Fetch(new Uri(origin, sheets[n]!.GetValue<string>()), cookie, Path.Combine(dir, name));
+            }
+            return kept;
+        }
+        catch
+        {
+            for (var n = 0; n < sheets.Count; n++) Delete(Path.Combine(dir, $".{itemId}.trick.{n}.jpg"));
+            return null;
+        }
+    }
 
     static async Task<string> Fetch(Uri url, string cookie, string file)
     {
@@ -280,6 +327,7 @@ sealed class OfflineStore
             }
             catch { /* skip a broken subtitle track */ }
         }
+        entry.Trickplay = await KeepTrickplay(d["trickplay"] as JsonObject, itemId, folder, dir, origin, cookie);
         if (!entries.Contains(entry)) return PublicList(); // cancelled meanwhile
         Begin(entry, new Uri(origin, path), cookie);
         Save();
@@ -415,6 +463,7 @@ sealed class OfflineStore
             Delete(VideoFile(e) + ".part");
             if (e.PosterFile != null) Delete(Path.Combine(root, e.PosterFile));
             foreach (var s in e.Subtitles) Delete(Path.Combine(root, s.File));
+            foreach (var f in e.Trickplay?.Files ?? new()) Delete(Path.Combine(root, f));
             // Tidy the title's folder if it's now empty.
             try
             {

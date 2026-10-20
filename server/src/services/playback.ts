@@ -155,6 +155,13 @@ function trickplayOf(item: JfItem | undefined, itemId: string, sourceId: string)
   };
 }
 
+/** Previews for a download: every picture's address, so the app can keep them all. */
+function trickplaySheets(trick: Trickplay | undefined): (Trickplay & { sheets: string[] }) | undefined {
+  if (!trick || !trick.count) return undefined;
+  const pictures = Math.ceil(trick.count / Math.max(1, trick.columns * trick.rows));
+  return { ...trick, sheets: Array.from({ length: pictures }, (_, n) => trick.url.replace('{index}', String(n))) };
+}
+
 /** The subtitle to start with: the one asked for, else Jellyfin's choice for this person (none: -1). */
 async function subtitleFor(asTheySee: Promise<JfItem | undefined>, source: JfMediaSource, asked: number | undefined) {
   if (asked !== undefined) return { subtitleStreamIndex: asked };
@@ -363,6 +370,7 @@ export async function offlineInfo(user: SessionUser, itemId: string, target: Off
         code: findLanguage(s.Language)?.code ?? s.Language,
         url: `${JF_PREFIX}/Videos/${itemId}/${source.Id}/Subtitles/${s.Index}/0/Stream.vtt`,
       })),
+    trickplay: trickplaySheets(trickplayOf(item, itemId, source.Id)),
     detailHref: info.detailHref,
   };
 }

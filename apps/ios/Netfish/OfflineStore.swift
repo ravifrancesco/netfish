@@ -16,6 +16,18 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
         var file: String // relative to the root folder
     }
 
+    /// Scrubbing previews (Jellyfin's trickplay pictures): frames of width×height, columns×rows
+    /// to a picture, one every `interval` seconds.
+    struct Trickplay: Codable {
+        var width: Double
+        var height: Double
+        var columns: Int
+        var rows: Int
+        var count: Int
+        var interval: Double
+        var files: [String] // relative to the root folder
+    }
+
     struct Entry: Codable {
         var itemId: String
         var kind: String
@@ -39,6 +51,7 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
         var posterFile: String?
         var posterType: String?
         var subtitles: [Subtitle]
+        var trickplay: Trickplay?
         /// What the server described, kept so an interrupted download can be retried.
         var source: String
     }
@@ -145,6 +158,10 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
     func videoFile(_ e: Entry) -> URL { root.appendingPathComponent(e.folder).appendingPathComponent(e.fileName) }
     func posterFile(_ e: Entry) -> URL? { e.posterFile.map { root.appendingPathComponent($0) } }
     func subtitleFile(_ e: Entry, _ n: Int) -> URL? { e.subtitles.indices.contains(n) ? root.appendingPathComponent(e.subtitles[n].file) : nil }
+    func trickplayFile(_ e: Entry, _ n: Int) -> URL? {
+        guard let files = e.trickplay?.files, files.indices.contains(n) else { return nil }
+        return root.appendingPathComponent(files[n])
+    }
     var hasDownloads: Bool { entries.contains { $0.state == "done" } }
 
     /// What the pages see (no file paths): same shape as the desktop app's list.
@@ -160,6 +177,12 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
                 },
             ]
             if e.posterFile != nil { item["poster"] = "\(LocalScheme.scheme)://app/media/\(e.itemId)/poster" }
+            if let t = e.trickplay {
+                item["trickplay"] = [
+                    "url": "\(LocalScheme.scheme)://app/media/\(e.itemId)/trick/{index}", "width": t.width, "height": t.height,
+                    "columns": t.columns, "rows": t.rows, "count": t.count, "interval": t.interval,
+                ] as [String: Any]
+            }
             for (key, value) in [("seriesId", e.seriesId), ("seriesTitle", e.seriesTitle), ("subtitle", e.subtitle), ("detailHref", e.detailHref), ("error", e.error)] {
                 if let value { item[key] = value }
             }
@@ -242,7 +265,7 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
             size: (d["size"] as? NSNumber)?.int64Value ?? 0, received: 0, converted: d["converted"] as? Bool ?? false,
             durationSeconds: (d["durationSeconds"] as? NSNumber)?.doubleValue, detailHref: d["detailHref"] as? String,
             server: origin.absoluteString, state: "downloading", error: nil,
-            addedAt: ISO8601DateFormatter().string(from: Date()), posterFile: nil, posterType: nil, subtitles: [], source: source
+            addedAt: ISO8601DateFormatter().string(from: Date()), posterFile: nil, posterType: nil, subtitles: [], trickplay: nil, source: source
         )
         entries = [entry] + entries.filter { $0.itemId != itemId }
         save()
@@ -267,6 +290,7 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
                 entry.subtitles.append(Subtitle(label: sub["label"] as? String ?? L("Subtitles"), code: code, file: "\(folder)/\(name)"))
             }
         }
+        entry.trickplay = await keepTrickplay(d["trickplay"] as? [String: Any], itemId: itemId, folder: folder, dir: dir, origin: origin, cookie: cookie)
         guard let url = URL(string: origin.absoluteString + path) else { throw Problem(L("Bad download address")) }
         var request = URLRequest(url: url)
         request.httpShouldHandleCookies = false
@@ -283,6 +307,25 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
         save()
         broadcast(now: true)
         return publicList()
+    }
+
+    /// The scrubbing previews beside the film, when the server lists them: all of them or none
+    /// (a gap would show the wrong frames).
+    private func keepTrickplay(_ t: [String: Any]?, itemId: String, folder: String, dir: URL, origin: URL, cookie: String) async -> Trickplay? {
+        guard let t, let sheets = t["sheets"] as? [String], !sheets.isEmpty,
+              let width = (t["width"] as? NSNumber)?.doubleValue, let height = (t["height"] as? NSNumber)?.doubleValue,
+              let columns = (t["columns"] as? NSNumber)?.intValue, let rows = (t["rows"] as? NSNumber)?.intValue,
+              let count = (t["count"] as? NSNumber)?.intValue, let interval = (t["interval"] as? NSNumber)?.doubleValue else { return nil }
+        var files: [String] = []
+        for (n, sheet) in sheets.enumerated() {
+            let name = ".\(itemId).trick.\(n).jpg"
+            guard let url = URL(string: origin.absoluteString + sheet), (try? await fetch(url, cookie: cookie, to: dir.appendingPathComponent(name))) != nil else {
+                for kept in files { try? FileManager.default.removeItem(at: root.appendingPathComponent(kept)) }
+                return nil
+            }
+            files.append("\(folder)/\(name)")
+        }
+        return Trickplay(width: width, height: height, columns: columns, rows: rows, count: count, interval: interval, files: files)
     }
 
     @MainActor
@@ -304,7 +347,8 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
     func remove(_ itemId: String) async -> [[String: Any]] {
         await cancelTask(itemId)
         if let e = entry(itemId) {
-            for file in [videoFile(e)] + [posterFile(e)].compactMap({ $0 }) + e.subtitles.indices.compactMap({ subtitleFile(e, $0) }) {
+            let previews = (e.trickplay?.files ?? []).indices.compactMap { trickplayFile(e, $0) }
+            for file in [videoFile(e)] + [posterFile(e)].compactMap({ $0 }) + e.subtitles.indices.compactMap({ subtitleFile(e, $0) }) + previews {
                 try? FileManager.default.removeItem(at: file)
             }
             // Tidy the title's folder if it's now empty.

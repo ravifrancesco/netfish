@@ -42,7 +42,7 @@ Your settings and sign-ins live in `/docker-data-volumes/netfish-data` on the Pi
 
 Portainer → **Stacks** → **netfish** → **Editor** → **Update the stack**, with **Re-pull image and redeploy** on. (Or **Containers → netfish → Recreate** with **Pull latest image**.)
 
-To stay on a particular version instead of always the newest, use a version tag: `ghcr.io/ravifrancesco/netfish:0.7.13`. The versions are listed on the [Releases page](https://github.com/ravifrancesco/netfish/releases).
+To stay on a particular version instead of always the newest, use a version tag: `ghcr.io/ravifrancesco/netfish:0.7.14`. The versions are listed on the [Releases page](https://github.com/ravifrancesco/netfish/releases).
 
 ## Building the image on the Pi instead
 

@@ -40,6 +40,9 @@ final class LocalScheme: NSObject, WKURLSchemeHandler {
         case "sub":
             guard parts.count >= 4, let n = Int(parts[3]), let file = store.subtitleFile(entry, n) else { return fail(task) }
             serve(task, file: file, type: "text/vtt; charset=utf-8")
+        case "trick":
+            guard parts.count >= 4, let n = Int(parts[3]), let file = store.trickplayFile(entry, n) else { return fail(task) }
+            serve(task, file: file, type: "image/jpeg")
         default:
             fail(task)
         }

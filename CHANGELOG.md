@@ -1,0 +1,411 @@
+# Changelog
+
+Every version of Netfish, newest first. Each one says what's new, what changed and what was fixed, and **what to update**:
+
+- **Server:** update the container in Portainer (Stacks → netfish → Update the stack, with *Re-pull image* on). Every app picks the change up from the server, with nothing to install.
+- **Apps:** the apps named need their new version as well. The Mac, Windows and Android apps (Fire TV too) offer it in Settings when it matters.
+
+Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
+
+## 0.7.14 (2026-10-19)
+
+### New
+- **Scrubbing previews in downloads.** When Jellyfin has made preview pictures for a title, the app saves them with the download and the downloads player shows them while you scrub, with no connection. They add a few MB to a download. Titles downloaded before this version need downloading again to get them.
+
+### Documentation
+- This changelog, in much more detail. Each release on GitHub now opens with its own entry from here.
+- The README covers Chromecast, scrubbing previews, the TV remote's timeline and the Jellyfin settings that audio and subtitles now follow.
+
+### Update
+- **Server**, and the **Mac, Windows, iPhone/iPad and Android** apps to keep previews with downloads.
+
+## 0.7.13 (2026-10-19)
+
+### New
+- **Chromecast** (Android app on phones and tablets with Google Play services). While a film or episode plays, the player's *Play on* button lists the Chromecasts on your network, under any Netfish screens. Pick one and the film carries on there from the same spot.
+  - The phone becomes the remote: play and pause, ±10 s, the timeline, volume, subtitles and audio. A different audio track restarts the stream there from the same spot. Android's notification has play and pause too.
+  - **Stop casting** in the same menu brings the film back to the phone, from where the Chromecast got to. If the Chromecast drops the connection, the phone carries on by itself.
+  - The phone screen may sleep while casting.
+  - It uses Google's standard Chromecast player. Files it plays as they are (H.264 up to 1080p in MP4, VP8/VP9 in WebM) are sent untouched; Jellyfin converts anything else to H.264 and AAC. Subtitles go as WebVTT files.
+  - The Chromecast can't sign in, so Netfish gives it links that carry a token. The token opens only that film's files and expires after 12 hours. The Chromecast must be able to reach the server address the app uses (its LAN address, not `localhost`).
+  - Casting stays out of Watch together rooms and Play on TV, where the room runs the player.
+- **Scrubbing previews.** Hovering over or dragging the timeline, or scrubbing with a TV remote, shows a frame from that moment above it. They come from Jellyfin's own trickplay pictures (Jellyfin 10.9 or later): turn on *trickplay image extraction* in each library's settings in Jellyfin and let its *Generate Trickplay Images* task make them. Titles without them show the time as before.
+- **TV: the timeline scrubs with the remote.** Move up onto the timeline (just above the buttons). Left and right move along it, in steps that grow while you hold: 10 s, then 30 s, then a minute. OK jumps there, or it jumps by itself after a moment.
+- **TV: Back asks before closing.** On Netfish's first page, Back shows *Press Back again to close Netfish*. Only a second press within three seconds closes it.
+- **Your audio and subtitle languages in Settings → Playback on this device.** Your preferred audio language, the subtitle mode (Default, Always, Only forced, None, Smart) and the subtitle language, which are your Jellyfin settings. Changing them here changes them in Jellyfin and in its own apps.
+
+### Changed
+- **Audio and subtitles follow Jellyfin.** A film or episode starts with the tracks Jellyfin's own apps would pick: your Jellyfin settings, and what Jellyfin remembers you chose for that title or show. Picking subtitles while watching makes them your default from then on, in Jellyfin too. Turning them off sets *Only forced*.
+- **TV: a bigger interface.** On Full HD and 4K TVs Netfish lays itself out for a 1280-pixel screen and scales that up, so cards, text and buttons are about 1.5× bigger.
+- **Channels: documentaries take turns.** Netfish's own channel picks a documentary for every other new title, as intended.
+- **Not on disk:** films not on disk can be marked watched (and unwatched) from their page, as shows could. Jellyfin forgets a film once its file is gone, so Netfish keeps the mark per person and hands it to Jellyfin once the film is back. Deleting a film or a whole show notes first who had watched it.
+- The section at the end of Movies and Shows is headed just *Not on disk*.
+
+### Fixed
+- **Signing in on one device signed you out on others.** With the server on plain http (a home address like `http://192.168.1.50:7777`), the random-id function browsers offer only on https wasn't there. So every browser and app gave Jellyfin the same device name, and Jellyfin ends a person's older session on the same device. Each device now gets its own id. After updating, sign in once more on each device.
+- **Samsung TV subtitles didn't show.** The first time a film's subtitles are asked for, Jellyfin pulls them out of the file, which on a Raspberry Pi can take over 30 seconds. Netfish gave up at 30 seconds. It now waits up to 5 minutes for subtitles, and the TV tries again (four times, 5 seconds apart) if the first attempt fails.
+- **TV: Back did nothing on a title page.** A hidden menu on title pages counted as an open one, so Back kept trying to close it.
+- **A show in both Shows and Not on disk.** When all of a show's files are deleted (in Netfish or in Sonarr), Sonarr leaves its folder, and Jellyfin keeps listing an empty show. That show is now only under *Not on disk*, with its page saying so. It no longer appears as playable on Home or in search. The other way round, a title Jellyfin really has episodes or a file of never shows as *Not on disk*, even when Radarr's or Sonarr's record says it was deleted.
+
+### Update
+- **Server**, and the **Android** app for Chromecast. Everything else comes from the server, including the Samsung TV and Fire TV changes.
+
+## 0.7.12 (2026-10-18)
+
+### Changed
+- **Movies and Shows: no *Not on disk* tab.** Titles deleted from disk come at the end of the list, apart and greyed out, in the same sort order as the rest. They still open to their page, which says when they were deleted and offers *Download again*.
+- **Not on disk follows Radarr and Sonarr.** A title counts as not on disk when Radarr or Sonarr still has it, unmonitored (so it isn't coming back by itself), without files, and with a file deletion in its history. That holds wherever it was deleted: Netfish, Radarr's or Sonarr's own pages, or another tool. A file replaced by a better one doesn't count. For what Netfish deleted itself, it adds who deleted it and the space freed.
+- What comes back drops off the list: on disk again, monitored again (on its way back), or removed from Radarr/Sonarr. A show with some seasons left stays in the library.
+- **Settings → Storage** counts films and shows not on disk apart, each linking straight to them.
+
+### Update
+- **Server.**
+
+## 0.7.11 (2026-10-18)
+
+### New
+- **Mac and Windows: the player's volume is the computer's own.** The volume keys move the player's slider and the slider moves the computer's volume (mpv stays at full volume). The speaker button mutes the computer.
+- **Subtitles you choose become the default**, for films and channels alike (shown in Settings).
+
+### Changed
+- **Channels: the break scene is much lighter.** It costs about a third of the computer's time it did: its moving parts animate on the graphics chip, and the light rays hold still while waiting. The *Live* dot pulses without repainting the page.
+- **Mac in full screen:** Back, the top bar and the channel controls no longer leave room for the hidden window buttons.
+
+### Fixed
+- **Channels in the apps:** subtitles chosen for a programme were sometimes lost. They're now switched once the programme has loaded.
+
+### Update
+- **Server**, and the **Mac** and **Windows** apps for the volume.
+
+## 0.7.10 (2026-10-18)
+
+### New
+- **Guide: request a new title still to come** from its card, even before it has downloaded. It airs as planned, joins the library once it's here, and isn't deleted after airing.
+- The card of a new title not downloaded yet says what it's about.
+- **Settings → Channels:** new titles someone requested say who, and can't be removed.
+
+### Changed
+- **Channels:** static only when changing channel. The next programme on the same channel comes in from black.
+
+### Update
+- **Server.**
+
+## 0.7.9 (2026-10-18)
+
+### Changed
+- **New titles for Netfish's own channel: every other one a nature documentary,** and only much-liked ones (TMDB 8 and up for a series, 7.5 for a film). A series' first season goes to the weekday one o'clock slot and plays from the first episode, one a weekday; a film goes to the documentary nights. Crime, war, history, music, reality and news documentaries aren't picked.
+
+### Fixed
+- Each channel's turn is now a count of what it has picked. It counted some twice, so Netfish's documentary turns hardly ever came.
+
+### Update
+- **Server.**
+
+## 0.7.8 (2026-10-18)
+
+### Changed
+- **Mac, iPhone, Android and Windows apps: when the server can't be reached** (no internet, or away from home), the app opens on its offline page, even with nothing downloaded. Before, it asked for the server's address as if that were wrong. It keeps trying and says when the server is back; *Change server…* is there for a server that has really moved. With nothing downloaded, it says just that.
+
+### Update
+- **Mac, iPhone/iPad, Android and Windows** apps.
+
+## 0.7.7 (2026-10-17)
+
+### Changed
+- **Channels guide:** it ends on one straight edge. A programme running past the guide's last hour stops there, and the guide ends sooner if a channel's schedule does, so no channel stops short of the others.
+- **The top bar** goes Home, Channels, Movies, Shows, Activity (on phones: Home, Movies, Shows, Search, Activity).
+
+### Update
+- **Server.**
+
+## 0.7.6 (2026-10-17)
+
+### Changed
+- **Channels guide:** the column of channels stays on top of everything that scrolls under it (an opened card, the line at *Now*), in one unbroken strip. A card opened with the mouse closes as the guide scrolls. The times along the top scroll with the guide, so *Now* and its line move as one.
+- **Settings:** Devices sits right under the app's own updates.
+- Pages load with the fish in the middle of the screen, Home and title pages included.
+
+### Update
+- **Server.**
+
+## 0.7.5 (2026-10-17)
+
+### Changed
+- **Channels guide:** the current minute is one line, from *Now* at the top down through every channel. Programmes on now keep their green edge but lose the progress bar, which didn't match the line for programmes that began before the guide does. The sentence above the guide is gone.
+
+### Update
+- **Server.**
+
+## 0.7.4 (2026-10-17)
+
+### New
+- **Channels guide: what's been on.** The stretch before now fills with what has been on since the guide's half hour, greyed out (the guide asks the server up to three hours back for it).
+- **Settings, for admins: a note when a newer Netfish is out** than the server runs (checked against GitHub's latest release after starting and every six hours), with how to update the container in Portainer. The account button gets a dot.
+
+### Changed
+- **Channels guide:** programmes show only their title. Hovered, or with the remote on them, they open out with the time and episode. One on now, opened, is solid, so what it opens over no longer shows through.
+- **New titles for channels download in the order they air:** the earliest title first, a show's episodes from the first, a whole season front to back, all behind everyone's own downloads.
+
+### Update
+- **Server.**
+
+## 0.7.3 (2026-10-16)
+
+### Changed
+- **Channels guide: one line of time** from now to three days ahead that scrolls sideways (a swipe, a touchpad). *Now*, *Tonight*, *Tomorrow* and the day after glide straight there, and the tab follows where you are. On a TV the remote goes programme by programme, and past the edge the guide moves on a good way. A long programme's name stays at the guide's left edge while it scrolls past.
+- In the guide, titles stay on one line. One that doesn't fit opens out on hover (or with the remote on it), with no tooltip first.
+- **A programme still to come opens a card:** when, on which channel, the episode and what it's about, with *Watch channel N now* and *More info*. One on now tunes in, as does the channel.
+
+### Fixed
+- Changing channel in the Mac, iPhone and Android apps flashed the last channel's picture after the static. It now stays on static until the new programme is really playing.
+
+### Update
+- **Server.**
+
+## 0.7.2 (2026-10-16)
+
+### New
+- **SuggestArr** (2.11 or newer), optional in Settings → Connections. What it requested from each person's viewing becomes a row on their Home (*Because you watched…*), and its requests are marked in Activity (with whose viewing, for admins). Admins see its jobs and can run them now.
+- **Activity: download details.** Each download also shows Radarr's or Sonarr's custom formats and score, the indexer and the download client. Admins see everything and pick in Settings → Downloads what everyone else sees.
+- **Trailers in your language:** they start in the language your Jellyfin audio setting asks for (else the app's, else English), with a switch under the video to the other languages the title has a trailer in.
+
+### Changed
+- **Home:** the big picture up top is always something in the library, never one to request, and a show there gets *Play* too (its next episode).
+- **Netfish's own channel keeps a day like a network's:**
+  - Category slots: cartoons from six, comedy reruns from nine, a film at one on weekends, the line-up at half six, the film at nine, late-night comedy, a late film, reruns.
+  - Every slot has several shows to take turns, borrowed from the next kind when the library has few, and no show plays more than two episodes in a row.
+  - It's for grown-ups: children's shows (rated TV-Y, TV-Y7, TV-G) stay on the Cartoons channel, and there are no animated or family films.
+  - Documentaries at one on weekdays (a series in order), and *Love, Death & Robots* and *Smiling Friends* late at night.
+  - When nothing short enough fits before half six or nine, the slot starts a few minutes early instead of waiting.
+- Netfish's own channel is always channel 1. It can't be renamed, hidden, moved or removed; only whether it gets new titles changes.
+- **Channels guide:** it starts at the half hour with a line at the current minute. Titles take two lines, and a short slot opens out over its neighbours on hover (a first tap on tablets).
+- Changing channel shows static until the picture plays, not a still of what's coming.
+- **The channel list fits phones** both ways up (a sheet above the controls, or a panel on the right when sideways), and scrolling it no longer changes channel.
+- **TVs ask who's watching again** after ten minutes away.
+
+### Fixed
+- **Samsung TVs:** the app starts (its scripts and styles are now separate files, as the TV requires), subtitles show, and Back works on every remote.
+- **Android:** the server and sign-in pages are centred and don't zoom.
+- *Try another release* asks Radarr or Sonarr to look again itself, so it works after picking a version by hand.
+- Leaving a channel stops counting as watching it straight away, and the guide catches up.
+
+### Update
+- **Server**, and the **Samsung TV** app.
+
+## 0.7.1 (2026-10-16)
+
+### Changed
+- **Channels:** changing channel looks like the rest of the controls: up, the channel, down. The channel's name (or the remote's OK) lists every channel with what's on, to pick one. *Watch from here* is gone.
+- Channels skip episodes Jellyfin knows of but has no file for, and a programme that won't play gets a second try before the break says it can't play here.
+- **Settings → Channels → New titles:** *Check now* says what it found (or that nothing's new).
+
+### Fixed
+- **Who's watching?:** someone whose sign-in has run out (signed out elsewhere, or a new password) stays in the picker and is asked for their password, instead of disappearing, and nobody else gets signed out. Switching checks the sign-in with Jellyfin there and then. Picking someone when Netfish opens on the profiles page goes on to Home.
+
+### Update
+- **Server.**
+
+## 0.7.0 (2026-10-15)
+
+### New
+- **Channels: your library as TV**, turned on by an admin. Settings → Channels starts with a line-up made from the library: Netfish, cartoons, sitcoms, drama & thrillers, new arrivals and more.
+  - Each channel plays around the clock for everyone at the same minute, with no pausing. Change channel with up/down, numbers or a swipe.
+  - Between programmes there's a short break with the fish (a net, bubbles, a shoal), then a look at what's next with a countdown. *Next* shows in the corner in the last minute and a half.
+  - A guide on Channels and an *On now* row on Home; the guide looks up to three days ahead.
+- **Netfish's own channel keeps a timetable like a network's:** cartoons in the morning, sitcoms in the afternoon, The Simpsons at half six, Family Guy after, a film at nine (the best films at the weekend, documentaries on Tuesdays and Sundays), then late-night comedy and reruns. Short shows come in twos, and no film comes back within a week.
+- **New titles for channels** (optional). For the channels picked, Netfish chooses well-liked films and first seasons nobody here has.
+  - They go in the guide a week ahead, marked *New*, and download 1 to 7 days before they air (through Radarr/Sonarr, tagged `netfish-channel`).
+  - They stay out of everyone's library and Activity, and are deleted after they air.
+  - All within the space, free disk, download hours, speed and number per channel each week the admin sets. One not downloaded in time gives its slot to the library.
+  - Anyone watching can **Keep** one (it joins the library), and nothing someone requested or chose to watch is ever deleted.
+- Default channel names follow each viewer's language.
+
+### Changed
+- Watch together: the two fish are bigger, one in front of the other.
+
+### Update
+- **Server.**
+
+## 0.6.3 (2026-10-15)
+
+### New
+- **Downloads play in Netfish's own player,** online or not: the same controls, keys, *Audio and Subtitles* menu and look as everything else, minus what needs the server (Watch together, Play on, other languages). The player is one piece shared by streaming and downloads, built into every app. On the Mac, iPhone and Windows you can switch audio tracks, and downloaded episodes offer the next one.
+- **Update notices:** when an app itself has something worth installing, Netfish says so on that device (never for changes that come from the server).
+  - The Mac, Windows and Android apps update in one click; Android from 0.6.3 on, through the system installer (Fire TV too).
+  - An iPhone installed from a Mac warns a couple of days before it stops opening, and Settings shows the date.
+- **Settings → Devices** (admins): every Netfish open right now, its app and version, and whether it should update. The Samsung TV app now says its version.
+
+### Fixed
+- **Android:** links to other sites (IMDb, What's new) open in the browser.
+- **Phones:** a tap that brings back the player's controls no longer also pauses the film.
+
+### Update
+- **Server**, and every app (Mac, Windows, iPhone/iPad, Android, Samsung TV).
+
+## 0.6.2 (2026-10-15)
+
+### Changed
+- **Opening the apps away from home:** a quick check (4 seconds at most) finds out whether the server answers, with the fish swimming meanwhile, then shows Netfish, offline mode (your downloads) or setup. No more black screen while the web view gives up on its own.
+- **Offline mode** keeps asking the server every 15 seconds and says when it's back, with a *Reconnect* button. It never switches by itself, in case a film is playing. *Try again* checks first and stays put if the server still doesn't answer.
+- **The fish around the app,** small and quiet: on loading pages and in the player, on empty screens, a fish out of water on errors, bubbles when a download finishes, two fish swimming together on Home's Watch together row, and in the offline banner.
+
+### Update
+- **Server**, and the **Mac, Windows, iPhone/iPad and Android** apps.
+
+## 0.6.1 (2026-10-15)
+
+### New
+- **Cancel request** on a title's page, for whoever asked for it or an admin, while nothing is downloading or on disk.
+
+### Fixed
+- **Stop for good** really takes a request back. With nothing on disk, the title leaves Radarr/Sonarr and its request is cleared in Seerr, so it reads *not requested* again (before, Seerr set it back to *looking for a good release* a few minutes later). A copy already on disk is kept; Radarr just stops looking for a better one.
+
+### Update
+- **Server.**
+
+## 0.6.0 (2026-10-15)
+
+### New
+- **Downloads play from the device:** Play (on a title, in Continue Watching, on an episode) opens the app's own player on the downloaded copy, from where the server says you got to. Where you stop reaches the server even when watched with no connection (sent the next time the app is online), so Continue Watching and *watched* stay right.
+- **Offline mode:** when the server can't be reached (at launch or while using the app), the apps show your downloads first, with your last Home below, greyed out (anything downloaded stays playable), and *Try again*.
+- **The round download button:** the ring fills as the download comes in (with the percentage), the arrow turns accent when it's done, and it offers to play or delete the download (or show or cancel it while downloading).
+
+### Fixed
+- Download progress lagged in the Mac, iPhone and iPad apps (it only updated when the download paused). Android checks twice as often.
+- The Download button didn't show in the Android phone app.
+
+### Update
+- **Server**, and the **Mac, Windows, iPhone/iPad and Android** apps.
+
+## 0.5.1 (2026-10-15)
+
+### New
+- **A cast button next to your profile picture,** like YouTube: connect to the TV (or any device with Netfish open) and every Play plays there, with your phone as the remote. *This device* plays here again. It disconnects by itself if the TV goes away.
+- **Watch together from the player:** the people icon turns what you're watching into a room without reloading the film.
+
+### Changed
+- **Title pages:** Play, Trailer and round icons (watched, download, and ⋯ with Watch together, Versions and Delete from disk) instead of a row of buttons.
+- Mac builds go to `~/Library/Caches`, so Spotlight shows only the installed Netfish; releases keep only the current version's files locally.
+- README: new screenshots, including Watch together and the phone remote.
+
+### Fixed
+- Each page change opened another live connection to the server, and after a few the app couldn't load anything for a while (since 0.4.1).
+- A picture coming from the browser's cache could stay invisible.
+- Handing a film over from the player sent it to the TV twice.
+
+### Update
+- **Server.**
+
+## 0.5.0 (2026-10-15)
+
+### New
+- **Play on TV:** send a film or episode to any device with Netfish open (your own, and the household's TVs), from its page or from the player mid-film. That device plays it and your phone becomes the remote: play/pause, ±10 s, seeking, audio and subtitles, stop, or *Watch here instead*. A bar at the bottom brings the remote back while you browse. Name each device in Settings → Playback on this device.
+
+### Changed
+- Watch together: the top-bar pill shows how many rooms are open when there's more than one.
+- **iPhone, iPad and Android apps:** no more pinch or double-tap zoom.
+- README: the feature list is grouped and much shorter to read.
+
+### Fixed
+- **Settings → Storage fits on a phone:** rows no longer run outside the box, titles wrap instead of being cut, and clean-up sizes sit under the title.
+
+### Update
+- **Server**, and the **iPhone/iPad** and **Android** apps (for zoom).
+
+## 0.4.1 (2026-10-14)
+
+### New
+- **Watch together shows up live for everyone:**
+  - a *Watch together* row on Home, with cards showing who's in the room, Live or Paused, and how far along it is;
+  - a pill in the top bar with the rooms;
+  - *… is watching this together · Join* on the title's page.
+
+  Rooms appear and disappear without reloading (a live list over server-sent events).
+
+### Changed
+- Settings → Desktop app: *Auto-update* is a switch, like the other rows.
+
+### Fixed
+- Home: a long title in a short window ran under the top bar, and the first row covered the hero's buttons.
+- **Server:** a video stream the viewer abandoned (seeking, closing the player) could crash the server.
+
+### Update
+- **Server.**
+
+## 0.4.0 (2026-10-14)
+
+### New
+- **Watch together:** start a room from any film or episode. Others on the server join from Home, a notification or an invite link, and play, pause, skipping and the next episode stay in step on every device (server-sent events, with drift correction).
+- **Who's watching?:** several people signed in on one device (the living-room TV), switching with a click, each with an optional 4-digit PIN.
+- **Ready to watch:** a Home row, and notifications in the Mac, Windows and Android apps (or the browser), when something you requested arrives.
+- **Mark as watched:** a film, an episode or a season; remove anything from Continue Watching.
+- **Settings → Storage suggests what could go:** finished long ago, or never started in a year, with sizes, to delete in one go or keep for good.
+- **Mac and Windows: *Update Netfish by itself*** downloads new versions in the background and installs them when you quit.
+
+### Fixed
+- The Mac build failed (or passed) at random: with `pipefail`, `grep -q` stopping at the first match could make the command before it fail.
+
+### Update
+- **Server**, and the **Mac** and **Windows** apps.
+
+## 0.3.0 (2026-10-14)
+
+### New
+- **Stop a download** from Activity or a title's page: for good, or throw this release away and let Radarr/Sonarr find another (admins, and whoever requested it).
+- **Delete from disk** (admins): a movie or chosen seasons, through Radarr/Sonarr. The title stays in the library as *Not on disk* and comes back with *Download again*.
+- **Settings → Storage:** free space per disk, what movies and shows take, and the biggest titles.
+- **Sort the library by length** (shortest or longest first), with lengths on the posters.
+- **The Mac and Windows apps update themselves:** a note on Home when a new version is out, and Settings → Desktop app → Update downloads it, installs it and reopens Netfish. Releases include `Netfish-mac.zip` for this.
+
+### Fixed
+- Fire TV: a square TV icon with the logo and "netfish".
+
+### Update
+- **Server**, and the **Mac** and **Windows** apps.
+
+## 0.2.2 (2026-10-14)
+
+### Fixed
+- **Mac:** opens again on macOS 15. The bundled libmpv listed its library search path twice, which macOS 15 refuses to load; the build now removes duplicates and fails if any remain.
+- **Fire TV:** a square TV icon with the logo and "netfish", since Fire TV squeezes the icon of apps installed outside its store into a square.
+
+### Update
+- The **Mac** and **Android** apps.
+
+## 0.2.1 (2026-10-14)
+
+### New
+- **Not out yet, said plainly:** when Radarr reports a film as not available (only in cinemas, or not out yet) or a show hasn't started, title pages, Activity and Versions say so, with the date it should arrive. Radarr's "not available" rejections read plainly.
+
+### Changed
+- **Fire TV / Android TV:** the app's tile is the full banner with the logo and "netfish".
+- **TV mode:** the focused person in a cast row gets a ring around their photo instead of a clipped box around the whole column.
+
+### Update
+- **Server**, and the **Android** app.
+
+## 0.2.0 (2026-10-14)
+
+### New
+- **Italian everywhere:** the web app, server messages, every native app and the install guides.
+- **Samsung TV (Tizen) app,** and step-by-step install guides for every device.
+- **Search by director or actor,** with a page for every person; names on title pages link there.
+- **Free recommendations:** *Top picks* blend TMDB with each person's favourite genres, directors and actors and what's popular on the server. New rows: *Popular on this server*, *More from (director)* and *Because you like (actor)*.
+- **Trakt** (optional) for the whole server: scrobbling, history import and recommendations (needs Trakt VIP).
+- README screenshots and gallery.
+
+### Fixed
+- **Mac:** bundles libmpv and runs on macOS 15 (it crashed on Sequoia).
+- **Windows:** native player hosting fixes, and a bundled Vulkan loader.
+
+### Update
+- **Server** and every app.
+
+## 0.1.0 (2026-10-14)
+
+The first version: a Netflix-style front end for a home media stack (Jellyfin, Seerr, Radarr, Sonarr, Bazarr, qBittorrent). It's a TypeScript server for the Pi (Portainer) with its web interface, plus native apps that play films themselves so the server sends files untouched:
+
+- **Mac:** a Swift app, with mpv drawing the film underneath the web interface.
+- **Windows:** a C# app, with mpv under WebView2.
+- **iPhone & iPad:** a Swift app with Apple's player and offline downloads.
+- **Android** (phones, tablets, Fire TV, Android TV): ExoPlayer with Jellyfin's FFmpeg audio decoders, TV mode, and downloads on phones.

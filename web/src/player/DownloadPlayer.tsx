@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Trickplay } from '@netfish/shared';
 import { desktop, type OfflineItem } from '../lib/desktop';
 import { getPrefs } from '../lib/prefs';
 import { rememberSubtitle } from '../lib/playbackPrefs';
@@ -23,6 +24,8 @@ export interface DownloadedFilm extends OfflineItem {
   video: string;
   subtitles: { url: string; label: string; code?: string }[];
   durationSeconds?: number;
+  /** Scrubbing previews kept with it (apps from 0.7.14 on, titles Jellyfin has them for). */
+  trickplay?: Trickplay;
 }
 
 export interface DownloadPlayerProps {
@@ -285,6 +288,7 @@ export function DownloadPlayer({ item, start = 0, onPosition, onClose, next, bac
       time={time}
       duration={duration}
       buffered={buffered}
+      trickplay={item.trickplay}
       toggle={toggle}
       seekTo={seekTo}
       volume={volume}
