@@ -234,9 +234,11 @@ function Player() {
     if (video.current instanceof HTMLVideoElement) pageVideo.current = video.current;
     video.current = cv as unknown as HTMLVideoElement;
     setPictureShown(false);
+    // The token goes in the path (/jellyfin/cast/<token>/…), so the links inside Jellyfin's
+    // playlists, relative to it, carry it too.
     const linked = (url: string) => {
       const link = new URL(url, location.origin);
-      if (s.castToken) link.searchParams.set('nfcast', s.castToken);
+      if (s.castToken) link.pathname = link.pathname.replace(/^\/jellyfin\//, `/jellyfin/cast/${s.castToken}/`);
       return link.toString();
     };
     const url = linked(s.url);

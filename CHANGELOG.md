@@ -7,6 +7,23 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.20 (2026-10-20)
+
+### Fixed
+- **Chromecast: films that need converting didn't play.** The Chromecast can't sign in, so Netfish gives it links carrying a pass for that one film. With Jellyfin 12 two things broke it:
+  - Jellyfin 12 writes the film's id with dashes in its stream links, which the pass check didn't recognise, so even the first playlist was refused.
+  - Jellyfin rebuilds the links inside its playlists without the pass, so the Chromecast was refused everything after the first.
+
+  The pass now sits in the link's path (`/jellyfin/cast/…/videos/…`), so every link inside Jellyfin's playlists carries it, and ids are compared with or without dashes. Checked against Jellyfin 12.2: playlists, segments and subtitles all open with the pass alone. Films the Chromecast plays as they are (MP4) worked before and still do.
+- **Channel guide on TVs (Fire TV, Android TV, Samsung).**
+  - **Programmes were too narrow.** On a Fire TV screen the guide fit three hours across, so a half-hour episode was a sliver with no room for its name. On TVs it now shows an hour and a half, like on a phone: half an hour is about a quarter of a Fire TV screen.
+  - **After going right, left didn't go back.** The focused programme opens out over the next ones so its whole name shows, and pressing left measured from that opened-out card, landing on a later programme each time. Left and right now step through programmes at their own size: right then left brings you back to where you started, even after the guide has scrolled.
+  - **Up went to the top bar instead of Now / Tonight / Tomorrow.** From a programme further right the nearest thing above was the search button or the menu. Leaving the guide upwards now always goes to the selected day tab, and from there up again to the top bar.
+  - **Up or down from a long film** went to whatever sat above the film's middle, which could be off the screen. It now moves to the row above or below within what's on screen.
+
+### Update
+- **Server.**
+
 ## 0.7.19 (2026-10-20)
 
 ### Fixed

@@ -42,7 +42,16 @@ export function registerJellyfinProxy(app: FastifyInstance) {
     url: `${JF_PREFIX}/*`,
     handler: async (req, reply) => {
       if (!config.jellyfin.url) return reply.code(503).send({ error: t('Jellyfin is not connected yet') });
-      const rest = req.url.slice(JF_PREFIX.length);
+      let rest = req.url.slice(JF_PREFIX.length);
+      // A Chromecast's link: /cast/<token>/videos/…, the token in the path so that every relative
+      // link in Jellyfin's playlists (variants, segments) carries it too (Jellyfin rebuilds their
+      // queries without anything of ours). nfcast=… in the query still works.
+      let castToken = new URL(rest, 'http://x').searchParams.get('nfcast') ?? undefined;
+      const castPath = /^\/cast\/([0-9a-f]{48})(\/.*)$/i.exec(rest);
+      if (castPath) {
+        castToken = castPath[1];
+        rest = castPath[2];
+      }
 
       if (req.method === 'GET') {
         const image = await cachedImage(rest, tokenFrom(req));
@@ -63,9 +72,8 @@ export function registerJellyfinProxy(app: FastifyInstance) {
         const value = req.headers[name];
         if (typeof value === 'string') headers[name] = value;
       }
-      // A Chromecast's link: its token stands for the person, for that title (and its player
-      // fetches across origins, so it's told it may).
-      const castToken = new URL(rest, 'http://x').searchParams.get('nfcast') ?? undefined;
+      // A Chromecast's token stands for the person, for that title (and its player fetches across
+      // origins, so it's told it may).
       const forCast = castAuth(castToken, rest.split('?')[0]);
       const token = forCast ?? tokenFrom(req);
       if (token) headers.authorization = authHeader(token);

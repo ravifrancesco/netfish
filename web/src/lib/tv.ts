@@ -108,6 +108,26 @@ function candidates(): HTMLElement[] {
   return [...scope.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(visible);
 }
 
+/**
+ * Where something sits, for moving between things: a guide programme opened out (over its
+ * neighbours) counts at its own size, so left and right step through the programmes in order.
+ */
+function rectOf(el: Element): DOMRect {
+  const r = el.getBoundingClientRect();
+  const own = el instanceof HTMLElement && el.classList.contains('guide__prog') ? parseFloat(el.style.width) : NaN;
+  return Number.isFinite(own) && own < r.width ? new DOMRect(r.left, r.top, own, r.height) : r;
+}
+
+/** The part of a guide programme that's on screen: a film can run far past the edge. */
+function onScreen(el: Element, r: DOMRect): DOMRect {
+  const guide = el.closest<HTMLElement>('.guide__scroller');
+  if (!guide) return r;
+  const g = guide.getBoundingClientRect();
+  const left = Math.max(r.left, g.left + Number(guide.dataset.revealInset ?? 0));
+  const right = Math.min(r.right, g.right);
+  return right > left ? new DOMRect(left, r.top, right - left, r.height) : r;
+}
+
 function best(from: DOMRect, dir: Direction, list: HTMLElement[], current: Element | null) {
   const cx = from.left + from.width / 2;
   const cy = from.top + from.height / 2;
@@ -115,7 +135,7 @@ function best(from: DOMRect, dir: Direction, list: HTMLElement[], current: Eleme
   let score = Infinity;
   for (const el of list) {
     if (el === current || el.contains(current) || current?.contains(el)) continue;
-    const r = el.getBoundingClientRect();
+    const r = rectOf(el);
     const ex = r.left + r.width / 2;
     const ey = r.top + r.height / 2;
     let along: number;
@@ -203,7 +223,14 @@ function onKey(e: KeyboardEvent) {
   e.preventDefault();
   const list = candidates();
   if (!active || active === document.body || !list.includes(active)) return focusFirst();
-  const next = best(active.getBoundingClientRect(), dir, list, active);
+  const from = dir === 'up' || dir === 'down' ? onScreen(active, rectOf(active)) : rectOf(active);
+  let next = best(from, dir, list, active);
+  // Leaving a part upwards that says where up goes (the guide: its day tabs, not whatever's
+  // nearest above, like the search button).
+  const part = active.closest<HTMLElement>('[data-tv-up]');
+  if (dir === 'up' && part && next && !part.contains(next)) {
+    next = document.querySelector<HTMLElement>(part.dataset.tvUp!) ?? next;
+  }
   if (next) focusEl(next, dir);
 }
 

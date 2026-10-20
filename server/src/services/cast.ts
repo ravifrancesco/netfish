@@ -23,8 +23,9 @@ export function castAuth(token: string | undefined, path: string): string | unde
   const t = token ? tokens.get(token) : undefined;
   if (!t || t.expires < Date.now()) return undefined;
   // The path as it will be sent on (../, %2e%2e and \ resolved: no way out of the film's files).
-  // Jellyfin writes it either way: /Videos/ for files, /videos/ in its HLS links.
+  // Jellyfin writes it in any case (/Videos/, /videos/), and Jellyfin 12 its ids with dashes too.
   if (/%2f|%5c/i.test(path)) return undefined;
   const resolved = new URL(path, 'http://x').pathname.toLowerCase();
-  return resolved.startsWith(`/videos/${t.itemId.toLowerCase()}/`) ? t.jellyfinToken : undefined;
+  const [, videos, id] = resolved.split('/');
+  return videos === 'videos' && id?.replace(/-/g, '') === t.itemId.toLowerCase().replace(/-/g, '') ? t.jellyfinToken : undefined;
 }

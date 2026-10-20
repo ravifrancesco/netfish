@@ -172,6 +172,9 @@ const nominalMinutes = (t: Title) => (t.type === 'movie' ? 84 + ((t.n * 37) % 70
 /** Scrubbing previews (Jellyfin's trickplay): 320×180 frames, every 10 s, 10×10 to a picture, made from the sample with ffmpeg. */
 const TRICKPLAY = (id: string) => ({ [id]: { '320': { Width: 320, Height: 180, TileWidth: 10, TileHeight: 10, ThumbnailCount: Math.ceil(DURATION_SECONDS / 10), Interval: 10_000, Bandwidth: 0 } } });
 
+/** A Jellyfin id as Jellyfin 12 writes it in stream links: 8-4-4-4-12. */
+const dashed = (id: string) => (/^[0-9a-f]{32}$/i.test(id) ? `${id.slice(0, 8)}-${id.slice(8, 12)}-${id.slice(12, 16)}-${id.slice(16, 20)}-${id.slice(20)}` : id);
+
 /**
  * Like Jellyfin 12: a text subtitle is handed out in its own format whenever the device profile
  * lists that format at all (an SRT as Stream.subrip), WebVTT only otherwise.
@@ -516,7 +519,8 @@ void app.register(
             ...(direct
               ? {}
               : {
-                  TranscodingUrl: `/videos/${item.id}/master.m3u8?MediaSourceId=${item.id}&AudioStreamIndex=${audioIndex}&PlaySessionId=${playSessionId}&ApiKey=${jfToken(req)}&TranscodeReasons=${(reasons.length ? reasons : ['ContainerNotSupported']).join(',')}`,
+                  // Like Jellyfin 12: the id with dashes in the path.
+                  TranscodingUrl: `/videos/${dashed(item.id)}/master.m3u8?MediaSourceId=${item.id}&AudioStreamIndex=${audioIndex}&PlaySessionId=${playSessionId}&ApiKey=${jfToken(req)}&TranscodeReasons=${(reasons.length ? reasons : ['ContainerNotSupported']).join(',')}`,
                   TranscodingSubProtocol: 'hls',
                 }),
           },
@@ -530,9 +534,15 @@ void app.register(
       reply.header('content-disposition', `attachment; filename="${fileOf(req.params.id)}"`).sendFile(fileOf(req.params.id)),
     );
     jf.get('/Videos/:id/stream.:ext', async (_req, reply) => reply.sendFile('sample.mp4'));
-    // Like Jellyfin, the playlists repeat the request's query on every link they give (that's how a
-    // token in it reaches the segments).
-    const queryOf = (url: string) => (url.includes('?') ? url.slice(url.indexOf('?')) : '');
+    // Like Jellyfin 12, the playlists rebuild their links' queries from Jellyfin's own parameters:
+    // anything else on the request (Netfish's nfcast=…) doesn't carry on.
+    const queryOf = (url: string) => {
+      if (!url.includes('?')) return '';
+      const q = new URLSearchParams(url.slice(url.indexOf('?') + 1));
+      q.delete('nfcast');
+      const text = q.toString();
+      return text ? `?${text}` : '';
+    };
     jf.get<{ Querystring: Q }>('/Videos/:id/master.m3u8', async (req, reply) => {
       const a = req.query.AudioStreamIndex === '2' ? 2 : 1;
       return reply

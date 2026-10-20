@@ -9,6 +9,7 @@ import { clockTime, episodeLine, programEnd, programTitle, serverNow, useChannel
 import { duration } from '../lib/format';
 import { NewBadge } from '../components/NewBadge';
 import { locale, t, tn } from '../i18n';
+import { isTV } from '../lib/tv';
 
 /**
  * The channel guide: every channel and what's on, from now to three days ahead, on one line of
@@ -34,7 +35,8 @@ const GAP = 4;
  */
 const liveStart = (now: number) => Math.floor((now - 20 * MINUTE) / HALF_HOUR) * HALF_HOUR;
 /** The time the guide's width shows at once: three hours, an hour and a half on a phone. */
-const spanFor = (width: number) => (width < 640 ? 1.5 : 3) * HOUR;
+// On a TV, an hour and a half across: room for each programme's name, read from the sofa.
+const spanFor = (width: number) => (width < 640 || isTV() ? 1.5 : 3) * HOUR;
 
 /** Seven in the evening, `days` from today: the evening line-up and the nine o'clock film. */
 function evening(now: number, days: number) {
@@ -364,7 +366,14 @@ export default function ChannelsPage() {
               </span>
             )}
           </div>
-          <div className="guide__scroller" ref={setScroller} onScroll={onScroll} data-reveal="far" data-reveal-inset={box.chan}>
+          <div
+            className="guide__scroller"
+            ref={setScroller}
+            onScroll={onScroll}
+            data-reveal="far"
+            data-reveal-inset={box.chan}
+            data-tv-up=".guide__when .tab.is-active"
+          >
             <div className="guide__body" style={{ width }}>
               {/* The times, scrolling with the guide; the line at "Now" runs on down every channel. */}
               <div className="guide__times" aria-hidden="true">
