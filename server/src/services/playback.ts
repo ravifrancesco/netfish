@@ -182,6 +182,9 @@ async function subtitleFor(asTheySee: Promise<JfItem | undefined>, source: JfMed
 export async function startPlayback(user: SessionUser, itemId: string, body: PlaybackRequest): Promise<PlaybackSession> {
   if (!body?.deviceProfile) throw new HttpError(400, 'deviceProfile is required');
   let allowDirectPlay = body.allowDirectPlay !== false;
+  // Jellyfin only applies the audio and subtitle tracks asked for when the request names the
+  // version too (otherwise it quietly picks its own). The item's own version, unless one was chosen.
+  const sourceId = body.mediaSourceId ?? itemId;
   const ask = (audioStreamIndex: number | undefined) =>
     jellyfin.playbackInfo(user.token, itemId, {
       UserId: user.id,
@@ -192,7 +195,7 @@ export async function startPlayback(user: SessionUser, itemId: string, body: Pla
       AudioStreamIndex: audioStreamIndex,
       // -1 = none: never let Jellyfin pick picture subtitles on its own (burning them in re-encodes the whole film).
       SubtitleStreamIndex: body.subtitleStreamIndex ?? -1,
-      MediaSourceId: body.mediaSourceId,
+      MediaSourceId: sourceId,
       EnableDirectPlay: allowDirectPlay,
       EnableDirectStream: true,
       EnableTranscoding: true,
@@ -205,7 +208,7 @@ export async function startPlayback(user: SessionUser, itemId: string, body: Pla
   const asTheySee = settle(jellyfin.item(user.token, user.id, itemId), undefined);
   let info = await ask(body.audioStreamIndex);
   if (info.ErrorCode) throw new HttpError(415, t("Jellyfin can't play this here ({code})", { code: info.ErrorCode }));
-  let source = info.MediaSources.find((s) => s.Id === body.mediaSourceId) ?? info.MediaSources[0];
+  let source = info.MediaSources.find((s) => s.Id === sourceId) ?? info.MediaSources[0];
   if (!source) throw new HttpError(404, t('No playable file found'));
 
   // Nobody chose an audio track and the default one needs converting: try a same-language track that plays as-is.

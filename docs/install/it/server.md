@@ -44,7 +44,7 @@ Le tue impostazioni e i tuoi accessi sono salvati in `/docker-data-volumes/netfi
 
 Portainer → **Stacks** → **netfish** → **Editor** → **Update the stack**, con **Re-pull image and redeploy** attivo. (Oppure **Containers → netfish → Recreate** con **Pull latest image**.)
 
-Per restare su una versione precisa invece di avere sempre l'ultima, usa un tag di versione: `ghcr.io/ravifrancesco/netfish:0.7.18`. Le versioni sono elencate nella [pagina Releases](https://github.com/ravifrancesco/netfish/releases).
+Per restare su una versione precisa invece di avere sempre l'ultima, usa un tag di versione: `ghcr.io/ravifrancesco/netfish:0.7.19`. Le versioni sono elencate nella [pagina Releases](https://github.com/ravifrancesco/netfish/releases).
 
 ## Creare l'immagine direttamente sul Pi
 

@@ -494,8 +494,10 @@ void app.register(
       const theirs = prefs && !prefs.PlayDefaultAudioTrack && prefs.AudioLanguagePreference
         ? streams.find((x) => x.Type === 'Audio' && x.Language === prefs.AudioLanguagePreference)?.Index
         : undefined;
-      const audioIndex = Number(body.AudioStreamIndex ?? theirs ?? streams.find((x) => x.Type === 'Audio' && x.IsDefault)?.Index ?? 1);
-      const subIndex = Number(body.SubtitleStreamIndex ?? streams.find((x) => x.Type === 'Subtitle' && x.IsDefault)?.Index ?? -1);
+      // Like Jellyfin: the tracks asked for only count when the request names this version too.
+      const named = typeof body.MediaSourceId === 'string' && body.MediaSourceId.toLowerCase() === item.id.toLowerCase();
+      const audioIndex = Number((named ? body.AudioStreamIndex : undefined) ?? theirs ?? streams.find((x) => x.Type === 'Audio' && x.IsDefault)?.Index ?? 1);
+      const subIndex = Number((named ? body.SubtitleStreamIndex : undefined) ?? streams.find((x) => x.Type === 'Subtitle' && x.IsDefault)?.Index ?? -1);
       const audioCodec = streams.find((x) => x.Index === audioIndex)?.Codec?.toLowerCase() ?? 'aac';
       const subCodec = streams.find((x) => x.Index === subIndex)?.Codec?.toLowerCase();
       const reasons = [

@@ -7,6 +7,15 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.19 (2026-10-20)
+
+### Fixed
+- **Switching the audio language in a browser or on a TV did nothing.** The menu showed your pick, but the sound stayed in Jellyfin's own choice: your preferred or last-remembered language. Jellyfin only applies the audio and subtitle track asked for when the request also names the file's version, and Netfish never did, so Jellyfin quietly picked its own. Netfish now names it, and the track you pick is the one you hear. Checked in a browser against Jellyfin 12.2 with MP4, MKV and AC3 files, English to Italian and back, measuring what actually plays.
+- The same oversight meant Netfish's "never burn picture subtitles into the film" request was ignored too. Jellyfin could re-encode a whole film to draw subtitles you hadn't asked for. Now it's honoured.
+
+### Update
+- **Server.**
+
 ## 0.7.18 (2026-10-20)
 
 ### Fixed
