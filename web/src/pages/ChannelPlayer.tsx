@@ -215,7 +215,8 @@ export default function ChannelPlayer() {
     const v = video.current;
     if (!v) return;
     v.volume = startVolume();
-    if (s.isHls && Hls.isSupported()) {
+    // TVs play streams with their own player (Dolby, HEVC), as in the film player.
+    if (s.isHls && Hls.isSupported() && !browserTV()) {
       const h = new Hls({ startPosition: start, maxBufferLength: 40, backBufferLength: 30 });
       h.on(Hls.Events.ERROR, (_e, data) => data.fatal && fail());
       h.loadSource(s.url);

@@ -7,6 +7,14 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.18 (2026-10-20)
+
+### Fixed
+- **Samsung and LG TVs play streams with the TV's own player,** as Jellyfin's own apps do. When a film has to come as a stream, Netfish used a web player library (hls.js) on TVs, which may not decode the Dolby sound (AC3, E-AC3) and HEVC the TV's profile promises. That happens for another audio language than the file's main one (common since 0.7.16), or anything Jellyfin converts. So switching the language could leave the film not playing. The TV's own player decodes them, just as it does for files it plays as they are. Checked against Jellyfin 12.2 here, but not on a real TV.
+
+### Update
+- **Server.**
+
 ## 0.7.17 (2026-10-20)
 
 ### Fixed

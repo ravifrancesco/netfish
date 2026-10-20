@@ -294,7 +294,9 @@ function Player() {
     hls.current?.destroy();
     hls.current = null;
     v.removeAttribute('src');
-    if (s.isHls && Hls.isSupported()) {
+    // TVs (Samsung, LG) play streams with their own player, as Jellyfin's apps do: it decodes the
+    // Dolby sound and HEVC their profile promises, which the browser's MSE (and so hls.js) may not.
+    if (s.isHls && Hls.isSupported() && !browserTV()) {
       const h = new Hls({ startPosition: start, maxBufferLength: 40, backBufferLength: 30 });
       let recovered = false;
       h.on(Hls.Events.ERROR, (_e, data) => {
