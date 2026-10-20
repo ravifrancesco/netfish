@@ -7,6 +7,19 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.16 (2026-10-20)
+
+### New
+- **A Discover tab (optional).** An admin can turn it on in **Settings → Discover**. Home then shows only what's in the library, ready to play, with its big picture, Continue Watching, new arrivals and the library's share of picks and trending. A **Discover** tab right after Home gets the rest: titles to request from Top picks, Trending, Popular, Because you watched…, Coming soon and your requests, with a big picture of something to request. It's off by default; turned off, Home is as before. On phones the tab bar gains Discover too.
+
+### Fixed
+- **Audio in your language on desktop browsers and TVs.** A browser or TV plays only a file's main audio track. When your Jellyfin language (or the track you picked) was another one, you heard the main track anyway; Android and the Mac/Windows apps were fine because their players switch tracks. Netfish now asks Jellyfin for the film repackaged with your track. That's light work: the picture is copied as it is. Channels too.
+- **Chromecast: "The Chromecast couldn't play this"** for films that need converting. Netfish now tells the Chromecast the stream's format (HLS in MPEG-TS segments), which Google's player needs, and if it still refuses a film the message adds the Chromecast's own error number.
+- **The trailer language switch** now always offers English and Italian when a title has trailers in them. Before, a desktop in English often had only English to offer, so the switch didn't appear. Your preferred language is in **Settings → Playback on this device**.
+
+### Update
+- **Server**, and the **Android** app for the Chromecast fix.
+
 ## 0.7.15 (2026-10-19)
 
 ### New

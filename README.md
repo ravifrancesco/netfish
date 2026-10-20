@@ -20,8 +20,9 @@ A Netflix-style front door for a home media server. One app to browse, discover,
 
 ### Watching
 - **Home like a streaming service:** Continue Watching, *Ready to watch*, *Top picks for you*, *Because you watched…*, new arrivals, trending and coming soon.
+- **Discover tab (optional):** an admin can split Home in two. Home then shows only what's in the library, ready to play, and a **Discover** tab after it has everything to request: trending, picks, coming soon and your requests.
 - **A real player:** plays the file as it is when it can; otherwise Jellyfin repackages it (cheap on a Pi) and only transcodes as a last resort. Audio and subtitle switching, resume, skip intro, next episode, keyboard shortcuts, and a preview picture as you scrub the timeline (from Jellyfin's trickplay images, see *Good to know*).
-- **Your languages, as in Jellyfin:** films start with the audio and subtitles your Jellyfin settings and Jellyfin's memory of each title ask for, the same tracks Jellyfin's own apps pick. Change those settings in **Settings → Playback on this device**; subtitles you pick while watching become your default.
+- **Your languages, as in Jellyfin:** films start with the audio and subtitles your Jellyfin settings and Jellyfin's memory of each title ask for, the same tracks Jellyfin's own apps pick. Change those settings in **Settings → Playback on this device**; subtitles you pick while watching become your default. A browser or TV can only play a file's main audio track, so when your language is another track, Jellyfin repackages the film with yours (light work: the picture is copied as it is).
 - **Play on TV:** connect to the TV (or any device with Netfish open) with the cast button next to your profile picture, like YouTube; then Play plays there and your phone becomes the remote: pause, skip, audio and subtitles. A film you're already watching can be handed over mid-way.
 - **Chromecast:** in the Android app on phones and tablets, the player's cast button also lists the Chromecasts on your network. The film carries on there from the same spot, the phone is the remote, and **Stop casting** brings it back.
 - **Watch together:** turn what you're watching into a room from the player (or from a title's **⋯** menu). Play, pause, skipping and the next episode stay in step on every device, and the room shows up for everyone on your server right away.
@@ -31,7 +32,7 @@ A Netflix-style front door for a home media server. One app to browse, discover,
 - **Offline:** download movies and episodes in the Mac, Windows, iPhone/iPad and Android phone apps, with their subtitles and scrubbing previews. Play then always uses the downloaded copy, and where you stop still counts on the server. When the server can't be reached, the apps switch to offline mode: your downloads first, the rest of your Home greyed out.
 
 ### Finding something
-- **One search for everything:** your library and all of TMDB, with clear badges (in library, requested, downloading 45%).
+- **One search for everything:** your library and all of TMDB. Titles already on the server say **In library**, the rest *Requested*, *On its way* or how far a download has got; the same goes for a director's or actor's films.
 - **Directors and actors:** search a name for their films and shows; every name on a title page opens its own page.
 - **Suggestions that learn, for free:** TMDB's "people who liked this also liked", blended with each person's favourite genres, directors and actors, plus *Popular on this server*. Runs on the Pi, no subscription.
 - **Scores and trailers:** TMDB, IMDb, Rotten Tomatoes, Metacritic and Letterboxd, and trailers in the app.
@@ -50,6 +51,7 @@ A Netflix-style front door for a home media server. One app to browse, discover,
 
 ### For the admin
 - **Set up from the app:** a first-run screen, then **Settings → Connections** for every service, with a test button.
+- **Home or Home + Discover:** **Settings → Discover** splits Home into what's in the library (Home) and what to request (Discover).
 - **Disk space:** stop or replace downloads, delete a movie or some seasons from disk, see how full each disk is and what could go. Titles deleted from disk stay at the end of Movies and Shows, greyed out under *Not on disk*, ready to download again, with who deleted them and the space freed. That follows Radarr and Sonarr, so it holds wherever a title was deleted. Watched marks are kept for when it's back.
 - **Trakt, optional:** one Trakt account for the whole server: history, scrobbling and its recommendations on Home (needs Trakt VIP, see *Good to know*).
 - **SuggestArr, optional:** what [SuggestArr](https://github.com/giuseppe99barchetta/SuggestArr) (2.11 or newer) requested from each person's viewing shows on their Home ("Because you watched…") and is marked in Activity; admins see its jobs and can run them now.
@@ -134,7 +136,7 @@ The apps show the interface from your server, so most new features arrive by upd
 
 **1. Portainer → Stacks → Add stack**, name it `netfish`, paste [`docker-compose.yml`](docker-compose.yml), and **Deploy**. No variables are needed: Portainer pulls the ready-made image `ghcr.io/ravifrancesco/netfish:latest` (built by GitHub for Raspberry Pi and PCs).
 
-**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.7.15`.
+**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.7.16`.
 
 <details>
 <summary>Or build the image on the Pi yourself</summary>

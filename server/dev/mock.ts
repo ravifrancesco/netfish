@@ -95,6 +95,8 @@ function libraryEpisodes(t: Title, season?: number): Item[] {
 }
 
 function audioOf(t: Title) {
+  // MOCK_TWO_LANGS=1: films in English with a French track second (the default being English).
+  if (process.env.MOCK_TWO_LANGS === '1' && t.type === 'movie' && !audio.has(`${t.type}-${t.tmdbId}`)) return ['eng', 'fre'];
   return audio.get(`${t.type}-${t.tmdbId}`) ?? [t.lang === 'fr' ? 'fre' : 'eng'];
 }
 
@@ -470,9 +472,15 @@ void app.register(
       const container = containerOf(item);
       const anyOf = (list: string | undefined, value: string) => !list || list.split(',').includes(value);
       const mp4 = profile?.DirectPlayProfiles?.find((p) => (p as { Type?: string }).Type !== 'Audio' && anyOf(p.Container, container) && anyOf(p.VideoCodec, 'h264'));
-      // Like Jellyfin: no track asked for means the default-flagged one (audio and subtitles alike).
-      const streams = streamsFor(item) as Array<{ Type: string; Index: number; Codec?: string; IsDefault?: boolean }>;
-      const audioIndex = Number(body.AudioStreamIndex ?? streams.find((x) => x.Type === 'Audio' && x.IsDefault)?.Index ?? 1);
+      // Like Jellyfin: no track asked for means the person's language when they don't always want the
+      // default-flagged track ("Play default audio track regardless of language" off), else that one.
+      const streams = streamsFor(item) as Array<{ Type: string; Index: number; Codec?: string; IsDefault?: boolean; Language?: string }>;
+      const asker = jfUser(req);
+      const prefs = asker ? configOf(asker) : undefined;
+      const theirs = prefs && !prefs.PlayDefaultAudioTrack && prefs.AudioLanguagePreference
+        ? streams.find((x) => x.Type === 'Audio' && x.Language === prefs.AudioLanguagePreference)?.Index
+        : undefined;
+      const audioIndex = Number(body.AudioStreamIndex ?? theirs ?? streams.find((x) => x.Type === 'Audio' && x.IsDefault)?.Index ?? 1);
       const subIndex = Number(body.SubtitleStreamIndex ?? streams.find((x) => x.Type === 'Subtitle' && x.IsDefault)?.Index ?? -1);
       const audioCodec = streams.find((x) => x.Index === audioIndex)?.Codec?.toLowerCase() ?? 'aac';
       const subCodec = streams.find((x) => x.Index === subIndex)?.Codec?.toLowerCase();

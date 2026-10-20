@@ -44,7 +44,7 @@ import { publicLanguages } from './lib/languages';
 import { HttpError, UpstreamError } from './lib/upstream';
 import { discoverPage, libraryPage, search, serviceStatus } from './services/browse';
 import { allDownloads, detailsFor } from './services/downloads';
-import { buildHome } from './services/home';
+import { homeFor } from './services/home';
 import { titleRatings } from './services/ratings';
 import { grabRelease, grabbedKeys, searchReleases } from './services/releases';
 import { jobsFor, requestSubtitles } from './services/subtitles';
@@ -85,6 +85,7 @@ function appConfig(): AppConfig {
       versions: arr,
       subtitles: has.bazarr(),
       channels: channelsEnabled(),
+      discoverTab: has.seerr() && getSettings().discoverTab,
     },
   };
 }
@@ -220,7 +221,8 @@ export async function apiRoutes(app: FastifyInstance) {
       if (typeof req.body?.ask === 'boolean') setAsk(device, req.body.ask);
       return listProfiles(device, tokenFrom(req));
     });
-    api.get('/home', async (req) => buildHome(userOf(req)));
+    // With the Discover tab on: Home is the library, ?part=discover everything else.
+    api.get<{ Querystring: { part?: string } }>('/home', async (req) => homeFor(userOf(req), req.query.part === 'discover' ? 'discover' : 'home'));
     // What you asked for that has arrived (the apps poll this to notify).
     api.get('/ready', async (req) => ({ items: await readyToWatch(userOf(req)) }));
     api.get('/languages', async () => publicLanguages());

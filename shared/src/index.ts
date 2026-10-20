@@ -35,6 +35,8 @@ export interface Features {
   subtitles: boolean;
   /** An admin turned Channels on. */
   channels: boolean;
+  /** An admin turned the Discover tab on: Home has only the library, Discover the rest. */
+  discoverTab: boolean;
 }
 
 export interface AppConfig {
@@ -693,6 +695,8 @@ export interface ServerSettings {
   manualGrabs: 'all' | 'admin';
   /** What people who aren't admins see about a download in Activity. */
   downloadDetails: DownloadDetail[];
+  /** A Discover tab after Home with what isn't in the library; Home then shows only what is. */
+  discoverTab: boolean;
 }
 
 export interface GrabRequest {
@@ -769,6 +773,11 @@ export interface PlaybackRequest {
   allowDirectPlay?: boolean;
   /** For a Chromecast: the session comes with a castToken for its links. */
   cast?: boolean;
+  /**
+   * The player only plays a file's default audio track (browsers, TVs, Apple's player): another
+   * track has to come as a repackaged stream, not the file as it is.
+   */
+  defaultAudioOnly?: boolean;
 }
 
 export interface PlaybackSession {

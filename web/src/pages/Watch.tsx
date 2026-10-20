@@ -335,6 +335,8 @@ function Player() {
         if (!casting && overlayActive.current && overlay) overlayProfile.current ??= await overlay.profile();
         const s = await api.playSession(itemId, {
           cast: casting || undefined,
+          // Only mpv and ExoPlayer switch audio tracks inside a file; anything else plays its default one.
+          defaultAudioOnly: casting || !(overlayActive.current && appSwitchesTracks),
           deviceProfile: casting ? CHROMECAST_PROFILE : overlayActive.current ? overlayProfile.current : buildDeviceProfile(getPrefs().maxBitrate),
           maxBitrate: getPrefs().maxBitrate || undefined,
           startSeconds: opts.start,
@@ -412,7 +414,7 @@ function Player() {
         casting.current.stopCasting();
       }
       // Not about a film (connecting, a device gone): said once.
-      if (state.error && state.time === undefined && !already) toast('error', t(state.error));
+      if (state.error && state.time === undefined && !already) toast('error', `${t(state.error)}${state.errorCode ? ` (${state.errorCode})` : ''}`);
     });
     return () => {
       stop();

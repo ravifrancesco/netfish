@@ -18,6 +18,7 @@ import { peopleRows, rankPicks, tasteOf, type PeopleRows, type Seed, type Taste 
 import { playTarget } from './titles';
 import { suggestedFor } from './suggestarr';
 import { t } from '../lib/i18n';
+import { getSettings } from '../settings';
 
 const EMPTY: JfItemsResult = { Items: [], TotalRecordCount: 0 };
 const EMPTY_PAGE: SeerrPage = { page: 1, totalPages: 0, totalResults: 0, results: [] };
@@ -217,3 +218,37 @@ export async function buildHome(user: SessionUser): Promise<HomeResponse> {
 
   return { hero: hero && { ...hero, play }, rows };
 }
+
+// ---------- Home and Discover ----------
+
+/** Rows only ever about the library (or only about what's coming), whatever their cards say. */
+const LIBRARY_ROWS = new Set(['ready', 'continue', 'popular-here', 'latest-movies', 'latest-shows', 'unwatched']);
+const ELSEWHERE_ROWS = new Set(['requested', 'upcoming']);
+/** A mixed row split in two is only worth showing with this many left. */
+const MIN_SPLIT = 4;
+
+const playable = (c: Card) => c.status === 'available' || c.status === 'partial';
+
+/**
+ * Home, or with the Discover tab on (an admin's choice) one half of it: Home keeps what's in the
+ * library, ready to play; Discover gets everything else (to request, on its way, coming soon).
+ */
+export async function homeFor(user: SessionUser, part: 'home' | 'discover'): Promise<HomeResponse> {
+  const whole = await buildHome(user);
+  if (!getSettings().discoverTab || !has.seerr()) return part === 'home' ? whole : { rows: [] };
+  const mine = part === 'home';
+  const rows = whole.rows.flatMap((row): Row[] => {
+    if (LIBRARY_ROWS.has(row.id)) return mine ? [row] : [];
+    if (ELSEWHERE_ROWS.has(row.id)) return mine ? [] : [row];
+    const items = row.items.filter((c) => playable(c) === mine);
+    return items.length >= MIN_SPLIT ? [{ ...row, items }] : [];
+  });
+  if (mine) return { hero: whole.hero, rows };
+  // Discover's big picture: something well liked to request, from its first rows.
+  const pool = rows
+    .flatMap((r) => r.items)
+    .filter((c, i, all) => c.status === 'none' && c.backdrop && c.overview && all.findIndex((x) => x.key === c.key) === i)
+    .slice(0, 8);
+  return { hero: pool.length ? pool[Math.floor(Math.random() * pool.length)] : undefined, rows };
+}
+

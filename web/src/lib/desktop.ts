@@ -86,6 +86,8 @@ export interface CastState {
   buffering?: boolean;
   ended?: boolean;
   error?: string;
+  /** The Chromecast's own reason for an error, a number (for bug reports). */
+  errorCode?: number;
   volume?: number;
   muted?: boolean;
   /** The film the rest is about (as it was sent). */
@@ -366,7 +368,7 @@ let castLast: CastState = {};
 function castBridge(native: AndroidNative): CastBridge {
   window.__netfishCast = (state) => {
     // Kept for whoever listens later: what lasts, not what just happened.
-    const { ended, error, ...lasting } = state; // eslint-disable-line @typescript-eslint/no-unused-vars
+    const { ended, error, errorCode, ...lasting } = state; // eslint-disable-line @typescript-eslint/no-unused-vars
     castLast = { ...castLast, ...lasting };
     castListeners.forEach((cb) => cb(state));
   };

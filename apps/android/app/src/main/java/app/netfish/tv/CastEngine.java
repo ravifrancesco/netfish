@@ -11,6 +11,8 @@ import android.util.Log;
 import androidx.mediarouter.media.MediaRouteSelector;
 import androidx.mediarouter.media.MediaRouter;
 
+import com.google.android.gms.cast.HlsSegmentFormat;
+import com.google.android.gms.cast.HlsVideoSegmentFormat;
 import com.google.android.gms.cast.MediaInfo;
 import com.google.android.gms.cast.MediaLoadRequestData;
 import com.google.android.gms.cast.MediaMetadata;
@@ -259,8 +261,14 @@ final class CastEngine {
     }
 
     private void pushError(String message) {
+        pushError(message, 0);
+    }
+
+    private void pushError(String message, int code) {
         try {
-            push.accept(new JSONObject().put("error", message).toString());
+            JSONObject json = new JSONObject().put("error", message);
+            if (code != 0) json.put("errorCode", code);
+            push.accept(json.toString());
         } catch (JSONException ignored) {
         }
     }
@@ -298,20 +306,29 @@ final class CastEngine {
                             .build());
                 }
                 String url = r.getString("url");
-                MediaInfo info = new MediaInfo.Builder(url)
+                String type = r.optString("contentType", "video/mp4");
+                MediaInfo.Builder media = new MediaInfo.Builder(url)
                         .setContentUrl(url)
                         .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
-                        .setContentType(r.optString("contentType", "video/mp4"))
+                        .setContentType(type)
                         .setStreamDuration((long) (r.optDouble("durationSeconds", 0) * 1000))
                         .setMetadata(meta)
-                        .setMediaTracks(tracks)
-                        .build();
+                        .setMediaTracks(tracks);
+                // Jellyfin's HLS: H.264 and AAC in MPEG-TS segments. Said outright: the Chromecast's
+                // player otherwise expects fMP4 segments and gives up on these.
+                if (type.toLowerCase().contains("mpegurl")) {
+                    media.setHlsSegmentFormat(HlsSegmentFormat.TS).setHlsVideoSegmentFormat(HlsVideoSegmentFormat.MPEG2_TS);
+                }
+                MediaInfo info = media.build();
                 MediaLoadRequestData.Builder request = new MediaLoadRequestData.Builder()
                         .setMediaInfo(info)
                         .setAutoplay(true)
                         .setCurrentTime((long) (r.optDouble("startSeconds", 0) * 1000));
                 if (r.has("subtitleId") && !r.isNull("subtitleId")) request.setActiveTrackIds(new long[] {r.getLong("subtitleId")});
-                session.getRemoteMediaClient().load(request.build());
+                // Refused outright: say so, with the Chromecast's own reason (a number), for a bug report.
+                session.getRemoteMediaClient().load(request.build()).setResultCallback(result -> {
+                    if (!result.getStatus().isSuccess()) pushError("The Chromecast couldn't play this", result.getStatus().getStatusCode());
+                });
             } catch (JSONException e) {
                 pushError("Nothing to play");
             }

@@ -15,7 +15,13 @@ const FILE = path.join(config.dataDir, 'settings.json');
 /** Every detail Activity can show about a download. */
 const DETAILS: DownloadDetail[] = ['quality', 'languages', 'release', 'formats', 'indexer', 'client'];
 // Until an admin picks, everyone sees what Activity always showed: quality, languages and the release.
-const DEFAULTS: ServerSettings = { maxMovieSizeGb: null, maxEpisodeSizeGb: null, manualGrabs: config.manualGrabs, downloadDetails: ['quality', 'languages', 'release'] };
+const DEFAULTS: ServerSettings = {
+  maxMovieSizeGb: null,
+  maxEpisodeSizeGb: null,
+  manualGrabs: config.manualGrabs,
+  downloadDetails: ['quality', 'languages', 'release'],
+  discoverTab: false,
+};
 
 function size(value: unknown, field: string): number | null {
   if (value === null || value === '' || value === 0) return null;
@@ -36,6 +42,10 @@ function validate(input: Partial<Record<keyof ServerSettings, unknown>>): Partia
     const list = input.downloadDetails;
     if (!Array.isArray(list) || list.some((d) => !DETAILS.includes(d))) throw new HttpError(400, `downloadDetails must be a list of: ${DETAILS.join(', ')}`);
     out.downloadDetails = DETAILS.filter((d) => list.includes(d));
+  }
+  if ('discoverTab' in input) {
+    if (typeof input.discoverTab !== 'boolean') throw new HttpError(400, 'discoverTab must be true or false');
+    out.discoverTab = input.discoverTab;
   }
   return out;
 }

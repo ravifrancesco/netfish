@@ -110,7 +110,7 @@ export const api = {
   removeProfile: (userId: string) => call<{ ok: true }>(`/profiles/${enc(userId)}`, { method: 'DELETE' }),
   updateMyProfile: (patch: { pin?: string | null; ask?: boolean }) => call<ProfilesResponse>('/profiles/me', { method: 'PUT', body: patch }),
 
-  home: () => call<HomeResponse>('/home'),
+  home: (part: 'home' | 'discover' = 'home') => call<HomeResponse>(part === 'discover' ? '/home?part=discover' : '/home'),
   ready: () => call<{ items: Card[] }>('/ready'),
   search: (q: string) => call<SearchResponse>(`/search?q=${enc(q)}`),
   person: (id: string) => call<PersonDetail>(`/person/${enc(id)}`),

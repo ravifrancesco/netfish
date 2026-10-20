@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Activity, Clapperboard, Film, HardDriveDownload, House, LogOut, RadioTower, Search, Settings, Tv, Users, X } from 'lucide-react';
+import { Activity, Clapperboard, Compass, Film, HardDriveDownload, House, LogOut, RadioTower, Search, Settings, Tv, Users, X } from 'lucide-react';
 import type { User } from '@netfish/shared';
 import { api } from '../api';
 import { appKind, desktop } from '../lib/desktop';
@@ -148,13 +148,16 @@ const LINKS = [
   { to: '/activity', label: t('Activity'), icon: Activity },
 ];
 const CHANNELS = { to: '/channels', label: t('Channels'), icon: RadioTower, end: false };
+const DISCOVER = { to: '/discover', label: t('Discover'), icon: Compass, end: false };
 
 export function Nav({ user }: { user: User }) {
   const [scrolled, setScrolled] = useState(false);
   const active = useActiveDownloads();
-  // Channels, when an admin has turned them on: in the top bar, right after Home (phones find them on Home).
-  const channels = Boolean(useConfig().data?.features.channels);
-  const links = channels ? [LINKS[0], CHANNELS, ...LINKS.slice(1)] : LINKS;
+  // Discover and Channels, when an admin has turned them on: right after Home (phones find Channels on Home).
+  const features = useConfig().data?.features;
+  const discover = Boolean(features?.discoverTab);
+  const links = [LINKS[0], ...(discover ? [DISCOVER] : []), ...(features?.channels ? [CHANNELS] : []), ...LINKS.slice(1)];
+  const tabs = [LINKS[0], ...(discover ? [DISCOVER] : []), ...LINKS.slice(1, 3)];
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
     onScroll();
@@ -184,7 +187,7 @@ export function Nav({ user }: { user: User }) {
         </div>
       </header>
       <nav className="tabbar" aria-label={t('Main')}>
-        {LINKS.slice(0, 3).map(({ to, label, icon: Icon, end }) => (
+        {tabs.map(({ to, label, icon: Icon, end }) => (
           <NavLink key={to} to={to} end={end} className="tabbar__item">
             <Icon size={22} />
             <span>{label}</span>

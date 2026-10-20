@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CircleArrowUp, LogOut, MonitorCog } from 'lucide-react';
+import { CircleArrowUp, Compass, LogOut, MonitorCog } from 'lucide-react';
 import { useLocation } from 'react-router';
 import type { DownloadDetail, PlaybackPrefs, ServerSettings, SubtitleMode } from '@netfish/shared';
 import { api } from '../api';
@@ -14,7 +14,7 @@ import { DeviceProfiles } from '../components/DeviceProfiles';
 import { LanguageSelect } from '../components/LanguageSelect';
 import { usePlaybackPrefs, useSetPlaybackPrefs } from '../lib/playbackPrefs';
 import { Mark } from '../components/Logo';
-import { Spinner, StorageWarning, useToast } from '../components/ui';
+import { Spinner, StorageWarning, Switch, useToast } from '../components/ui';
 import { useConfig, useMe } from '../lib/hooks';
 import { appKind, desktop, useOffline } from '../lib/desktop';
 import { bytes } from '../lib/format';
@@ -93,6 +93,34 @@ const DOWNLOAD_DETAILS: Array<[DownloadDetail, string]> = [
   ['indexer', t('Indexer')],
   ['client', t('Download client')],
 ];
+
+/** The Discover tab: Home with only the library, what to request in a tab of its own. */
+function DiscoverTab() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const q = useQuery({ queryKey: ['admin-settings'], queryFn: api.adminSettings });
+  const save = useMutation({
+    mutationFn: (discoverTab: boolean) => api.saveAdminSettings({ discoverTab }),
+    onSuccess: (data) => {
+      qc.setQueryData(['admin-settings'], data);
+      void qc.invalidateQueries({ queryKey: ['config'] });
+      void qc.invalidateQueries({ queryKey: ['home'] });
+    },
+    onError: (err) => toast('error', (err as Error).message),
+  });
+  if (!q.data) return <Spinner />;
+  return (
+    <div className="account">
+      <Compass size={22} />
+      <div className="chanset__about">
+        <strong>{t('Discover tab')}</strong>
+        <span className="muted small">{t('Home shows only what’s in the library, ready to play. Trending, picks to request, coming soon and requests move to a Discover tab after Home.')}</span>
+      </div>
+      <span className="spacer" />
+      <Switch on={q.data.discoverTab} onChange={(on) => save.mutate(on)} label={t('Discover tab')} disabled={save.isPending} />
+    </div>
+  );
+}
 
 /** Server-wide download rules. Applies to versions people pick in Netfish. */
 function DownloadRules() {
@@ -385,6 +413,13 @@ export default function Settings() {
           <h2>{t('Devices')}</h2>
           <p className="muted small">{t('Where Netfish is open right now, and whether its app should be updated.')}</p>
           <Devices />
+        </section>
+      )}
+
+      {me?.isAdmin && config?.features.discover && (
+        <section className="panel" id="discover">
+          <h2>{t('Discover')}</h2>
+          <DiscoverTab />
         </section>
       )}
 

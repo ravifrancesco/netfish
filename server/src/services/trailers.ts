@@ -34,12 +34,17 @@ function preferredLanguage(user: SessionUser): Promise<string | undefined> {
     .catch(() => undefined);
 }
 
+/** The languages Netfish's own interface comes in. */
+const INTERFACE_LANGUAGES = ['en', 'it'];
+
 export async function trailersFor(user: SessionUser, mediaType: MediaType, tmdbId: number): Promise<TrailerChoices> {
   const [preferred, english] = await Promise.all([preferredLanguage(user), videosIn(mediaType, tmdbId, 'en')]);
   const app = lang() === 'it' ? 'it' : config.metadataLanguage.split('-')[0].toLowerCase();
   const original = english.original;
   const inEnglish = new Set((english.videos ?? []).map((v) => v.key));
-  const wanted = [...new Set([preferred, app, original, 'en'].filter((code): code is string => Boolean(code)))];
+  // Also every language Netfish itself speaks, whatever this device is set to (the switch then
+  // offers Italian on an English desktop too, when there's an Italian trailer).
+  const wanted = [...new Set([preferred, app, original, ...INTERFACE_LANGUAGES].filter((code): code is string => Boolean(code)))];
   const found = await Promise.all(
     wanted.map(async (code) => {
       const list = code === 'en' ? english.videos : (await settle(videosIn(mediaType, tmdbId, code), undefined))?.videos?.filter((v) => !inEnglish.has(v.key));

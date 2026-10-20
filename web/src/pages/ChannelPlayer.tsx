@@ -247,6 +247,8 @@ export default function ChannelPlayer() {
           deviceProfile: useOverlay ? overlayProfile.current : buildDeviceProfile(getPrefs().maxBitrate),
           maxBitrate: getPrefs().maxBitrate || undefined,
           startSeconds: position(),
+          // Only mpv and ExoPlayer switch audio tracks inside a file; anything else plays its default one.
+          defaultAudioOnly: !(useOverlay && appSwitchesTracks),
         });
         if (!alive) {
           if (countRef.current) report('stop', s);
@@ -332,7 +334,12 @@ export default function ChannelPlayer() {
     if (!p) return;
     stopStream();
     void api
-      .playSession(p.itemId, { deviceProfile: useOverlay ? overlayProfile.current : buildDeviceProfile(getPrefs().maxBitrate), startSeconds: position(), audioStreamIndex: index })
+      .playSession(p.itemId, {
+        deviceProfile: useOverlay ? overlayProfile.current : buildDeviceProfile(getPrefs().maxBitrate),
+        startSeconds: position(),
+        audioStreamIndex: index,
+        defaultAudioOnly: !(useOverlay && appSwitchesTracks),
+      })
       .then((next) => {
         sessionRef.current = next;
         setSession(next);

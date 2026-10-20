@@ -97,13 +97,19 @@ function Hero({ card }: { card: NonNullable<HomeResponse['hero']> }) {
   );
 }
 
-export default function Home() {
-  const home = useQuery({ queryKey: ['home'], queryFn: api.home, staleTime: 60_000, refetchInterval: 60_000 });
+/** Discover (when an admin turns it on): what isn't in the library, to request; Home keeps the rest. */
+export function Discover() {
+  return <Home part="discover" />;
+}
+
+export default function Home({ part = 'home' }: { part?: 'home' | 'discover' }) {
+  const discover = part === 'discover';
+  const home = useQuery({ queryKey: ['home', part], queryFn: () => api.home(part), staleTime: 60_000, refetchInterval: 60_000 });
   const me = useMe().data;
   // The apps keep a copy of Home, shown greyed out (downloads aside) when offline.
   useEffect(() => {
     const save = desktop()?.saveSnapshot;
-    if (!save || !home.data) return;
+    if (discover || !save || !home.data) return;
     const absolute = (url?: string) => (url ? new URL(url, location.origin).toString() : undefined);
     save(
       JSON.stringify({
@@ -121,7 +127,7 @@ export default function Home() {
         })),
       }),
     );
-  }, [home.data, me?.name]);
+  }, [home.data, me?.name, discover]);
 
   if (home.isError) return <div className="page container"><ErrorState error={home.error} retry={() => void home.refetch()} /></div>;
   if (!home.data) return <PageLoader />;
@@ -131,16 +137,18 @@ export default function Home() {
     <div className="home">
       {hero ? <Hero card={hero} /> : <div className="hero hero--empty" />}
       <div className="rows">
-        <SetupNudge />
-        <UpdateNudge />
-        <TogetherRow />
-        <ChannelsRow />
+        {!discover && (
+          <>
+            <SetupNudge />
+            <UpdateNudge />
+            <TogetherRow />
+            <ChannelsRow />
+          </>
+        )}
         {rows.map((row) => (
           <Row key={row.id} row={row} />
         ))}
-        {rows.length === 0 && (
-          <Empty>{t('Your library is empty.')}</Empty>
-        )}
+        {rows.length === 0 && <Empty>{discover ? t('Nothing new to discover right now.') : t('Your library is empty.')}</Empty>}
       </div>
     </div>
   );

@@ -9,7 +9,7 @@ import { useConfig, useMe } from './lib/hooks';
 import { isTV, manageFocus } from './lib/tv';
 import ActivityPage from './pages/Activity';
 import Browse from './pages/Browse';
-import Home from './pages/Home';
+import Home, { Discover } from './pages/Home';
 import Login from './pages/Login';
 import PersonPage from './pages/Person';
 import Search from './pages/Search';
@@ -87,6 +87,7 @@ function Shell({ user }: { user: NonNullable<ReturnType<typeof useMe>['data']> }
         <Suspense fallback={<div className="page container"><PageLoader /></div>}>
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/discover" element={<Discover />} />
             <Route path="/movies" element={<Browse key="movie" mediaType="movie" />} />
             <Route path="/shows" element={<Browse key="tv" mediaType="tv" />} />
             <Route path="/search" element={<Search />} />

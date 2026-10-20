@@ -35,6 +35,11 @@ export default {
   'Partly in your library': 'In parte nella tua libreria',
   'On its way': 'In arrivo',
   'In library': 'In libreria',
+  Discover: 'Scopri',
+  'Nothing new to discover right now.': 'Al momento non c’è niente di nuovo da scoprire.',
+  'Discover tab': 'Scheda Scopri',
+  'Home shows only what’s in the library, ready to play. Trending, picks to request, coming soon and requests move to a Discover tab after Home.':
+    'La Home mostra solo quello che è già in libreria, pronto da guardare. Tendenze, consigli da richiedere, prossime uscite e richieste passano in una scheda Scopri dopo la Home.',
   Requested: 'Richiesto',
   'Not in your library': 'Non è nella tua libreria',
   Partial: 'Parziale',

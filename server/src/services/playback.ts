@@ -67,6 +67,12 @@ function trackLabel(s: JfMediaStream): string {
   return [lang ?? s.DisplayTitle ?? t('Track {n}', { n: s.Index }), ...extra].join(' · ');
 }
 
+/** The audio track a player that can't switch plays: the one marked default, else the first. */
+function fileDefaultAudio(source: JfMediaSource): number | undefined {
+  const audio = (source.MediaStreams ?? []).filter((s) => s.Type === 'Audio');
+  return (audio.find((s) => s.IsDefault) ?? audio[0])?.Index;
+}
+
 function tracks(itemId: string, source: JfMediaSource) {
   const streams = source.MediaStreams ?? [];
   const audioTracks: StreamTrack[] = streams
@@ -173,7 +179,7 @@ async function subtitleFor(asTheySee: Promise<JfItem | undefined>, source: JfMed
 
 export async function startPlayback(user: SessionUser, itemId: string, body: PlaybackRequest): Promise<PlaybackSession> {
   if (!body?.deviceProfile) throw new HttpError(400, 'deviceProfile is required');
-  const allowDirectPlay = body.allowDirectPlay !== false;
+  let allowDirectPlay = body.allowDirectPlay !== false;
   const ask = (audioStreamIndex: number | undefined) =>
     jellyfin.playbackInfo(user.token, itemId, {
       UserId: user.id,
@@ -210,6 +216,21 @@ export async function startPlayback(user: SessionUser, itemId: string, body: Pla
         info = retry;
         source = { ...again, DefaultAudioStreamIndex: better.Index };
       }
+    }
+  }
+
+  // The file as it is, but this player only plays its default audio track and the person's
+  // language (or their pick) is another one: Jellyfin repackages it with that track instead.
+  const chosenAudio = body.audioStreamIndex ?? source.DefaultAudioStreamIndex;
+  if (body.defaultAudioOnly && allowDirectPlay && source.SupportsDirectPlay && chosenAudio !== undefined && chosenAudio !== fileDefaultAudio(source)) {
+    allowDirectPlay = false;
+    const retry = await ask(chosenAudio);
+    const again = retry.MediaSources.find((s) => s.Id === source!.Id) ?? retry.MediaSources[0];
+    if (!retry.ErrorCode && again && (again.TranscodingUrl || again.SupportsDirectStream)) {
+      info = retry;
+      source = { ...again, DefaultAudioStreamIndex: chosenAudio };
+    } else {
+      allowDirectPlay = true; // couldn't: the file as it is, in its own default language, beats nothing
     }
   }
 
