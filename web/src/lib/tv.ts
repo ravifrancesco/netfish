@@ -222,9 +222,23 @@ function onKey(e: KeyboardEvent) {
   }
   e.preventDefault();
   const list = candidates();
-  if (!active || active === document.body || !list.includes(active)) return focusFirst();
-  const from = dir === 'up' || dir === 'down' ? onScreen(active, rectOf(active)) : rectOf(active);
-  let next = best(from, dir, list, active);
+  if (!active || active === document.body) return focusFirst();
+  // A window that has just opened has focus itself: move from its title bar (down: into it, not
+  // to its close button).
+  const opened = active.classList.contains('modal__panel') ? active.querySelector('.modal__head') : null;
+  if (!opened && !list.includes(active)) return focusFirst();
+  const from = opened
+    ? opened.getBoundingClientRect()
+    : dir === 'up' || dir === 'down'
+      ? onScreen(active, rectOf(active))
+      : rectOf(active);
+  let next = best(from, dir, list, opened ?? active);
+  // A window with more to read than fits on the screen: up and down scroll it before leaving it.
+  const body = active.closest('.modal')?.querySelector<HTMLElement>('.modal__body');
+  if (body && (dir === 'up' || dir === 'down') && (!next || !body.contains(next))) {
+    const more = dir === 'down' ? body.scrollHeight - body.clientHeight - body.scrollTop : body.scrollTop;
+    if (more > 2) return body.scrollBy({ top: (dir === 'down' ? 1 : -1) * body.clientHeight * 0.8, behavior: 'smooth' });
+  }
   // Leaving a part upwards that says where up goes (the guide: its day tabs, not whatever's
   // nearest above, like the search button).
   const part = active.closest<HTMLElement>('[data-tv-up]');

@@ -7,6 +7,17 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.21 (2026-10-20)
+
+### Fixed
+- **Channel guide on TVs: a programme's window didn't fit the screen.** Opening a programme still to come showed its picture across the whole window, and the rest (when it's on, the episode, the description) was cut off below with no way to scroll with the remote. On TVs the window is now wide, with the picture on the left and the details beside it, so it fits a Fire TV or Samsung screen.
+  - **Long descriptions:** down on the remote scrolls the text first, then moves to the buttons; up scrolls back. The picture stays where it is while the text moves. This works in any window on a TV with more to read than fits.
+  - **Down when a window opens** now goes to its buttons (*Watch channel now*, *More info*), not up to the close button. Back still closes it.
+  - The window's picture also lost some stray padding it picked up from the Settings footer, which happened to share its name.
+
+### Update
+- **Server.**
+
 ## 0.7.20 (2026-10-20)
 
 ### Fixed

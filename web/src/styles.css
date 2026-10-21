@@ -4801,33 +4801,45 @@ html.is-tv .guide__prog:focus {
   text-transform: capitalize;
 }
 /* A programme still to come, opened. */
-.about {
+.program-about,
+.program-about__text {
   display: grid;
   gap: 8px;
 }
-.about p {
+.program-about p {
   margin: 0;
 }
-.about__image {
+.program-about__image {
   width: 100%;
   aspect-ratio: 16 / 9;
   object-fit: cover;
   border-radius: 10px;
   background: var(--surface-2);
 }
-.about__when {
+.program-about__when {
   color: var(--accent);
   font-weight: 700;
 }
-.about__episode {
+.program-about__episode {
   font-weight: 600;
 }
-.about__overview {
+.program-about__overview {
   color: var(--text-2);
   line-height: 1.5;
 }
-.about__new {
+.program-about__new {
   color: var(--text-2);
+}
+/* TVs: the picture beside the details, so it all fits on the screen. */
+html.is-tv .program-about {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  align-items: start;
+  gap: 20px;
+}
+/* A long description scrolls past it; the picture stays. */
+html.is-tv .program-about__image {
+  position: sticky;
+  top: 0;
 }
 /* Phones: a narrower column of channels (the number, the name under it) and an hour and a half across. */
 @media (max-width: 640px) {

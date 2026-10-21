@@ -182,6 +182,8 @@ function About({ program, channel, now, onClose }: { program: ChannelProgram; ch
   const sub = episodeLine(program);
   return (
     <Modal
+      // On a TV, picture and details side by side: stacked, they don't fit the screen.
+      wide={isTV()}
       title={
         <>
           {programTitle(program)}
@@ -212,19 +214,21 @@ function About({ program, channel, now, onClose }: { program: ChannelProgram; ch
         </>
       }
     >
-      <div className="about">
-        {program.image && <img className="about__image" src={program.image} alt="" />}
-        <p className="about__when">
-          {dayName(program.start, now)} {clockTime(program.start)}–{clockTime(programEnd(program))} · {channel.number} {channel.name}
-        </p>
-        {sub && <p className="about__episode">{sub}</p>}
-        <p className="muted small">{[program.year, program.rating, duration(program.seconds)].filter(Boolean).join(' · ')}</p>
-        {askable && (
-          <p className="about__new small">
-            {requested ? t('Requested. It stays in the library.') : t('New on this channel. Leaves after it airs unless requested.')}
+      <div className="program-about">
+        {program.image && <img className="program-about__image" src={program.image} alt="" />}
+        <div className="program-about__text">
+          <p className="program-about__when">
+            {dayName(program.start, now)} {clockTime(program.start)}–{clockTime(programEnd(program))} · {channel.number} {channel.name}
           </p>
-        )}
-        {about.isLoading ? <Spinner size={18} /> : about.data?.overview ? <p className="about__overview">{about.data.overview}</p> : null}
+          {sub && <p className="program-about__episode">{sub}</p>}
+          <p className="muted small">{[program.year, program.rating, duration(program.seconds)].filter(Boolean).join(' · ')}</p>
+          {askable && (
+            <p className="program-about__new small">
+              {requested ? t('Requested. It stays in the library.') : t('New on this channel. Leaves after it airs unless requested.')}
+            </p>
+          )}
+          {about.isLoading ? <Spinner size={18} /> : about.data?.overview ? <p className="program-about__overview">{about.data.overview}</p> : null}
+        </div>
       </div>
     </Modal>
   );
