@@ -104,6 +104,8 @@ export interface JfTrickplay {
 export interface JfItem {
   Id: string;
   Name: string;
+  /** With fields=RecursiveItemCount: a show's episodes (its seasons don't count). */
+  RecursiveItemCount?: number;
   OriginalTitle?: string;
   Type: 'Movie' | 'Series' | 'Season' | 'Episode' | string;
   ProductionYear?: number;

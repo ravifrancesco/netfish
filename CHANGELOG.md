@@ -7,6 +7,22 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.22 (2026-10-20)
+
+### Changed
+- **Forced subtitles count as "Off" in the player's menu.** Some files carry a *forced* subtitle track next to the full one: it only shows signs and lines in another language. Jellyfin turns it on by itself when subtitles are off or set to *Only when the audio isn't my language* and the film is in your language. The menu then ticked "English · Forced", which looked as if subtitles had been set to forced. Now, as on Netflix:
+  - **"Off" is ticked** while only the forced track is showing, and the forced track isn't listed separately (unless it's the only one in its language).
+  - **Choosing "Off"** keeps the forced track on (signs and other-language lines still show), matching what you get when a film starts.
+  - The same in films, episodes and channels, on every device, and in the subtitles list on a phone used as a remote.
+  - Checked against Jellyfin 12.2: with *Only when the audio isn't my language*, a film in English starts with its forced English track, and a film in Italian with the full English one.
+
+### Fixed
+- **A deleted show could stay in Shows.** When a show's files are deleted, Jellyfin keeps listing it while its folder is still there (Sonarr leaves it, often with subtitles inside). Netfish only left such a show out when it knew the show was deleted: deleted all at once through Netfish, or unmonitored with a deletion in Sonarr's history. Otherwise the show stayed in Shows, with a page offering *Request* and nothing to play. Now Netfish also asks Jellyfin which shows have no episodes left (one request, its own count) and leaves those out of Shows, Home and search, however the files went. Checked against Jellyfin 12.2: a show counts 0 episodes as soon as its files are gone, with the folder and a leftover subtitle still there.
+- **"Forced" said twice** ("English · Forced · Forced") for forced tracks whose own name is "Forced".
+
+### Update
+- **Server.**
+
 ## 0.7.21 (2026-10-20)
 
 ### Fixed

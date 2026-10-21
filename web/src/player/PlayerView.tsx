@@ -8,6 +8,7 @@ import { desktop } from '../lib/desktop';
 import { setSystemMuted, setSystemVolume, systemVolume, useSystemVolume } from '../lib/systemVolume';
 import { isTV } from '../lib/tv';
 import { parseVtt, type Cue } from './vtt';
+import { menuSubtitles } from './tracks';
 import { t } from '../i18n';
 
 /**
@@ -23,6 +24,9 @@ export interface MenuTrack {
   label: string;
   /** After the name, dimmed. */
   note?: string;
+  /** Subtitles: forced ones (signs, lines in another language) go with "Off". */
+  forced?: boolean;
+  code?: string;
 }
 
 export interface PlayerViewProps {
@@ -221,6 +225,8 @@ export function TrackMenu(props: {
   audioMore?: ReactNode;
   subtitlesMore?: ReactNode;
 }) {
+  const subtitles = menuSubtitles(props.subtitles);
+  const off = props.subtitleIndex === undefined || !subtitles.some((track) => track.index === props.subtitleIndex);
   return (
     <div className="player__menu">
       {(props.audio.length > 0 || props.audioMore) && (
@@ -238,11 +244,11 @@ export function TrackMenu(props: {
       )}
       <div className="player__menu-col">
         <h3>{t('Subtitles')}</h3>
-        <button className={`player__opt${props.subtitleIndex === undefined ? ' is-on' : ''}`} onClick={() => props.chooseSubtitle(undefined)}>
+        <button className={`player__opt${off ? ' is-on' : ''}`} onClick={() => props.chooseSubtitle(undefined)}>
           <Check size={16} className="player__tick" />
           {t('Off')}
         </button>
-        {props.subtitles.map((track) => (
+        {subtitles.map((track) => (
           <button key={track.index} className={`player__opt${props.subtitleIndex === track.index ? ' is-on' : ''}`} onClick={() => props.chooseSubtitle(track.index)}>
             <Check size={16} className="player__tick" />
             {track.label}

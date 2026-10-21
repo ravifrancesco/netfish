@@ -115,9 +115,24 @@ export function showHasEpisodes(user: SessionUser, seriesId: string): Promise<bo
   });
 }
 
+/**
+ * Jellyfin's ids for every show it lists with no episodes in it (files deleted, folder left
+ * behind), in one request: however they went (Netfish, Sonarr's own page, by hand).
+ */
+const hollow = new TTLCache<string[]>(200);
+export function episodelessShows(user: SessionUser): Promise<string[]> {
+  return hollow.wrap(user.id, MINUTE, async () => {
+    const res = await jellyfin
+      .items(user.token, { userId: user.id, includeItemTypes: 'Series', recursive: true, fields: 'RecursiveItemCount', enableImages: false })
+      .catch(() => undefined);
+    return (res?.Items ?? []).filter((i) => i.RecursiveItemCount === 0).map((i) => i.Id);
+  });
+}
+
 /** Call after something lands in the library so cards flip to "Play" quickly. */
 export function invalidateLibrary() {
   filled.clear();
+  hollow.clear();
   indexes.clear();
   shown.clear();
 }

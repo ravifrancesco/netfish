@@ -63,7 +63,9 @@ function trackLabel(s: JfMediaStream): string {
   const lang = languageLabel(s.Language);
   const english = findLanguage(s.Language)?.name;
   const sameAsLanguage = s.Title === lang || s.Title === english;
-  const extra = [s.Title && !sameAsLanguage ? s.Title : undefined, s.IsForced ? t('Forced') : undefined].filter(Boolean);
+  // "Forced" once, when the track's own name already says it.
+  const saysForced = s.Title?.toLowerCase().includes('forced') || s.Title?.toLowerCase() === t('Forced').toLowerCase();
+  const extra = [s.Title && !sameAsLanguage ? s.Title : undefined, s.IsForced && !saysForced ? t('Forced') : undefined].filter(Boolean);
   return [lang ?? s.DisplayTitle ?? t('Track {n}', { n: s.Index }), ...extra].join(' · ');
 }
 

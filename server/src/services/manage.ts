@@ -14,7 +14,7 @@ import { HttpError } from '../lib/upstream';
 import { forgetRadarrMovie, forgetSonarrSeries, radarrMovie, sonarrSeries } from './arrLookup';
 import { catalog } from './catalog';
 import { allDownloads, forgetDownloads } from './downloads';
-import { findInLibrary, hiddenIds, invalidateLibrary, libraryIndex, showHasEpisodes, type LibraryIndex } from './library';
+import { episodelessShows, findInLibrary, hiddenIds, invalidateLibrary, libraryIndex, showHasEpisodes, type LibraryIndex } from './library';
 import { noteWatchedBeforeDelete } from './watched';
 import { grabbedKeys, seriesFor } from './releases';
 import { myRequestKeys } from './requests';
@@ -414,15 +414,19 @@ async function goneFor(user: SessionUser, mediaType: MediaType): Promise<Array<G
 }
 
 /**
- * Jellyfin's ids for the shows it lists with nothing in them (deleted, their folders left):
- * they're under "Not on disk", not in Shows. Quickly or not at all (Sonarr may be slow).
+ * Jellyfin's ids for the shows it lists with nothing in them (deleted, their folders left): not
+ * in Shows (the ones known to be deleted are under "Not on disk"). Jellyfin's own count of their
+ * episodes, whoever deleted them, plus those known deleted (quickly or not at all: Sonarr may be slow).
  */
 const empties = new TTLCache<string[]>(200);
 export function emptyShows(user: SessionUser): Promise<string[]> {
-  if (!has.sonarr() && !Object.values(removed).some((e) => e.mediaType === 'tv')) return Promise.resolve([]);
+  const known = has.sonarr() || Object.values(removed).some((e) => e.mediaType === 'tv');
   return empties.wrap(user.id, MINUTE, async () => {
-    const list = await Promise.race([settle(goneFor(user, 'tv'), []), new Promise<[]>((resolve) => setTimeout(() => resolve([]), 4000))]);
-    return list.flatMap((g) => (g.empty ? [g.empty] : []));
+    const [hollow, gone] = await Promise.all([
+      episodelessShows(user),
+      known ? Promise.race([settle(goneFor(user, 'tv'), []), new Promise<[]>((resolve) => setTimeout(() => resolve([]), 4000))]) : [],
+    ]);
+    return [...new Set([...hollow, ...gone.flatMap((g) => (g.empty ? [g.empty] : []))])];
   });
 }
 

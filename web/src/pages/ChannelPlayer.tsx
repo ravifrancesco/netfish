@@ -18,7 +18,7 @@ import { screenId } from '../lib/screens';
 import { buildDeviceProfile } from '../player/profile';
 import { OverlayVideo, trackPositions } from '../player/overlay';
 import { PageSubtitles, TrackMenu, useVolume } from '../player/PlayerView';
-import { pickSubtitle } from '../player/tracks';
+import { forcedFor, pickSubtitle } from '../player/tracks';
 import { t, tn } from '../i18n';
 import { browserTV } from '../lib/tv';
 
@@ -124,7 +124,8 @@ export default function ChannelPlayer() {
 
   const choiceFor = (s: PlaybackSession) => {
     const want = wantSubs.current;
-    if (want === null) return undefined;
+    // Off: only the forced ones (signs, lines in another language).
+    if (want === null) return forcedFor(s, s.audioStreamIndex, useOverlay && appDrawsSubtitles);
     if (want) return s.subtitleTracks.find((tr) => tr.code === want && !tr.forced && (useOverlay ? appDrawsSubtitles || tr.vttUrl : tr.vttUrl));
     return pickSubtitle(s, undefined, useOverlay && appDrawsSubtitles);
   };
@@ -317,8 +318,8 @@ export default function ChannelPlayer() {
 
   const chooseSubtitle = (index?: number) => {
     const track = index === undefined ? undefined : session?.subtitleTracks.find((tr) => tr.index === index);
-    setSubtitle(track);
-    wantSubs.current = track ? (track.code ?? null) : null;
+    setSubtitle(track ?? (session ? forcedFor(session, audioIndex, useOverlay && appDrawsSubtitles) : undefined));
+    wantSubs.current = track && !track.forced ? (track.code ?? null) : null;
     rememberSubtitle(track);
   };
   const chooseAudio = (index: number) => {

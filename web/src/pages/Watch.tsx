@@ -15,7 +15,7 @@ import { startVolume } from '../lib/systemVolume';
 import { buildDeviceProfile } from '../player/profile';
 import { OverlayVideo, trackPositions } from '../player/overlay';
 import { PlayerView, useVolume } from '../player/PlayerView';
-import { pickSubtitle } from '../player/tracks';
+import { forcedFor, menuSubtitles, pickSubtitle } from '../player/tracks';
 import { explainReasons } from '../player/reasons';
 import { useTogether } from '../lib/together';
 import { TogetherChip, TogetherNotes, TogetherPanel } from '../components/Together';
@@ -728,11 +728,15 @@ function Player() {
   };
   const chooseSubtitle = (track?: StreamTrack) => {
     const wasBurned = subtitle?.burnIn;
-    setSubtitle(track);
+    const s = sessionRef.current;
+    const appDraws = !castingRef.current && overlayActive.current && appDrawsSubtitles;
+    // Off still shows the forced ones (signs, lines in another language) for what's being heard.
+    const shown = track ?? (s ? forcedFor(s, audioIndex, appDraws) : undefined);
+    setSubtitle(shown);
     rememberSubtitle(track);
-    if (!castingRef.current && overlayActive.current && appDrawsSubtitles) return; // the app's player draws every kind itself
-    if (track?.burnIn || wasBurned) {
-      void load({ start: video.current?.currentTime ?? 0, audio: audioIndex, subtitle: track?.burnIn ? track.index : undefined, allowDirectPlay: !track?.burnIn });
+    if (appDraws) return; // the app's player draws every kind itself
+    if (shown?.burnIn || wasBurned) {
+      void load({ start: video.current?.currentTime ?? 0, audio: audioIndex, subtitle: shown?.burnIn ? shown.index : undefined, allowDirectPlay: !shown?.burnIn });
     }
   };
 
@@ -755,9 +759,10 @@ function Player() {
     void api
       .roomTracks(roomId, together.clientId, {
         audio: list(session.audioTracks),
-        subtitles: list(session.subtitleTracks),
+        // As in the player's menu: forced ones go with "Off".
+        subtitles: list(menuSubtitles(session.subtitleTracks)),
         audioIndex,
-        subtitleIndex: subtitle?.index ?? null,
+        subtitleIndex: subtitle && menuSubtitles(session.subtitleTracks).some((tr) => tr.index === subtitle.index) ? subtitle.index : null,
       })
       .catch(() => {});
   }, [remote, roomId, session, joined, audioIndex, subtitle]); // eslint-disable-line react-hooks/exhaustive-deps

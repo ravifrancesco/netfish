@@ -129,7 +129,10 @@ function streamsFor(item: Item) {
   }
   const langs = audioOf(t);
   const subKey = item.kind === 'episode' ? `ep-${t.tmdbId}-${item.s}-${item.e}` : `movie-${t.tmdbId}`;
-  const subs = [...(subtitles.get(subKey) ?? new Set(item.kind === 'episode' ? ['en'] : []))];
+  // MOCK_FORCED=1: films carry an English track and a forced one (signs, lines in another language).
+  const forced = process.env.MOCK_FORCED === '1' && item.kind === 'movie';
+  const subs = [...(subtitles.get(subKey) ?? new Set(item.kind === 'episode' || forced ? ['en'] : []))];
+  const forcedIndex = 1 + langs.length + subs.length;
   return [
     { Type: 'Video', Index: 0, Codec: 'h264', DisplayTitle: '720p H264 SDR' },
     // "Salt & Steel" is an MKV with Dolby Digital 5.1 + DTS (sample-dolby.mkv), like a Blu-ray rip.
@@ -147,6 +150,15 @@ function streamsFor(item: Item) {
         DeliveryUrl: `/Videos/${item.id}/${item.id}/Subtitles/${index}/0/Stream.vtt?ApiKey=leak`,
       };
     }),
+    ...(forced
+      ? [
+          {
+            Type: 'Subtitle', Index: forcedIndex, Codec: 'subrip', Language: 'eng', Title: 'Forced', DisplayTitle: 'EN', IsForced: true,
+            IsExternal: true, IsTextSubtitleStream: true, DeliveryMethod: 'External',
+            DeliveryUrl: `/Videos/${item.id}/${item.id}/Subtitles/${forcedIndex}/0/Stream.vtt?ApiKey=leak`,
+          },
+        ]
+      : []),
   ];
 }
 
@@ -247,6 +259,8 @@ function dto(item: Item, userId?: string, full = false): Record<string, unknown>
         Overview: t.overview, Genres: t.genres, CommunityRating: t.rating, OfficialRating: 'TV-14', RunTimeTicks: nominalMinutes(t) * 600_000_000,
         ProviderIds: { Tmdb: String(t.tmdbId), Tvdb: String(t.tvdbId) }, ImageTags: { Primary: 'p1' }, BackdropImageTags: ['b1'],
         DateCreated: date(titleAdded(t)), UserData: userDataDto(userId, item), People: jfPeople(t),
+        // Jellyfin counts a show's episodes here: 0 once its files are deleted, its folder left.
+        RecursiveItemCount: libraryEpisodes(t).length,
       };
     case 'season':
       return { Id: item.id, Name: `Season ${item.s}`, Type: 'Season', IndexNumber: item.s, SeriesId: seriesId, SeriesName: t.title, ImageTags: { Primary: 'p1' } };
