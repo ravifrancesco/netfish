@@ -7,6 +7,24 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.34 (2026-10-23)
+
+### Fixed
+- **Netfish's own channel: no more empty evenings (and afternoons) with a smaller library.**
+  - The shows' own times get their shows first, before anything fills in. A filler earlier in the day can no longer take a cartoon that 6pm needs.
+  - The evening takes other animation (anime) when there are too few grown-up cartoons, and the sitcoms take leftover animation.
+  - A time no show is left for gets a film, or a show that fits, instead of staying empty.
+  - With two dramas or fewer, one goes after one o'clock's documentary (else that hour had nothing) and the mornings get more films.
+  - Films are chosen to fill the stretch they're in (six hours: three of about two), not just one after the other.
+- With a single documentary series (on at one o'clock all week), Sunday's 9pm is a documentary film, not that series again.
+
+### New
+- **New titles fill what the guide lacks.** When Netfish's own timetable has fewer grown-up cartoons, sitcoms or dramas than times for them (under four), every other new title it picks is one of those, the scarcest first.
+- **Just started, downloaded straight away.** For three hours after *Start over with automatic channels*, or after turning New titles on, what's due downloads whatever the download hours, so the guide fills with the real thing. Settings shows those as starting straight away. (`FRESH_RUSH_HOURS` in the stack changes the three hours; 0 turns it off.)
+
+### Update
+- **Server.**
+
 ## 0.7.33 (2026-10-23)
 
 ### Fixed

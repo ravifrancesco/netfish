@@ -34,6 +34,8 @@ const WEEK = 7 * DAY;
 const GUESS: Record<MediaType, number> = { movie: 5 * GB, tv: 9 * GB };
 /** No release found for this long: given up on. */
 const GIVE_UP = 12 * 3600_000;
+/** After starting over: this long downloading whatever the hours (FRESH_RUSH_HOURS, 3 unless set). */
+const RUSH = config.freshRushHours * 3600_000;
 /** Just added: being looked for (a release grabbed in a few minutes). Past it, still nothing: it no longer takes a turn. */
 const LOOKING = 15 * 60_000;
 /**
@@ -101,6 +103,8 @@ interface Stored {
   stopped: string[];
   /** How many each channel has picked, ever: its turn (Netfish's own takes a documentary every other one). */
   turns: Record<string, number>;
+  /** Until then, what's due downloads whatever the hours (the channels were just started over, or New titles turned on). */
+  rushUntil?: number;
 }
 
 function load(): Stored {
@@ -108,7 +112,7 @@ function load(): Stored {
     const data = JSON.parse(fs.readFileSync(FILE, 'utf8')) as Partial<Stored>;
     const titles = (data.titles ?? []).map((f) => ({ ...f, notBefore: f.notBefore ?? f.addedAt, seconds: f.seconds ?? 0, genres: f.genres ?? [] }));
     const log = (data.log ?? []).map((x) => (typeof x === 'number' ? { at: x, channelId: '' } : x));
-    return { titles, tried: data.tried ?? [], log, stopped: data.stopped ?? [], turns: data.turns ?? {} };
+    return { titles, tried: data.tried ?? [], log, stopped: data.stopped ?? [], turns: data.turns ?? {}, rushUntil: data.rushUntil };
   } catch {
     return { titles: [], tried: [], log: [], stopped: [], turns: {} };
   }
@@ -135,6 +139,8 @@ export interface ChannelsLink {
   onAir(key: string): boolean;
   /** Takes these titles out of every schedule from their next airing on. */
   drop(keys: string[]): void;
+  /** What Netfish's own timetable is short of (fewer shows than times for them), most needed first. */
+  short(): Array<'cartoon' | 'sitcom' | 'drama'>;
 }
 let link: ChannelsLink | undefined;
 export const linkChannels = (l: ChannelsLink) => {
@@ -302,6 +308,9 @@ const genreIds = (names: string[] = []) => [...new Set(names.map((n) => TMDB_GEN
 
 const ANIMATION = 16;
 const COMEDY = 35;
+const DRAMA = 18;
+const CRIME = 80;
+const MYSTERY = 9648;
 const DOCUMENTARY = 99;
 const FAMILY = 10751;
 const KIDS = 10762;
@@ -330,8 +339,11 @@ interface Want {
   minVotes?: number;
 }
 
-/** What a channel would like new, given what it plays. `turn` varies Netfish's own channel. */
-export function wantsOf(source: ChannelSource, turn = 0): Want[] {
+/**
+ * What a channel would like new, given what it plays. `turn` varies Netfish's own channel;
+ * `short`: what its timetable has too few shows for (those every other turn, so its times fill).
+ */
+export function wantsOf(source: ChannelSource, turn = 0, short: Array<'cartoon' | 'sitcom' | 'drama'> = []): Want[] {
   switch (source.kind) {
     case 'mix': {
       // Something of every kind it plays, in turn: a film for nine o'clock (Friday's and
@@ -344,8 +356,14 @@ export function wantsOf(source: ChannelSource, turn = 0): Want[] {
       const sitcom: Want = { mediaType: 'tv', genres: [COMEDY], avoid: [ANIMATION, KIDS, DOCUMENTARY], shortEpisodes: true };
       // ("Family" is fine: The Simpsons is Animation, Comedy, Family. Kids isn't.)
       const cartoon: Want = { mediaType: 'tv', genres: [ANIMATION], need: [COMEDY], avoid: [KIDS] };
-      const documentaries = Math.floor(turn / 5) % 2 ? [docFilm, docSeries] : [docSeries, docFilm];
-      const kinds = [[film], documentaries, [sitcom], [film], [cartoon]][turn % 5];
+      const drama: Want = { mediaType: 'tv', genres: [DRAMA, CRIME, MYSTERY], avoid: [ANIMATION, KIDS, DOCUMENTARY, COMEDY] };
+      if (short.length && turn % 2 === 0) {
+        const need = { cartoon, sitcom, drama }[short[(turn / 2) % short.length]];
+        return [need, film];
+      }
+      const n = short.length ? Math.floor(turn / 2) : turn;
+      const documentaries = Math.floor(n / 5) % 2 ? [docFilm, docSeries] : [docSeries, docFilm];
+      const kinds = [[film], documentaries, [sitcom], [film], [cartoon]][n % 5];
       return kinds.includes(film) ? kinds : [...kinds, film];
     }
     case 'cartoons':
@@ -862,7 +880,9 @@ async function step(now: number) {
 
   // The download hours and speed, through qBittorrent (lowest priority too). A full disk stops them as well.
   const hours = inHours(s, now, settings.timeZone);
-  const go = hours && !lowDisk;
+  // Just started over (or New titles just turned on): the guide's to fill, whatever the hours.
+  const rushing = now < (stored.rushUntil ?? 0);
+  const go = (hours || rushing) && !lowDisk;
   if (has.qbittorrent()) {
     // In the order they'll be on: the title that airs first, and a show's episodes from the first.
     const hashes = stored.titles
@@ -904,6 +924,23 @@ async function step(now: number) {
   const planning = await planOne(s, defs, now, settings.timeZone);
   lastWaiting = starting ?? planning;
   if (JSON.stringify(stored.titles.map((f) => [f.key, f.state, f.airAt])) !== before) onChange();
+  save();
+}
+
+/** When a planned title will start downloading: its time, in the download hours (straight away, just after starting over). */
+function startsAt(s: FreshSettings, f: Fresh, timeZone?: string): number {
+  const at = Math.max(Date.now(), f.keptBy ? 0 : downloadAt(f, s));
+  return at < (stored.rushUntil ?? 0) ? at : nextInHours(s, at, timeZone);
+}
+
+/**
+ * The channels were just started over, or New titles turned on: for a few hours what's due
+ * downloads whatever the hours, so the guide fills with them.
+ */
+export function rushFresh(why: string) {
+  if (!RUSH) return;
+  stored.rushUntil = Date.now() + RUSH;
+  log.info('new titles', `${why}: what's due downloads straight away for the next ${RUSH / 3600_000} hours, whatever the download hours`);
   save();
 }
 
@@ -958,6 +995,8 @@ async function startDue(s: FreshSettings, go: boolean, lowDisk: boolean, now: nu
   due.startedAt = now;
   due.state = 'downloading';
   due.size = guess(due.mediaType);
+  // Started outside the hours (the channels just started over): carries on outside them.
+  if (!hours) due.rush = true;
   // Noted straight away: a restart now mustn't forget it's in Radarr/Sonarr.
   save();
   if (due.keptBy) keptToHousehold(due);
@@ -1086,7 +1125,7 @@ async function planOne(s: FreshSettings, defs: ChannelDef[], now: number, timeZo
     const last = Math.max(0, ...mine(def.id).map((f) => f.notBefore));
     const spread = Math.max(now + s.aheadDays * DAY, last + WEEK / Math.max(1, share(def)));
     const turn = turnOf(def.id);
-    for (const want of wantsOf(def.source, turn)) {
+    for (const want of wantsOf(def.source, turn, def.source.kind === 'mix' ? (link?.short() ?? []) : [])) {
       // Netfish's own films: Friday's and Saturday's nine o'clock first.
       const evening =
         def.source.kind === 'mix' && want.mediaType === 'movie' && !want.genres.includes(DOCUMENTARY)
@@ -1107,7 +1146,7 @@ async function planOne(s: FreshSettings, defs: ChannelDef[], now: number, timeZo
         const plan = await settle(planFor(r, want, def.id, notBefore, now), undefined, (err) => log.warn('new titles', `Couldn't plan "${r.title ?? r.name}"`, err));
         if (plan) {
           stored.titles.push(plan);
-          log.info('new titles', `Picked "${plan.title}" for ${def.name}: downloads from ${logTime(nextInHours(s, Math.max(now, downloadAt(plan, s)), timeZone))}, on from ${logTime(plan.notBefore)}`);
+          log.info('new titles', `Picked "${plan.title}" for ${def.name}: downloads from ${logTime(startsAt(s, plan, timeZone))}, on from ${logTime(plan.notBefore)}`);
           stored.log.push({ at: now, channelId: def.id, key: plan.key });
           stored.turns[def.id] = turn + 1;
           return undefined;
@@ -1144,7 +1183,7 @@ export async function freshStatus(): Promise<FreshStatus> {
     airAt: iso(f.airAt),
     // Asked for: as soon as it can.
     downloadAt: f.state === 'planned' ? iso(f.keptBy ? Date.now() : downloadAt(f, s)) : undefined,
-    startsAt: f.state === 'planned' ? iso(nextInHours(s, Math.max(Date.now(), f.keptBy ? 0 : downloadAt(f, s)), settings?.timeZone)) : undefined,
+    startsAt: f.state === 'planned' ? iso(startsAt(s, f, settings?.timeZone)) : undefined,
     keptBy: f.keptBy,
   }));
   const order: Record<FreshState, number> = { downloading: 0, planned: 1, ready: 1, aired: 2, kept: 3 };

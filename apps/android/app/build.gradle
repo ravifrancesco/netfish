@@ -3,7 +3,7 @@ plugins {
 }
 
 // Version shown in Settings; keep in step with the root package.json.
-def netfishVersion = '0.7.33'
+def netfishVersion = '0.7.34'
 
 android {
     namespace 'app.netfish.tv'

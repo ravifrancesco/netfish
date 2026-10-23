@@ -9,7 +9,7 @@ import { jfImage } from '../lib/images';
 import { writeJson } from '../lib/storage';
 import { HttpError } from '../lib/upstream';
 import { inLanguage, t } from '../lib/i18n';
-import { FRESH_DEFAULTS, freshHidden, freshPlans, freshRetired, linkChannels, onFreshChange, runFresh, validFresh, type FreshPlan } from './fresh';
+import { FRESH_DEFAULTS, freshHidden, freshPlans, freshRetired, linkChannels, onFreshChange, runFresh, rushFresh, validFresh, type FreshPlan } from './fresh';
 import { log, setLogTimeZone } from '../lib/log';
 
 /**
@@ -680,7 +680,8 @@ function grownUpShows(lib: Library, ids: string[]): string[] {
 function documentary(sched: Schedule, lib: Library, at: number, day: number, onToday: Set<string>): Program | undefined {
   const shows = usual(lib, lib.kinds.docShows);
   const films = lib.kinds.docFilms.filter((id) => !onToday.has(id));
-  if (shows.length && (day === 0 || !films.length)) {
+  // (One series only: it's one o'clock's all week; Sunday has a film then, if there is one.)
+  if (shows.length && ((day === 0 && shows.length > 1) || !films.length)) {
     const i = sched.next['doc:show'] ?? 0;
     const show = shows[i % shows.length];
     if (!onToday.has(show) || !films.length) {
@@ -828,8 +829,15 @@ function planDay(sched: Schedule, lib: Library, from: number, timeZone: string) 
     return (!fresh && newestFilm(ids)) || film(sched, lib, name, ids, slotTime());
   };
   const fits = (ids: string[], room: number) => ids.filter((id) => (lib.byId.get(id)?.seconds ?? Infinity) <= room);
+  /**
+   * A film that ends in time; in a long stretch, one that leaves room for the others it'll take
+   * (six hours: three of about two), so it fills without a long break.
+   */
   const filmIn = (name: string, ids: string[], room: number): Unit | undefined => {
-    const p = filmOf(name, fits(ids, room));
+    const lengths = fits(ids, room).map((id) => lib.byId.get(id)!.seconds);
+    const typical = median(lengths) + BREAK_SECONDS + 5 * 60;
+    const share = room / Math.max(1, Math.round(room / typical));
+    const p = filmOf(name, fits(ids, Math.min(room, share * 1.08))) ?? filmOf(name, fits(ids, room));
     return p ? [{ program: p }] : undefined;
   };
   const residents = (sched.residents ??= {});
@@ -913,12 +921,15 @@ function planDay(sched: Schedule, lib: Library, from: number, timeZone: string) 
   };
 
   // ---- The timetable ----
-  /** Times for these shows from `start` to `end` (minutes), each long enough for a short show's two episodes. */
-  const slots = (kind: string, ids: string[], start: number, end: number, pools: string[][]): Anchor[] => {
+  /**
+   * Times for `available` of these shows from `start` to `end` (minutes), each long enough for a
+   * short show's two episodes.
+   */
+  const slots = (kind: string, ids: string[], available: number, start: number, end: number, pools: string[][]): Anchor[] => {
     const minutes = median(ids.flatMap((id) => lib.bySeries.get(id)?.map((e) => e.seconds / 60) ?? [])) || 22;
     const each = Math.max(30, Math.ceil(((minutes < PAIR_MAX / 60 ? 2 * minutes : minutes) + 1) / 5) * 5);
     const room = Math.max(1, Math.round((end - start) / each));
-    const count = Math.min(room, ids.length);
+    const count = Math.min(room, available);
     const length = count === room ? (end - start) / count : each;
     const out: Anchor[] = Array.from({ length: count }, (_, i) => ({ at: start + Math.round(i * length), slot: { key: `${kind}:${i}`, pools } }));
     // Too few shows for all of it: the rest filled in.
@@ -929,11 +940,18 @@ function planDay(sched: Schedule, lib: Library, from: number, timeZone: string) 
   // out; as many as leave the morning four hours for its films.
   const dramaMinutes = others.flatMap((id) => lib.bySeries.get(id)?.map((e) => e.seconds / 60) ?? []).sort((a, b) => a - b);
   const dramaSlot = Math.max(DRAMA_SLOT, Math.ceil(((dramaMinutes[Math.floor(dramaMinutes.length * 0.75)] ?? 0) + 1) / 5) * 5);
-  const dramas = Math.min(DRAMA_SLOTS, others.length, Math.floor((MATINEE - DAY_START - MORNING) / dramaSlot));
-  const afternoonDrama = !weekend && others.length > dramas;
-  const sitcomSlots = slots('sitcom', sitcoms, SITCOMS, CARTOONS, [sitcoms]);
-  const cartoonSlots = slots('cartoon', cartoons, CARTOONS, PRIME, [cartoons]);
-  const taken = [...sitcomSlots, ...cartoonSlots].filter((a) => a.slot).length;
+  // A drama after one o'clock's documentary first (else that's an hour with nothing new), then the mornings'.
+  const docs = k.docShows.length + k.docFilms.length > 0;
+  const afternoon = docs && others.length > 0;
+  const dramas = Math.min(DRAMA_SLOTS, others.length - (afternoon ? 1 : 0), Math.floor((MATINEE - DAY_START - MORNING) / dramaSlot));
+  const afternoonDrama = afternoon && !weekend;
+  // The evening's cartoons: grown-up ones, then other animation (anime) if there are too few; the
+  // sitcoms, then any animation left over. So three to nine is full where the library allows.
+  const animation = [...new Set([...cartoons, ...toons])];
+  const cartoonSlots = slots('cartoon', cartoons, animation.length, CARTOONS, PRIME, [cartoons, toons]);
+  const cartoonCount = cartoonSlots.filter((a) => a.slot).length;
+  const sitcomSlots = slots('sitcom', sitcoms, sitcoms.length + Math.max(0, animation.length - cartoonCount), SITCOMS, CARTOONS, [sitcoms, toons]);
+  const taken = cartoonCount + sitcomSlots.filter((a) => a.slot).length;
   const lateSlots = Math.max(0, Math.min(LATE_SLOTS, late.length - taken));
   const roomFor = (t: number, end: number) => (end - t) / 1000 - BREAK_SECONDS;
   /**
@@ -1007,6 +1025,29 @@ function planDay(sched: Schedule, lib: Library, from: number, timeZone: string) 
     },
     { at: DAY_START + 24 * 60 },
   ];
+
+  // ---- Who has each time today ----
+  // The shows' own times first (cartoons, sitcoms, dramas, then late night), before anything fills
+  // in, so a filler never takes a show its own time needs. A time nobody's left for: films (or
+  // shows without a time of their own) until the next one, never an empty stretch.
+  const priority = ['cartoon', 'sitcom', 'drama', 'late'];
+  const order = anchors
+    .map((anchor, i) => ({ anchor, i }))
+    .filter(({ anchor, i }) => anchor.slot && clock(anchors[i + 1]?.at ?? anchor.at) > from)
+    .sort((a, b) => priority.indexOf(a.anchor.slot!.key.split(':')[0]) - priority.indexOf(b.anchor.slot!.key.split(':')[0]) || a.i - b.i);
+  const nobody = new Set<number>();
+  for (const { anchor, i } of order) {
+    lib.slot = Math.max(from, clock(anchor.at));
+    if (!residentFor(anchor.slot!.key, anchor.slot!.pools, lib.slot)) nobody.add(i);
+  }
+  lib.slot = from;
+  for (let i = anchors.length - 1; i >= 0; i--) {
+    if (!nobody.has(i)) continue;
+    const { at, slot } = anchors[i];
+    // Next to another such: one stretch.
+    if (nobody.has(i - 1)) anchors.splice(i, 1);
+    else anchors[i] = { at, fill: { films: at >= LATE ? grownUpFilms : dayFilms, shows: [...slot!.pools.flat(), ...late] } };
+  }
 
   // ---- Laid out ----
   const plan: Planned[] = [];
@@ -1296,6 +1337,20 @@ linkChannels({
     const now = Date.now();
     return Object.values(stored.schedules).some((x) => x.entries.some((e) => e.start - BREAK_SECONDS * 1000 <= now && now < e.start + e.seconds * 1000 && keyOfEntry(e) === key));
   },
+  short: () => {
+    if (!library) return [];
+    const k = library.kinds;
+    const grown = (ids: string[]) => ids.filter((id) => !forChildren(library!.series.find((x) => x.id === id) ?? { genres: [] }));
+    // Planned new shows count already (so it isn't asked for again and again).
+    const planned = freshPlans().filter((p) => p.mediaType === 'tv');
+    const animation = grown(k.toons).length + planned.filter((p) => has(p.genres, ANIMATION)).length;
+    const sitcoms = k.sitcoms.length + planned.filter((p) => has(p.genres, COMEDY) && !has(p.genres, ANIMATION)).length;
+    const dramas =
+      grown(k.shows).filter((id) => !k.toons.includes(id) && !k.sitcoms.includes(id) && !k.docShows.includes(id)).length +
+      planned.filter((p) => !has(p.genres, [...ANIMATION, ...COMEDY, ...DOCUMENTARY])).length;
+    const counts = { cartoon: animation, sitcom: sitcoms, drama: dramas };
+    return (['cartoon', 'sitcom', 'drama'] as const).filter((kind) => counts[kind] < 4).sort((a, b) => counts[a] - counts[b]);
+  },
   drop: (keys) => {
     const now = Date.now();
     const gone = new Set(keys);
@@ -1545,6 +1600,8 @@ export async function updateChannels(user: SessionUser, patch: Partial<Record<ke
   const ids = new Set(next.channels.map((c) => c.id));
   const movedZone = next.timeZone !== stored.settings.timeZone;
   for (const id of Object.keys(stored.schedules)) if (!ids.has(id) || movedZone) delete stored.schedules[id];
+  const freshOn = (x: ChannelSettings) => Boolean(x.enabled && x.fresh?.enabled && x.channels.some((c) => c.fresh));
+  if (!freshOn(stored.settings) && freshOn(next)) rushFresh('New titles turned on');
   stored = { ...stored, settings: next };
   save();
   // New titles follow the settings straight away (starting, or deleting what's no longer wanted).
@@ -1578,6 +1635,8 @@ export async function resetChannels(user: SessionUser): Promise<ChannelAdmin> {
   const real = await getLibrary(user, true);
   const channels = automatic(real);
   stored = { settings: { ...stored.settings, channels }, schedules: {} };
+  // New titles for the new channels download straight away, whatever the hours (once they're on).
+  rushFresh('Channels started over');
   // The new guide made straight away, so it's there when the guide's opened.
   if (stored.settings.enabled) {
     const now = Date.now();
