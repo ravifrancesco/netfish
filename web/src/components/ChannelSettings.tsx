@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, Eye, EyeOff, History, Play, Plus, RadioTower, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Baby, Eye, EyeOff, History, Play, Plus, RadioTower, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
 import type { ChannelAdmin, ChannelDef, ChannelSettings as Settings, ChannelSource } from '@netfish/shared';
 import { api } from '../api';
 import { ErrorState, Modal, Spinner, Switch, useToast } from './ui';
@@ -19,6 +19,8 @@ function describe(source: ChannelSource, genres: string[]): string {
       return t('Animated shows, and now and then a film');
     case 'sitcoms':
       return t('Comedy shows, a different one each time');
+    case 'kids':
+      return t('Children’s shows, and now and then a family film');
     case 'films':
       // The channel lists genres in several languages; only the library's own show.
       return t('Films: {genres}', { genres: genres.filter((g) => source.genres.includes(g.toLowerCase())).slice(0, 4).join(', ') || source.genres[0] });
@@ -57,6 +59,7 @@ function AddChannel({ data, onAdd, busy }: { data: ChannelAdmin; onAdd: (def: Pi
           <option value="mix">{t('A day of TV, like Netfish')}</option>
           <option value="cartoons">{t('Cartoons')}</option>
           <option value="sitcoms">{t('Sitcoms')}</option>
+          {data.kids && <option value="kids">{t('Kids')}</option>}
           <option value="genre">{t('A genre')}</option>
           <option value="series">{t('One show, in order')}</option>
           <option value="recent">{t('The newest films')}</option>
@@ -186,6 +189,15 @@ export function ChannelSettings() {
             </div>
             <span className="spacer" />
             <Switch on={data.countWatched} onChange={(on) => save.mutate({ countWatched: on })} label={t('Count channels as watching')} />
+          </div>
+          <div className="account">
+            <Baby size={22} />
+            <div className="chanset__about">
+              <span>{t('Kids channel')}</span>
+              <span className="muted small">{t('A channel of children’s shows and family films, and New titles of that kind for it. Off: nothing made for children on any channel, nor among New titles (they stay in the library).')}</span>
+            </div>
+            <span className="spacer" />
+            <Switch on={Boolean(data.kids)} onChange={(on) => save.mutate({ kids: on })} label={t('Kids channel')} disabled={save.isPending} />
           </div>
 
           <ul className="chanset__list">

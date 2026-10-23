@@ -58,7 +58,7 @@ interface Round {
  * The rules schedules are made by. Raised when they change (a new timetable for Netfish's own
  * channel, say), so a week already planned is made again, from a few minutes ahead.
  */
-const PLAN = 9;
+const PLAN = 10;
 
 interface Schedule {
   /** What the channel was built from: a different source starts a new schedule. */
@@ -175,6 +175,8 @@ interface Library {
   /** Each show's episodes, in order. */
   bySeries: Map<string, Program[]>;
   series: Array<{ id: string; name: string; genres: string[]; rating?: string; key?: string }>;
+  /** Made for children: only on the Kids channel (when there's one), never on the others. */
+  kids: { shows: string[]; films: string[]; series: Array<{ id: string; name: string }> };
   /** New on the channel looking (Netfish brought them in for it), due on now: first in line. */
   fresh?: { films: string[]; shows: string[] };
   /** All of this channel's new ones (due or not): they go on only as new, never in the usual turns. */
@@ -285,16 +287,34 @@ async function fetchLibrary(user: SessionUser): Promise<Library> {
   return libraryFrom(movies, series, episodes);
 }
 
+/**
+ * Made for children: shows by their genre (Kids, Children) or rating (TV-Y, TV-Y7; TV-G
+ * animation); films that are Family or Kids, or rated G. Only ever on the Kids channel (Settings
+ * → Channels), never on the others; still in the library to watch, either way.
+ */
+const childrensShow = (s: JfItem) => {
+  const rating = (s.OfficialRating ?? '').toUpperCase();
+  return has(s.Genres ?? [], CHILDREN) || /^TV-(Y|Y7|Y7-FV)$/.test(rating) || (rating === 'TV-G' && has(s.Genres ?? [], ANIMATION));
+};
+const childrensFilm = (m: JfItem) => has(m.Genres ?? [], KIDS) || /^(G|TV-Y|TV-Y7|TV-G)$/i.test(m.OfficialRating ?? '');
+
 /** What channels make of the library's films, shows and episodes. */
 function libraryFrom(movies: { Items: JfItem[] }, series: { Items: JfItem[] }, episodes: { Items: JfItem[] }): Library {
   const seriesGenres = new Map(series.Items.map((s) => [s.Id, s.Genres ?? []]));
   const seriesKeys = new Map(series.Items.map((s) => [s.Id, keyOf(s)]));
-  const movieList = movies.Items.map((i) => toProgram(i, seriesGenres, seriesKeys)).filter((p): p is Program => Boolean(p));
   // Specials (season 0) are out: they're rarely what anyone wants on a channel.
-  const episodeList = episodes.Items.map((i) => toProgram(i, seriesGenres, seriesKeys)).filter((p): p is Program => Boolean(p) && (p!.season ?? 1) > 0);
+  const allEpisodes = episodes.Items.map((i) => toProgram(i, seriesGenres, seriesKeys)).filter((p): p is Program => Boolean(p) && (p!.season ?? 1) > 0);
   const bySeries = new Map<string, Program[]>();
-  for (const e of episodeList) if (e.seriesId) bySeries.set(e.seriesId, [...(bySeries.get(e.seriesId) ?? []), e]);
+  for (const e of allEpisodes) if (e.seriesId) bySeries.set(e.seriesId, [...(bySeries.get(e.seriesId) ?? []), e]);
   for (const list of bySeries.values()) list.sort((a, b) => (a.season ?? 0) - (b.season ?? 0) || (a.episode ?? 0) - (b.episode ?? 0));
+  // What's made for children, apart: the Kids channel's only.
+  const kidsShows = series.Items.filter((s) => childrensShow(s) && bySeries.has(s.Id));
+  const kidsFilms = new Set(movies.Items.filter(childrensFilm).map((m) => m.Id));
+  const kidsIds = new Set(kidsShows.map((s) => s.Id));
+  const allMovies = movies.Items.map((i) => toProgram(i, seriesGenres, seriesKeys)).filter((p): p is Program => Boolean(p));
+  const movieList = allMovies.filter((m) => !kidsFilms.has(m.id));
+  const episodeList = allEpisodes.filter((e) => !kidsIds.has(e.seriesId ?? ''));
+  series = { Items: series.Items.filter((s) => !kidsIds.has(s.Id)) };
 
   const shows = series.Items.filter((s) => bySeries.has(s.Id));
   const toons = shows.filter((s) => has(s.Genres ?? [], ANIMATION));
@@ -310,6 +330,7 @@ function libraryFrom(movies: { Items: JfItem[] }, series: { Items: JfItem[] }, e
     episodes: episodeList,
     bySeries,
     series: series.Items.map((s) => ({ id: s.Id, name: s.Name, genres: s.Genres ?? [], rating: s.OfficialRating, key: keyOf(s) })),
+    kids: { shows: kidsShows.map((s) => s.Id), films: allMovies.filter((m) => kidsFilms.has(m.id)).map((m) => m.id), series: kidsShows.map((s) => ({ id: s.Id, name: s.Name })) },
     kinds: {
       toons: idsOf(toons),
       kidsToons: idsOf(toons.filter((s) => childish(s) || !has(s.Genres ?? [], COMEDY))),
@@ -329,7 +350,8 @@ function libraryFrom(movies: { Items: JfItem[] }, series: { Items: JfItem[] }, e
       docFilms: best(movieList.filter((m) => nice(m.genres))).map((m) => m.id),
     },
   };
-  for (const p of [...lib.movies, ...lib.episodes]) lib.byId.set(p.id, p);
+  // (Children's too: the Kids channel plays them, and a channel of one show plays the show it's of.)
+  for (const p of [...allMovies, ...allEpisodes]) lib.byId.set(p.id, p);
   return lib;
 }
 
@@ -426,10 +448,15 @@ function viewFor(lib: Library, channelId: string, sched: Schedule | undefined, n
     return mine(id);
   };
   const kinds = Object.fromEntries(Object.entries(lib.kinds).map(([kind, ids]) => [kind, ids.filter(ok)])) as Library['kinds'];
+  const kids = { ...lib.kids, shows: lib.kids.shows.filter(ok), films: lib.kids.films.filter(ok) };
   const films = lib.movies.filter((m) => mine(m.id));
   const shows = lib.series.filter((x) => mine(x.id));
-  // Stand-ins sorted into kinds the way the library's own are.
+  // Stand-ins sorted into kinds the way the library's own are (children's: the Kids channel's).
   for (const m of films.filter((x) => isPlaceholder(x.id))) {
+    if (has(m.genres, KIDS)) {
+      kids.films.push(m.id);
+      continue;
+    }
     kinds.films.push(m.id);
     if (light(m.genres)) kinds.lightFilms.push(m.id);
     if (has(m.genres, ANIMATION)) kinds.animatedFilms.push(m.id);
@@ -438,6 +465,10 @@ function viewFor(lib: Library, channelId: string, sched: Schedule | undefined, n
     } else if (!has(m.genres, KIDS)) kinds.eveningFilms.push(m.id), kinds.bigFilms.push(m.id);
   }
   for (const x of shows.filter((y) => isPlaceholder(y.id))) {
+    if (has(x.genres, CHILDREN)) {
+      kids.shows.push(x.id);
+      continue;
+    }
     kinds.shows.push(x.id);
     const minutes = median(lib.bySeries.get(x.id)?.map((e) => e.seconds) ?? []);
     if (has(x.genres, ANIMATION)) {
@@ -451,6 +482,7 @@ function viewFor(lib: Library, channelId: string, sched: Schedule | undefined, n
   return {
     ...lib,
     kinds,
+    kids,
     movies: lib.movies.filter((m) => ok(m.id)),
     series: lib.series.filter((x) => ok(x.id)),
     fresh: { films: films.map((m) => m.id), shows: shows.map((x) => x.id) },
@@ -1165,6 +1197,12 @@ function pickOne(def: ChannelDef, sched: Schedule, lib: Library, at: number, tim
       sched.turn += 1;
       if (sched.turn % 5 === 0 && lib.kinds.animatedFilms.length) return one(film(sched, lib, 'films', lib.kinds.animatedFilms, at));
       return one(episodeFrom(sched, lib, 'toons', lib.kinds.toons) ?? film(sched, lib, 'films', lib.kinds.animatedFilms, at));
+    case 'kids': {
+      // Children's shows, with a family film every few (the Kids channel: nothing for children elsewhere).
+      sched.turn += 1;
+      if (sched.turn % 4 === 0 && lib.kids.films.length) return one(film(sched, lib, 'films', lib.kids.films, at));
+      return one(episodeFrom(sched, lib, 'kids', lib.kids.shows) ?? film(sched, lib, 'films', lib.kids.films, at));
+    }
     case 'sitcoms':
       return one(episodeFrom(sched, lib, 'sitcoms', lib.kinds.sitcoms));
     case 'films':
@@ -1458,17 +1496,20 @@ export async function listChannels(user: SessionUser, hours = 4, now = Date.now(
  * serious films, comedies, family films, science fiction and the newest films, each only if
  * there's enough for it.
  */
-function automatic(lib: Library): ChannelDef[] {
+/** Enough made for children for a channel of its own. */
+const hasKids = (lib: Library) => lib.kids.shows.reduce((n, id) => n + (lib.bySeries.get(id)?.length ?? 0), 0) >= 6 || lib.kids.films.length >= 3;
+
+function automatic(lib: Library, kids = false): ChannelDef[] {
   const k = lib.kinds;
   const episodes = (shows: string[]) => shows.reduce((n, id) => n + (lib.bySeries.get(id)?.length ?? 0), 0);
   const defs: Array<Omit<ChannelDef, 'number' | 'id'>> = [];
   if (lib.episodes.length || lib.movies.length) defs.push({ name: 'Netfish', source: { kind: 'mix' }, builtIn: true });
   if (episodes(k.toons) >= 6 || k.animatedFilms.length >= 3) defs.push({ name: t('Cartoons'), source: { kind: 'cartoons' } });
   if (episodes(k.sitcoms) >= 6) defs.push({ name: t('Sitcoms'), source: { kind: 'sitcoms' } });
+  if (kids && hasKids(lib)) defs.push({ name: t('Kids'), source: { kind: 'kids' } });
   const lineup: Array<[string, Extract<ChannelSource, { kind: 'films' }>]> = [
     [t('Drama & thrillers'), { kind: 'films', genres: SERIOUS, avoid: [...COMEDY, ...ANIMATION, ...KIDS] }],
     [t('Comedy films'), { kind: 'films', genres: COMEDY, avoid: ANIMATION }],
-    [t('Family films'), { kind: 'films', genres: [...KIDS, ...ANIMATION] }],
     [t('Sci-fi & fantasy'), { kind: 'films', genres: SCIFI, avoid: ANIMATION }],
   ];
   for (const [name, source] of lineup) if (filmsOf(source, lib).length >= 5) defs.push({ name, source });
@@ -1491,7 +1532,7 @@ export async function channelAdmin(user: SessionUser): Promise<ChannelAdmin> {
     fresh: { ...FRESH_DEFAULTS, ...stored.settings.fresh },
     channels: stored.settings.channels.map((c) => ({ ...c, name: shownName(c.name) })),
     genres: [...genres.entries()].map(([name, n]) => ({ name, ...n })).sort((a, b) => a.name.localeCompare(b.name)),
-    series: lib.series
+    series: [...lib.series, ...(stored.settings.kids ? lib.kids.series : [])]
       .filter((s) => lib.bySeries.has(s.id))
       .map((s) => ({ id: s.id, name: s.name, episodes: lib.bySeries.get(s.id)!.length }))
       .sort((a, b) => a.name.localeCompare(b.name)),
@@ -1527,13 +1568,14 @@ function validSource(v: unknown): ChannelSource {
     case 'sitcoms':
     case 'recent':
     case 'shows':
+    case 'kids':
       return { kind: s.kind };
   }
   throw new HttpError(400, t('A channel needs something to play'));
 }
 
 /** The names Netfish gives channels: each viewer sees them in their own language, until the admin renames one. */
-const GIVEN_NAMES = ['Cartoons', 'Sitcoms', 'Drama & thrillers', 'Comedy films', 'Family films', 'Sci-fi & fantasy', 'New arrivals'];
+const GIVEN_NAMES = ['Cartoons', 'Sitcoms', 'Kids', 'Drama & thrillers', 'Comedy films', 'Family films', 'Sci-fi & fantasy', 'New arrivals'];
 function shownName(name: string): string {
   for (const given of GIVEN_NAMES) if (name === given || name === inLanguage('it', () => t(given))) return t(given);
   const n = /^(?:Channel|Canale) (\d+)$/.exec(name)?.[1];
@@ -1548,6 +1590,8 @@ function defaultName(source: ChannelSource, n: number) {
       return t('Cartoons');
     case 'sitcoms':
       return t('Sitcoms');
+    case 'kids':
+      return t('Kids');
     case 'genre':
       return source.genre;
     case 'series':
@@ -1587,6 +1631,17 @@ function validTimeZone(v: unknown): string | undefined {
 export async function updateChannels(user: SessionUser, patch: Partial<Record<keyof ChannelSettings, unknown>>): Promise<ChannelAdmin> {
   const next: ChannelSettings = { ...stored.settings };
   if ('countWatched' in patch) next.countWatched = Boolean(patch.countWatched);
+  // No Kids channel without the setting (it's what says children's things may be on one).
+  if (!(('kids' in patch ? patch.kids : stored.settings.kids))) next.channels = next.channels.filter((c) => c.source.kind !== 'kids');
+  // The Kids channel: on, it's added (if there's enough for it); off, it goes (and its New titles with it).
+  if ('kids' in patch && Boolean(patch.kids) !== Boolean(stored.settings.kids)) {
+    next.kids = Boolean(patch.kids);
+    const lib = await getLibrary(user);
+    const rest = next.channels.filter((c) => c.source.kind !== 'kids');
+    // (Turned on by hand: there, if the library has anything for children at all; New titles can fill it.)
+    const any = lib.kids.shows.length + lib.kids.films.length > 0;
+    next.channels = next.kids && any ? [...rest, { id: randomUUID().slice(0, 8), number: rest.length + 1, name: t('Kids'), source: { kind: 'kids' } }] : rest;
+  }
   if ('channels' in patch) next.channels = withNetfish(validChannels(patch.channels), stored.settings.channels.find((c) => c.builtIn));
   if ('timeZone' in patch) next.timeZone = validTimeZone(patch.timeZone) ?? next.timeZone;
   setLogTimeZone(next.timeZone);
@@ -1594,7 +1649,7 @@ export async function updateChannels(user: SessionUser, patch: Partial<Record<ke
   if ('enabled' in patch) {
     next.enabled = Boolean(patch.enabled);
     // Turned on for the first time: a line-up of its own to start with.
-    if (next.enabled && !next.channels.length) next.channels = automatic(await getLibrary(user, true));
+    if (next.enabled && !next.channels.length) next.channels = automatic(await getLibrary(user, true), next.kids);
   }
   // Schedules of channels that are gone go with them; a new time zone starts them all again.
   const ids = new Set(next.channels.map((c) => c.id));
@@ -1649,7 +1704,7 @@ export async function resetChannels(user: SessionUser): Promise<ChannelAdmin> {
   // A channel made from the same thing as before keeps what it was (its ✨ New titles, and so
   // the new titles it has), Netfish's own too; only the others' go.
   const before = [...stored.settings.channels];
-  const channels = automatic(real).map((c) => {
+  const channels = automatic(real, stored.settings.kids).map((c) => {
     const i = before.findIndex((b) => sourceKey(b.source) === sourceKey(c.source) && Boolean(b.builtIn) === Boolean(c.builtIn));
     if (i < 0) return c;
     const [same] = before.splice(i, 1);

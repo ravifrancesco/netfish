@@ -946,7 +946,9 @@ export type ChannelSource =
   | { kind: 'genre'; genre: string; movies: boolean; episodes: boolean }
   | { kind: 'series'; seriesId: string; seriesName: string }
   | { kind: 'recent' }
-  | { kind: 'shows' };
+  | { kind: 'shows' }
+  /** Made for children: their shows, and now and then a family film (only with Settings → Channels → Kids channel on). */
+  | { kind: 'kids' };
 
 export interface ChannelDef {
   id: string;
@@ -1065,6 +1067,11 @@ export interface ChannelSettings {
   /** Where the household is (the admin's device's time zone): the 9pm film is at 9pm there. */
   timeZone?: string;
   fresh?: FreshSettings;
+  /**
+   * A Kids channel: children's shows and family films (and New titles of that kind for it). Off
+   * (the default): nothing made for children on any channel, nor among New titles.
+   */
+  kids?: boolean;
 }
 
 export interface ChannelAdmin extends ChannelSettings {

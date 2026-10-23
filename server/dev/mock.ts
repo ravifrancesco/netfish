@@ -247,7 +247,7 @@ function dto(item: Item, userId?: string, full = false): Record<string, unknown>
     case 'movie':
       return {
         Id: item.id, Name: t.title, Type: 'Movie', ProductionYear: t.year, PremiereDate: `${t.year}-06-01T00:00:00.0000000Z`,
-        Overview: t.overview, Genres: t.genres, CommunityRating: t.rating, OfficialRating: 'PG-13', RunTimeTicks: full ? RUNTIME_TICKS : nominalMinutes(t) * 600_000_000,
+        Overview: t.overview, Genres: t.genres, CommunityRating: t.rating, OfficialRating: t.cert ?? 'PG-13', RunTimeTicks: full ? RUNTIME_TICKS : nominalMinutes(t) * 600_000_000,
         ProviderIds: { Tmdb: String(t.tmdbId) }, ImageTags: { Primary: 'p1', Thumb: 't1' }, BackdropImageTags: ['b1'],
         DateCreated: date(titleAdded(t)), UserData: userDataDto(userId, item), Taglines: [],
         People: jfPeople(t),
@@ -256,7 +256,7 @@ function dto(item: Item, userId?: string, full = false): Record<string, unknown>
     case 'series':
       return {
         Id: item.id, Name: t.title, Type: 'Series', ProductionYear: t.year, PremiereDate: `${t.year}-01-15T00:00:00.0000000Z`,
-        Overview: t.overview, Genres: t.genres, CommunityRating: t.rating, OfficialRating: 'TV-14', RunTimeTicks: nominalMinutes(t) * 600_000_000,
+        Overview: t.overview, Genres: t.genres, CommunityRating: t.rating, OfficialRating: t.cert ?? 'TV-14', RunTimeTicks: nominalMinutes(t) * 600_000_000,
         ProviderIds: { Tmdb: String(t.tmdbId), Tvdb: String(t.tvdbId) }, ImageTags: { Primary: 'p1' }, BackdropImageTags: ['b1'],
         DateCreated: date(titleAdded(t)), UserData: userDataDto(userId, item), People: jfPeople(t),
         // Jellyfin counts a show's episodes here: 0 once its files are deleted, its folder left.
@@ -645,7 +645,7 @@ function mediaInfo(t: Title) {
 
 const GENRE_IDS: Record<string, number> = {
   Action: 28, Adventure: 12, Animation: 16, Comedy: 35, Crime: 80, Documentary: 99, Drama: 18, Family: 10751, Fantasy: 14,
-  Horror: 27, Mystery: 9648, Romance: 10749, 'Science Fiction': 878, Thriller: 53, War: 10752, Western: 37, History: 36, Music: 10402,
+  Horror: 27, Kids: 10762, Mystery: 9648, Romance: 10749, 'Science Fiction': 878, Thriller: 53, War: 10752, Western: 37, History: 36, Music: 10402,
 };
 const genreIds = (t: Title) => t.genres.map((name) => GENRE_IDS[name] ?? 0);
 
@@ -774,14 +774,14 @@ void app.register(
       };
       if (type === 'movie') {
         const out = releaseOf(t) as { inCinemas: string; digitalRelease: string };
-        const releases = { results: [{ iso_3166_1: 'US', release_dates: [{ certification: 'PG-13', type: 3, release_date: out.inCinemas }, { type: 4, release_date: out.digitalRelease }] }] };
+        const releases = { results: [{ iso_3166_1: 'US', release_dates: [{ certification: t.cert ?? 'PG-13', type: 3, release_date: out.inCinemas }, { type: 4, release_date: out.digitalRelease }] }] };
         return { ...common, title: t.title, originalTitle: t.title, releaseDate: out.inCinemas.slice(0, 10), runtime: 104 + (t.n % 30), releases, externalIds: { imdbId: `tt${9000000 + t.n}` } };
       }
       return {
         ...common, name: t.title, originalName: t.title, firstAirDate: (releaseOf(t).firstAired ?? '').slice(0, 10), episodeRunTime: [t.runtime ?? 48], numberOfSeasons: t.seasons,
         nextEpisodeToAir: releaseOf(t).nextAiring ? { airDate: releaseOf(t).nextAiring!.slice(0, 10) } : null,
         createdBy: [{ id: personId(creatorOf(t)), name: creatorOf(t) }], networks: [{ name: 'Mock+' }],
-        contentRatings: { results: [{ iso_3166_1: 'US', rating: 'TV-14' }] }, externalIds: { tvdbId: t.tvdbId, imdbId: `tt${9100000 + t.n}` },
+        contentRatings: { results: [{ iso_3166_1: 'US', rating: t.cert ?? 'TV-14' }] }, externalIds: { tvdbId: t.tvdbId, imdbId: `tt${9100000 + t.n}` },
         seasons: Array.from({ length: t.seasons }, (_, i) => ({ id: t.tmdbId * 10 + i, seasonNumber: i + 1, name: `Season ${i + 1}`, episodeCount: EPISODES_PER_SEASON, airDate: `${t.year + i}-01-15`, posterPath: `/poster-season-${t.tmdbId}-${i + 1}.jpg` })),
       };
     };

@@ -7,6 +7,17 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.37 (2026-10-23)
+
+### New
+- **Channels are for grown-ups, unless you want a Kids channel.** By default nothing made for children is on any channel or among New titles: kids' shows (Kids genre, or rated TV-Y or TV-Y7, or TV-G cartoons) and family films (Family or Kids, or rated G). They stay in the library to watch as before, just not on channels.
+  - **Settings → Channels → Kids channel** turns on a **Kids** channel: children's shows, with a family film now and then. With ✨ it gets New titles of that kind, and only it does. Turned off, the channel goes, and its New titles with it.
+  - **Cartoons** is grown-up animation now. The automatic line-up no longer makes a "Family films" channel.
+- **New titles made for children, picked for a channel that isn't the Kids one, are deleted** (Paw Patrol for Cartoons, say), downloaded or not. The log says so.
+
+### Update
+- **Server.** The guide is made again without them after the update.
+
 ## 0.7.36 (2026-10-23)
 
 ### Changed

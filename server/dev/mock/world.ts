@@ -25,6 +25,8 @@ export interface Title {
   rating: number;
   /** A show's episodes, in minutes (48 if not given). */
   runtime?: number;
+  /** Its US rating (PG-13 for films and TV-14 for shows if not given). */
+  cert?: string;
 }
 
 function hash(s: string) {
@@ -99,6 +101,9 @@ export const TITLES: Title[] = [
         { ...T(123, 'Harbour Masters', 2022, 1, ['Comedy'], 'The worst-run marina on the coast, and the inspector sent to close it.'), rating: 7.9, runtime: 24 },
         { ...T(124, 'Squid Club', 2020, 2, ['Animation', 'Comedy'], 'Grown-up cephalopods with grown-up problems.'), rating: 8.1, runtime: 22 },
         { ...T(125, 'Deep Fried', 2023, 1, ['Animation', 'Comedy'], 'A seaside chip shop run by a very stressed crab.'), rating: 7.8, runtime: 22 },
+        // For children: only ever for a Kids channel.
+        { ...T(126, 'Pup Squad', 2019, 3, ['Animation', 'Kids'], 'Six rescue puppies and their boat keep the harbour safe.'), rating: 8.3, runtime: 22, cert: 'TV-Y' },
+        { ...M(46, 'Little Fins', 2020, ['Animation', 'Family'], 'A tiny fish swims out past the reef to find her way home.'), rating: 8.2, cert: 'G' },
       ]
     : []),
 ];

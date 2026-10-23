@@ -339,7 +339,13 @@ interface Want {
   /** How well liked, at least (TMDB's score and its number of votes): 6.8 by 200 people unless said. */
   minRating?: number;
   minVotes?: number;
+  /** The Kids channel's: made for children (anywhere else, never). */
+  forKids?: boolean;
 }
+
+/** Made for children (by the genres TMDB gave it): Kids (TV), or a family film. */
+const forChildren = (f: { mediaType: MediaType; genres: string[] }) =>
+  f.genres.some((g) => /^(kids|bambini)$/i.test(g)) || (f.mediaType === 'movie' && f.genres.some((g) => /^(family|famiglia)$/i.test(g)));
 
 /**
  * What a channel would like new, given what it plays. `turn` varies Netfish's own channel;
@@ -371,9 +377,16 @@ export function wantsOf(source: ChannelSource, turn = 0, short: Array<'cartoon' 
       return kinds.includes(film) ? kinds : [...kinds, film];
     }
     case 'cartoons':
-      return [{ mediaType: 'tv', genres: [ANIMATION], avoid: [] }];
+      // (Grown-up animation: what's for children is never picked, see suits and planFor.)
+      return [{ mediaType: 'tv', genres: [ANIMATION], avoid: [KIDS] }];
     case 'sitcoms':
       return [{ mediaType: 'tv', genres: [COMEDY], avoid: [ANIMATION, KIDS, DOCUMENTARY], shortEpisodes: true }];
+    case 'kids': {
+      // Children's shows, a family film every third.
+      const shows: Want = { mediaType: 'tv', genres: [KIDS], avoid: [HORROR], forKids: true };
+      const films: Want = { mediaType: 'movie', genres: [FAMILY], avoid: [HORROR], forKids: true };
+      return turn % 3 === 2 ? [films, shows] : [shows, films];
+    }
     case 'films':
       return [{ mediaType: 'movie', genres: genreIds(source.genres), avoid: genreIds(source.avoid) }];
     case 'genre': {
@@ -398,6 +411,9 @@ const dateOf = (r: SeerrResult) => Date.parse((r.mediaType === 'tv' ? r.firstAir
 /** Whether a TMDB result is good for this channel: well liked, out a while, and nobody's had it. */
 export function suits(r: SeerrResult, want: Want, now: number): boolean {
   const genres = r.genreIds ?? [];
+  // Made for children (TV's Kids, family films): the Kids channel's only, and only that for it.
+  const children = genres.includes(KIDS) || (want.mediaType === 'movie' && genres.includes(FAMILY));
+  if (children !== Boolean(want.forKids)) return false;
   if (want.genres.length && !genres.some((g) => want.genres.includes(g))) return false;
   if (want.need?.some((g) => !genres.includes(g))) return false;
   if (genres.some((g) => want.avoid.includes(g))) return false;
@@ -443,6 +459,10 @@ async function planFor(r: SeerrResult, want: Want, channelId: string, notBefore:
   if (want.mediaType === 'movie') {
     if (has.radarr() && (await settle(radarr.movieByTmdb(r.id), undefined))) return undefined; // someone's
     const d = await seerr.movie(r.id);
+    const ratings = (d.releases?.results ?? []).filter((x) => x.iso_3166_1 === 'US').flatMap((x) => x.release_dates?.map((y) => y.certification ?? '') ?? []);
+    const children = ratings.includes('G') || (d.genres ?? []).some((g) => g.id === FAMILY || g.id === KIDS);
+    // For children only on the Kids channel; nothing rated for grown-ups there.
+    if (want.forKids ? !children || ratings.some((r) => ['R', 'NC-17'].includes(r)) : children) return undefined;
     return {
       ...base,
       title: d.title ?? r.title ?? '',
@@ -455,6 +475,12 @@ async function planFor(r: SeerrResult, want: Want, channelId: string, notBefore:
   const d = await seerr.tv(r.id);
   const tvdbId = d.externalIds?.tvdbId;
   if (!tvdbId) return undefined;
+  // For children: TV's Kids, or rated for them (TV-Y, TV-Y7; TV-G cartoons). The Kids channel's
+  // only (and nothing rated for grown-ups there).
+  const rating = (d.contentRatings?.results?.find((x) => x.iso_3166_1 === 'US')?.rating ?? '').toUpperCase();
+  const genreIds = (d.genres ?? []).map((g) => g.id);
+  const children = genreIds.includes(KIDS) || /^TV-(Y|Y7|Y7-FV)$/.test(rating) || (rating === 'TV-G' && genreIds.includes(ANIMATION));
+  if (want.forKids ? !children || ['TV-14', 'TV-MA'].includes(rating) : children) return undefined;
   const runtime = Math.min(...(d.episodeRunTime?.length ? d.episodeRunTime : [45]));
   // Sitcoms: half-hour episodes.
   if (want.shortEpisodes && runtime > 35) return undefined;
@@ -852,7 +878,10 @@ async function step(now: number) {
   const removed: Fresh[] = [];
   for (const f of stored.titles) {
     if (f.state === 'kept') continue;
-    const wanted = defs.some((d) => d.id === f.channelId);
+    // Made for children but for a channel that isn't the Kids one (picked before there was one): it goes.
+    const def = defs.find((d) => d.id === f.channelId);
+    const childish = Boolean(def) && def!.source.kind !== 'kids' && forChildren(f);
+    const wanted = Boolean(def) && !childish;
     const done = link.doneAt(f.key);
     // Asked for by someone: theirs once it has aired (or once its channel stops wanting new titles).
     if (f.keptBy && f.state !== 'planned' && ((f.state === 'ready' && done && now >= done) || (!wanted && !link.onAir(f.key)))) {
@@ -868,7 +897,11 @@ async function step(now: number) {
     if (due || (!wanted && !link.onAir(f.key))) {
       const ok = await settle(remove(f, queue).then(() => true), false);
       if (ok) removed.push(f);
-      if (ok) log.info('new titles', due ? `"${f.title}" has aired: deleted (${gb(f.size)} freed)` : `"${f.title}": its channel no longer takes new titles, deleted`);
+      if (ok)
+        log.info(
+          'new titles',
+          due ? `"${f.title}" has aired: deleted (${gb(f.size)} freed)` : childish ? `"${f.title}" is made for children, and not for the Kids channel: deleted` : `"${f.title}": its channel no longer takes new titles, deleted`,
+        );
     }
   }
   if (removed.length) {

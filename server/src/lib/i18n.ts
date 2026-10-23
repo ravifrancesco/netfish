@@ -252,6 +252,7 @@ const IT: Record<string, string> = {
   'New arrivals': 'Nuovi arrivi',
   Cartoons: 'Cartoni',
   Sitcoms: 'Sitcom',
+  Kids: 'Bambini',
   'Drama & thrillers': 'Drammi e thriller',
   'Comedy films': 'Film comici',
   'Family films': 'Film per famiglie',
