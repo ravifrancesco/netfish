@@ -461,10 +461,12 @@ export async function apiRoutes(app: FastifyInstance) {
       if (itemId.startsWith('fresh:')) {
         const [type, id] = (key ?? '').split('-');
         const found = await settle<{ overview?: string } | undefined>(type === 'movie' ? catalog.movie(Number(id)) : catalog.tv(Number(id)), undefined);
-        return { overview: found?.overview, requested };
+        // Its page from TMDB, like any title not in the library (when TMDB knows it).
+        return { overview: found?.overview, requested, href: found && (type === 'movie' || type === 'tv') ? `/title/${type}/${Number(id)}` : undefined };
       }
       const item = await jellyfin.item(user.token, user.id, itemId);
-      return { overview: item.Overview, pageId: item.SeriesId ?? item.Id, requested };
+      const pageId = item.SeriesId ?? item.Id;
+      return { overview: item.Overview, pageId, href: `/title/jf/${pageId}`, requested };
     });
     // A new title on a channel: anyone can keep it, or ask for it before it's here (it joins the library).
     api.post<{ Body: { itemId?: string } }>('/channels/keep', async (req) => {

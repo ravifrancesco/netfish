@@ -1020,9 +1020,25 @@ export interface FreshStatus {
   /** Why nothing's being added right now. */
   waiting?: 'off' | 'no-channels' | 'hours' | 'space' | 'disk' | 'week' | 'enough' | 'services';
   titles: FreshTitle[];
+  /** The last look inside the download hours: what happened then (outside them, "outside the hours" says little). */
+  lastInHours?: { at: string; note: FreshNote; title?: string };
+  /** What happened to new titles lately, newest first. */
+  events: FreshEvent[];
   /** What it can use: Radarr for films, Sonarr for shows, Seerr to find them, qBittorrent for hours and speed. */
   services: { radarr: boolean; sonarr: boolean; seerr: boolean; qbittorrent: boolean };
   profiles: { movie: Array<{ id: number; name: string }>; show: Array<{ id: number; name: string }> };
+}
+
+/** What a look inside the download hours came to. */
+export type FreshNote = 'started' | 'downloading' | 'nothing-due' | 'disk' | 'space' | 'services' | 'add-failed' | 'already-there';
+
+/** Something that happened to a new title. */
+export interface FreshEvent {
+  at: string;
+  title: string;
+  what: 'started' | 'add-failed' | 'already-there' | 'nothing-found' | 'too-big';
+  /** What Radarr or Sonarr said, when adding it failed. */
+  detail?: string;
 }
 
 /** Settings → Channels (admins). */
@@ -1066,6 +1082,8 @@ export interface ProgramAbout {
   overview?: string;
   /** The Jellyfin id of the film, or of the show an episode is from (none for a new title still on its way). */
   pageId?: string;
+  /** Its page in Netfish: the library's, or for a new title still on its way TMDB's (trailer, cast, Request). */
+  href?: string;
   /** A new title on a channel that someone has kept, or asked for: it stays, in the library. */
   requested?: boolean;
 }

@@ -7,6 +7,20 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.24 (2026-10-22)
+
+### Changed
+- **Channel guide: New titles you don't have yet say *Keep*, not *Request*.** Opening a programme that was brought in for a channel offers *Keep* (it stays in the library once it's here), the same as the *Keep* button in the channel player. Once kept, it says *Kept*.
+
+### New
+- **Channel guide: *More info* for New titles not downloaded yet.** Their window had only TMDB's description. It now has *More info*, to the title's own page (trailer, cast, ratings), like any title outside the library. An episode of a new show goes to the show.
+- **Settings → Channels → New titles: why nothing is downloading, and what happened lately.**
+  - Outside the download hours the section said only "Outside download hours", which hid what stops them at night. It now adds what the last check *inside* the hours found: that it started one, that one was still downloading, that nothing was due yet, that the disk was nearly full, or that the title couldn't be added to Radarr or Sonarr.
+  - A new **Lately** list shows what happened to each New title: started downloading, couldn't be added (with what Radarr or Sonarr said), already in Radarr or Sonarr, nothing found to download in 12 hours (so it was dropped), or bigger than the space left. Until now these happened without a trace, so a title could quietly disappear from the plan.
+
+### Update
+- **Server.**
+
 ## 0.7.23 (2026-10-22)
 
 ### Changed

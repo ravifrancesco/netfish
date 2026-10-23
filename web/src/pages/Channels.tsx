@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Ref } from 'react';
 import { Link } from 'react-router';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Plus } from 'lucide-react';
+import { Check } from 'lucide-react';
 import type { Channel, ChannelProgram } from '@netfish/shared';
 import { api } from '../api';
 import { ErrorState, Empty, Modal, PageLoader, Spinner, useToast } from '../components/ui';
@@ -170,7 +170,7 @@ function About({ program, channel, now, onClose }: { program: ChannelProgram; ch
     mutationFn: () => api.keepChannelTitle(program.itemId),
     onSuccess: (res) => {
       const title = program.seriesTitle ?? program.title;
-      toast('ok', res.here ? t('Requested: {title} is in the library now', { title }) : t('Requested {title}.', { title }));
+      toast('ok', res.here ? t('Kept: {title} is in the library now', { title }) : t('Kept {title}: it joins the library once it’s here.', { title }));
       void qc.invalidateQueries({ queryKey: ['program-about', program.itemId] });
       void qc.invalidateQueries({ queryKey: ['channels'] });
     },
@@ -199,15 +199,15 @@ function About({ program, channel, now, onClose }: { program: ChannelProgram; ch
           {askable &&
             (requested ? (
               <button className="btn btn--ghost" disabled>
-                <Check size={18} /> {t('Requested')}
+                <Check size={18} /> {t('Kept')}
               </button>
             ) : (
               <button className="btn btn--accent" disabled={request.isPending || about.isLoading} onClick={() => request.mutate()}>
-                {request.isPending ? <Spinner size={18} /> : <Plus size={18} />} {t('Request')}
+                {request.isPending ? <Spinner size={18} /> : <Check size={18} />} {t('Keep')}
               </button>
             ))}
-          {about.data?.pageId && (
-            <Link to={`/title/jf/${about.data.pageId}`} className="btn btn--primary">
+          {about.data?.href && (
+            <Link to={about.data.href} className="btn btn--primary">
               {t('More info')}
             </Link>
           )}
@@ -224,7 +224,7 @@ function About({ program, channel, now, onClose }: { program: ChannelProgram; ch
           <p className="muted small">{[program.year, program.rating, duration(program.seconds)].filter(Boolean).join(' · ')}</p>
           {askable && (
             <p className="program-about__new small">
-              {requested ? t('Requested. It stays in the library.') : t('New on this channel. Leaves after it airs unless requested.')}
+              {requested ? t('Kept. It stays in the library.') : t('New on this channel. Leaves after it airs unless someone keeps it.')}
             </p>
           )}
           {about.isLoading ? <Spinner size={18} /> : about.data?.overview ? <p className="program-about__overview">{about.data.overview}</p> : null}

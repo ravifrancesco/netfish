@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
-import type { ChannelAdmin, ChannelSettings, FreshSettings, FreshStatus, FreshTitle } from '@netfish/shared';
+import type { ChannelAdmin, ChannelSettings, FreshEvent, FreshSettings, FreshStatus, FreshTitle } from '@netfish/shared';
 import { api } from '../api';
 import { Progress, Switch, useToast } from './ui';
 import { bytes } from '../lib/format';
@@ -79,6 +79,45 @@ function stateText(f: FreshTitle, fromHour: number): string {
       return t('Aired · deleting');
     case 'kept':
       return f.keptBy === 'requested' ? t('Kept (requested)') : t('Kept by {name}', { name: f.keptBy ?? '' });
+  }
+}
+
+/** What the last look inside the download hours came to. */
+function hoursText(last: NonNullable<FreshStatus['lastInHours']>): string {
+  const title = last.title ?? '';
+  switch (last.note) {
+    case 'started':
+      return t('started {title}', { title });
+    case 'downloading':
+      return t('{title} was still downloading', { title });
+    case 'nothing-due':
+      return t('nothing was due yet');
+    case 'disk':
+      return t('disk nearly full, {title} waited', { title });
+    case 'space':
+      return t('no space left for {title}', { title });
+    case 'services':
+      return t('Radarr or Sonarr not set up');
+    case 'add-failed':
+      return t('{title} couldn’t be added', { title });
+    case 'already-there':
+      return t('{title} was already in Radarr or Sonarr', { title });
+  }
+}
+
+/** Something that happened to a new title. */
+function eventText(e: FreshEvent): string {
+  switch (e.what) {
+    case 'started':
+      return t('{title}: started downloading', { title: e.title });
+    case 'add-failed':
+      return t('{title}: couldn’t be added', { title: e.title });
+    case 'already-there':
+      return t('{title}: already in Radarr or Sonarr, dropped', { title: e.title });
+    case 'nothing-found':
+      return t('{title}: nothing found to download in 12 hours, dropped', { title: e.title });
+    case 'too-big':
+      return t('{title}: bigger than the space left, dropped', { title: e.title });
   }
 }
 
@@ -232,7 +271,13 @@ export function FreshTitles({ data, save, busy }: { data: ChannelAdmin; save: (p
             )}
           </div>
           <div className="fresh__status">
-            <span className="muted small">{note ?? (s?.titles.length ? '' : t('Nothing yet.'))}</span>
+            <span className="muted small">
+              {note ?? (s?.titles.length ? '' : t('Nothing yet.'))}
+              {/* Outside the hours, what the last look inside them found: why nothing's downloading. */}
+              {s?.waiting === 'hours' && s.lastInHours && (
+                <> {t('Last check in the download hours ({when}): {what}.', { when: when(s.lastInHours.at), what: hoursText(s.lastInHours) })}</>
+              )}
+            </span>
             <span className="spacer" />
             <button className="btn btn--ghost btn--sm" onClick={() => check.mutate()} disabled={check.isPending}>
               <RefreshCw size={14} className={check.isPending ? 'spin' : undefined} /> {check.isPending ? t('Checking…') : t('Check now')}
@@ -268,6 +313,19 @@ export function FreshTitles({ data, save, busy }: { data: ChannelAdmin; save: (p
                 </li>
               ))}
             </ul>
+          )}
+          {Boolean(s?.events.length) && (
+            <div className="fresh__events">
+              <strong className="small">{t('Lately')}</strong>
+              <ul>
+                {s!.events.slice(0, 10).map((e) => (
+                  <li key={`${e.at}${e.title}${e.what}`} className="small">
+                    <span className="muted">{when(e.at)}</span> {eventText(e)}
+                    {e.detail && <span className="muted"> · {e.detail}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </>
       )}
