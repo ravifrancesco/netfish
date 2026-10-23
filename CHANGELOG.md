@@ -7,6 +7,17 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.26 (2026-10-22)
+
+### Fixed
+- **New titles didn't download by themselves.** A New title's download time was worked out from its slot in the guide ("downloads 2 days before it's on"). That slot moves whenever the guide is made again from some point on: when something is deleted from the library, when the next New title is placed, when one misses its slot. So the download kept being "not yet", until the slot settled during the day, too close to air for the next download hours, and the title missed it. Meanwhile the guide filled up with New titles that never came, with 0 B used and nothing in Radarr or Sonarr.
+  - Now the download time is fixed when the title is picked: your *Download ahead* days before the earliest it can be on. The guide only ever puts it there or later, so it always has that many nights of download hours before it airs, however the guide moves.
+  - It downloads even before it's in the guide. In Settings it says *Downloads Sun 04:25 · not in the guide yet* until it has a slot.
+  - The first one picked for a channel is due straight away (its earliest slot is exactly that many days on), so it starts in the next download hours.
+
+### Update
+- **Server.**
+
 ## 0.7.25 (2026-10-22)
 
 ### New

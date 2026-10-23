@@ -104,6 +104,7 @@ export default {
   'Guide made again from now.': 'Guida rifatta da adesso.',
   'Keeps your channels; what’s on now carries on': 'Tiene i tuoi canali; ciò che è in onda continua',
   'Rebuild the guide': 'Rifai la guida',
+  'Downloads {download} · not in the guide yet': 'Si scarica {download} · non ancora nella guida',
   'Kept: {title} is in the library now': 'Tenuto: {title} ora è nella libreria',
   'New titles': 'Titoli nuovi',
   'Needs Seerr (to find them), and Radarr or Sonarr.': 'Servono Seerr (per trovarli) e Radarr o Sonarr.',

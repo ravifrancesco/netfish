@@ -68,9 +68,9 @@ function stateLabel(f: FreshTitle, fromHour: number): string {
 function stateText(f: FreshTitle, fromHour: number): string {
   switch (f.state) {
     case 'planned':
-      return f.airAt && f.downloadAt
-        ? t('On {when} · downloads {download}', { when: when(f.airAt), download: when(f.downloadAt) })
-        : t('Waiting for a slot');
+      if (f.airAt && f.downloadAt) return t('On {when} · downloads {download}', { when: when(f.airAt), download: when(f.downloadAt) });
+      // Not in the guide yet: it downloads all the same, and goes in once there's a slot.
+      return f.downloadAt ? t('Downloads {download} · not in the guide yet', { download: when(f.downloadAt) }) : t('Waiting for a slot');
     case 'downloading':
       return f.paused ? t('Paused until {time}', { time: hourLabel(fromHour) }) : t('Downloading, {n}%', { n: Math.round((f.progress ?? 0) * 100) });
     case 'ready':

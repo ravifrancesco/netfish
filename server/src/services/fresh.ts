@@ -252,7 +252,12 @@ const used = () => stored.titles.filter((f) => f.state === 'downloading' || f.st
 const planned = () => stored.titles.filter((f) => f.state === 'planned').reduce((n, f) => n + guess(f.mediaType), 0);
 const upcoming = () => stored.titles.filter((f) => f.state === 'planned' || f.state === 'downloading' || f.state === 'ready');
 const pickedThisWeek = (now: number, channelId?: string) => stored.log.filter((x) => x.at > now - WEEK && (!channelId || x.channelId === channelId)).length;
-const downloadAt = (f: Fresh, s: FreshSettings) => (f.airAt === undefined ? undefined : f.airAt - s.aheadDays * DAY);
+/**
+ * When it downloads: its days ahead before the earliest it can be on (`notBefore`, fixed when it's
+ * picked; the guide only ever puts it there or later). Not from its slot in the guide: that moves
+ * whenever the guide is made again, and could keep a download from ever starting in time.
+ */
+const downloadAt = (f: Fresh, s: FreshSettings) => Math.min(f.notBefore, f.airAt ?? Infinity) - s.aheadDays * DAY;
 
 // ---------- Finding something new ----------
 
@@ -695,8 +700,8 @@ async function startDue(s: FreshSettings, go: boolean, lowDisk: boolean, now: nu
   if (busy) return noted(undefined, 'downloading', busy);
   // Asked for by someone: due now (with or without a slot of its own still to come).
   const due = stored.titles
-    .filter((f) => f.state === 'planned' && (f.keptBy || (f.airAt !== undefined && now >= downloadAt(f, s)!)))
-    .sort((a, b) => (a.airAt ?? now) - (b.airAt ?? now))[0];
+    .filter((f) => f.state === 'planned' && (f.keptBy || now >= downloadAt(f, s)))
+    .sort((a, b) => (a.airAt ?? a.notBefore) - (b.airAt ?? b.notBefore))[0];
   if (!due) return noted(undefined, 'nothing-due');
   if (lowDisk) return noted('disk', 'disk', due);
   if (!go) return 'hours';
@@ -743,8 +748,8 @@ export async function downloadNow(): Promise<FreshNowResult> {
       if (f.state === 'downloading') f.rush = true;
     }
     const due = stored.titles
-      .filter((f) => f.state === 'planned' && (f.keptBy || (f.airAt !== undefined && now >= downloadAt(f, s)!)))
-      .sort((a, b) => (a.airAt ?? now) - (b.airAt ?? now));
+      .filter((f) => f.state === 'planned' && (f.keptBy || now >= downloadAt(f, s)))
+      .sort((a, b) => (a.airAt ?? a.notBefore) - (b.airAt ?? b.notBefore));
     for (const f of due) {
       if (lastFree !== undefined && lastFree < s.minFreeGb * GB) {
         failed.push({ title: f.title, reason: t('Disk nearly full.') });
