@@ -7,6 +7,23 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.32 (2026-10-23)
+
+### New
+- **Netfish's own channel runs a timetable: each show at its own time, every day.** It works like a real channel's line-up (and like the "time slots" of Tunarr and ErsatzTV):
+  - **Every show has a time of day:** dramas an hour each up to 13:00 (up to three, and one at 14:00 on weekdays), sitcoms from 15:00 and grown-up cartoons from 18:00 (every 45 minutes for half-hour shows), and short late-night shows from 23:00. If Friends is at 16:30, it's at 16:30 every day, two episodes back to back.
+  - **A new line-up every Monday:** each show keeps its time for the week (or until it's all been on), then the next one in turn takes it. Where it left off, it carries on next time.
+  - **New things first:** a New title takes a time of its own from its first day on the channel. A show new in your library gets one the next day.
+  - **Films fill the stretches in between** (the morning, after 1pm, after 9pm, overnight), with the breaks **shared out evenly** instead of one long wait before the next show.
+  - 13:00 is a documentary (a film at the weekend). 21:00 is the film, or the documentary on Tuesday and Sunday (now two episodes when they fit). On weekdays the 21:00 film is one that ends close to 23:00, when the late-night shows start.
+  - Still nothing twice in a day. A show only gets its time when it's on: if the film before runs well over, that show skips the night rather than starting late.
+
+### Fixed
+- **Start over with automatic channels seemed to do nothing for a while.** The button now says *Starting over…* with a spinner, and says when it's done. The new guide is made straight away, so it's there when you open it.
+
+### Update
+- **Server.** The guide is made again for the new timetable after the update.
+
 ## 0.7.31 (2026-10-23)
 
 ### New

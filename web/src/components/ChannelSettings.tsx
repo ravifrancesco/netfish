@@ -123,7 +123,15 @@ export function ChannelSettings() {
   };
   // Every change also says where this device is, so the timetable follows the household's clock.
   const save = useMutation({ mutationFn: (patch: Partial<Settings>) => api.saveChannels({ ...patch, timeZone: zone() }), onSuccess: done, onError: (e) => toast('error', (e as Error).message) });
-  const reset = useMutation({ mutationFn: api.resetChannels, onSuccess: done, onError: (e) => toast('error', (e as Error).message) });
+  // Reading the whole library again takes a while on a big one: the button says so meanwhile.
+  const reset = useMutation({
+    mutationFn: api.resetChannels,
+    onSuccess: (data) => {
+      done(data);
+      toast('ok', tn(data.channels.length, 'Started over: {n} channel, guide made again.', 'Started over: {n} channels, guide made again.'));
+    },
+    onError: (e) => toast('error', (e as Error).message),
+  });
   // The guide made again from now: the channels as they are.
   const rebuild = useMutation({
     mutationFn: api.rebuildGuide,
@@ -235,8 +243,14 @@ export function ChannelSettings() {
             <button className="btn btn--ghost btn--sm" onClick={() => rebuild.mutate()} disabled={rebuild.isPending} title={t('Keeps your channels; what’s on now carries on')}>
               {rebuild.isPending ? <Spinner size={14} /> : <RotateCcw size={14} />} {t('Rebuild the guide')}
             </button>
-            <button className="btn btn--ghost btn--sm" onClick={() => setConfirmReset(true)}>
-              {t('Start over with automatic channels')}
+            <button className="btn btn--ghost btn--sm" onClick={() => setConfirmReset(true)} disabled={reset.isPending}>
+              {reset.isPending ? (
+                <>
+                  <Spinner size={14} /> {t('Starting over…')}
+                </>
+              ) : (
+                t('Start over with automatic channels')
+              )}
             </button>
           </div>
         </>
