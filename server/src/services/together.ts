@@ -9,6 +9,7 @@ import { openLine, send } from '../lib/sse';
 import { HttpError } from '../lib/upstream';
 import { t } from '../lib/i18n';
 import { episodeLabel } from './cards';
+import { log } from '../lib/log';
 
 /**
  * Watch together: one person opens a room for a film or an episode, others on the server
@@ -283,8 +284,10 @@ export function leave(user: SessionUser, id: string, clientId: unknown) {
   for (const s of player.streams) s.end();
   // Play on TV is over once the TV stops playing.
   const players = [...room.players.values()].filter((p) => !p.controller);
-  if (!room.players.size || (room.kind === 'remote' && !player.controller && !players.length)) end(room);
-  else broadcast(room);
+  if (!room.players.size || (room.kind === 'remote' && !player.controller && !players.length)) {
+    end(room);
+    if (room.kind === 'together') log.info('together', `The room for "${room.title}" closed: ${user.name} was the last to leave`);
+  } else broadcast(room);
   return { ok: true };
 }
 

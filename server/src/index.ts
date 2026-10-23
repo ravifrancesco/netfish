@@ -1,6 +1,7 @@
 import { buildApp } from './app';
 import { config, has } from './config';
 import { SETUP_CODE } from './connections';
+import { log } from './lib/log';
 import { storageFix, storageWritable } from './lib/storage';
 
 async function main() {
@@ -8,16 +9,16 @@ async function main() {
   const services = Object.entries(has)
     .map(([name, check]) => `${name}: ${check() ? 'on' : 'off'}`)
     .join(', ');
-  app.log.info(`Netfish ${config.version} — ${services}`);
-  if (!has.jellyfin()) app.log.warn('No Jellyfin address yet: open Netfish in a browser to set it up.');
-  if (!storageWritable()) app.log.error(storageFix());
-  app.log.info(`Setup code: ${SETUP_CODE} (only needed to change the Jellyfin address from the sign-in screen)`);
-  if (!config.publicDir) app.log.info('No web build found; serving the API only (use the Vite dev server for the UI).');
+  log.info('server', `Netfish ${config.version} — ${services}`);
+  if (!has.jellyfin()) log.warn('server', 'No Jellyfin address yet: open Netfish in a browser to set it up.');
+  if (!storageWritable()) log.error('server', storageFix());
+  log.info('server', `Setup code: ${SETUP_CODE} (only needed to change the Jellyfin address from the sign-in screen)`);
+  if (!config.publicDir) log.info('server', 'No web build found; serving the API only (use the Vite dev server for the UI).');
 
   await app.listen({ port: config.port, host: config.host });
 
   const shutdown = async (signal: string) => {
-    app.log.info(`${signal} received, shutting down`);
+    log.info('server', `${signal} received, shutting down`);
     await app.close();
     process.exit(0);
   };
@@ -26,6 +27,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(err);
+  log.error('server', "Netfish couldn't start", err);
   process.exit(1);
 });

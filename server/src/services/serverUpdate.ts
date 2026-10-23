@@ -1,6 +1,7 @@
 import type { ServerUpdate } from '@netfish/shared';
 import { config } from '../config';
 import { HOUR } from '../lib/cache';
+import { log } from '../lib/log';
 
 /**
  * Is there a newer Netfish than this server? GitHub's latest release, asked soon after starting
@@ -31,7 +32,10 @@ async function check() {
     if (!res.ok) return;
     const release = (await res.json()) as { tag_name?: string; html_url?: string; draft?: boolean; prerelease?: boolean };
     if (!release.tag_name || release.draft || release.prerelease) return;
-    latest = { version: release.tag_name.replace(/^v/i, ''), url: release.html_url ?? '' };
+    const version = release.tag_name.replace(/^v/i, '');
+    // Said once for each new version.
+    if (version !== latest?.version && newer(version, config.version)) log.info('updates', `Netfish ${version} is out (this server is ${config.version}): update the stack in Portainer`);
+    latest = { version, url: release.html_url ?? '' };
   } catch {
     // Offline, or GitHub busy: the next check will do.
   }

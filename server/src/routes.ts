@@ -57,6 +57,7 @@ import { listDevices, listScreens, openLive, playOn } from './services/screens';
 import { channelAdmin, channelsEnabled, keyOfItem, listChannels, rebuildGuide, resetChannels, updateChannels, watching } from './services/channels';
 import { downloadNow, freshRequested, freshStatus, keepFresh, noteChosen, removeFresh, runFresh } from './services/fresh';
 import { catalog } from './services/catalog';
+import { gb, log } from './lib/log';
 import { cleanupSuggestions, keepForGood } from './services/cleanup';
 import { playbackPrefs, setPlaybackPrefs } from './services/playbackPrefs';
 import { cancelRequest, deleteFromDisk, downloadAgain, goneKeys, removedTitles, stopDownload, storage } from './services/manage';
@@ -102,6 +103,34 @@ function mediaTitle(req: FastifyRequest<{ Params: TitleParams }>): { mediaType: 
 }
 
 const clean = (v: unknown, max = 120) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+
+/** Which app a request came from, for the log. */
+function appOf(req: FastifyRequest): string {
+  const ua = String(req.headers['user-agent'] ?? '');
+  if (/NetfishDesktop/i.test(ua)) return /Windows/i.test(ua) ? 'Windows app' : 'Mac app';
+  if (/AFT[A-Z]|Fire ?TV/i.test(ua)) return 'Fire TV';
+  if (/Tizen|SMART-TV/i.test(ua)) return 'Samsung TV';
+  if (/Android/i.test(ua)) return /Mobile/i.test(ua) ? 'Android phone' : 'Android TV';
+  if (/iPhone|iPad/i.test(ua)) return 'iPhone/iPad';
+  return 'browser';
+}
+
+/** A line for the log about a title, with its name (TMDB's), written once it's known: never holding the answer up. */
+function logTitle(mediaType: MediaType, tmdbId: number, line: (name: string) => string) {
+  void settle<{ title?: string; name?: string } | undefined>(mediaType === 'movie' ? catalog.movie(tmdbId) : catalog.tv(tmdbId), undefined).then((found) =>
+    log.info('library', line(`"${found?.title ?? found?.name ?? `${mediaType} ${tmdbId}`}"`)),
+  );
+}
+
+/** A Jellyfin item's name for the log ("Show · S1:E2 · Name"), without holding the answer up. */
+function logItem(user: SessionUser, itemId: string, area: string, line: (name: string) => string) {
+  void settle(jellyfin.item(user.token, user.id, itemId), undefined).then((item) => {
+    const episode = item?.SeriesName ? [item.SeriesName, item.ParentIndexNumber !== undefined ? `S${item.ParentIndexNumber}:E${item.IndexNumber ?? '?'}` : '', item.Name].filter(Boolean).join(' · ') : undefined;
+    log.info(area, line(`"${episode ?? item?.Name ?? itemId}"`));
+  });
+}
+
+const seasonsSaid = (seasons?: number[] | 'all') => (Array.isArray(seasons) && seasons.length ? ` (season${seasons.length > 1 ? 's' : ''} ${seasons.join(', ')})` : '');
 const int = (v: unknown, fallback: number, min = 0, max = 1000) => {
   const n = Number(v);
   return Number.isInteger(n) ? Math.min(max, Math.max(min, n)) : fallback;
@@ -139,12 +168,14 @@ export async function apiRoutes(app: FastifyInstance) {
       result = await jellyfin.authenticate(username, typeof req.body?.password === 'string' ? req.body.password : '', device);
     } catch (err) {
       if (err instanceof UpstreamError && (err.status === 401 || err.status === 400)) {
+        log.warn('sign-in', `Wrong username or password for "${username}" (${appOf(req)}, ${req.ip})`);
         throw new HttpError(401, t('Wrong username or password'));
       }
       throw err;
     }
     const user = toSessionUser(result.User, result.AccessToken);
     rememberSession(user);
+    log.info('sign-in', `${user.name} signed in (${appOf(req)}, ${req.ip})`);
     // One more profile on this device, for "Who's watching?".
     rememberProfile(ensureDevice(req, reply), user);
     reply.setCookie(SESSION_COOKIE, result.AccessToken, {
@@ -162,6 +193,7 @@ export async function apiRoutes(app: FastifyInstance) {
     // Signing out also takes this person off the device's profiles.
     const user = token ? await checkToken(token).catch(() => null) : null;
     if (user) removeProfile(deviceOf(req), user.id);
+    if (user) log.info('sign-in', `${user.name} signed out (${appOf(req)})`);
     if (token) {
       await settle(jellyfin.logout(token), undefined);
       forgetSession(token);
@@ -279,7 +311,9 @@ export async function apiRoutes(app: FastifyInstance) {
 
     api.post<{ Params: TitleParams; Body: GrabRequest }>('/title/:type/:id/grab', async (req) => {
       const { mediaType, tmdbId } = mediaTitle(req);
-      return grabRelease(userOf(req), mediaType, tmdbId, req.body ?? ({} as GrabRequest));
+      const done = await grabRelease(userOf(req), mediaType, tmdbId, req.body ?? ({} as GrabRequest));
+      logTitle(mediaType, tmdbId, (name) => `${userOf(req).name} chose another version of ${name}`);
+      return done;
     });
 
     api.post<{ Params: TitleParams; Body: SubtitleRequest }>('/title/:type/:id/subtitles', async (req, reply) => {
@@ -297,7 +331,9 @@ export async function apiRoutes(app: FastifyInstance) {
     });
     api.post<{ Body: CreateRequest }>('/requests', async (req, reply) => {
       reply.code(201);
-      return createRequest(userOf(req), req.body ?? ({} as CreateRequest));
+      const created = await createRequest(userOf(req), req.body ?? ({} as CreateRequest));
+      logTitle(req.body.mediaType, req.body.tmdbId, (name) => `${userOf(req).name} requested ${name}${seasonsSaid(req.body.seasons)}`);
+      return created;
     });
     api.get('/downloads', async (req) => {
       const [items, requested] = await Promise.all([allDownloads(), myRequestKeys(userOf(req))]);
@@ -321,7 +357,9 @@ export async function apiRoutes(app: FastifyInstance) {
         : undefined;
     api.post<{ Params: TitleParams; Body: { seasons?: number[] } }>('/title/:type/:id/delete', { preHandler: requireAdmin }, async (req) => {
       const { mediaType, tmdbId } = mediaTitle(req);
-      return deleteFromDisk(userOf(req), mediaType, tmdbId, seasonsOf(req.body));
+      const done = await deleteFromDisk(userOf(req), mediaType, tmdbId, seasonsOf(req.body));
+      logTitle(mediaType, tmdbId, (name) => `${userOf(req).name} deleted ${name} from disk${seasonsSaid(seasonsOf(req.body))}: ${gb(done.freed)} freed`);
+      return done;
     });
     // Watched or not from a title's page (one that isn't in Jellyfin too: deleted from disk).
     api.post<{ Params: TitleParams; Body: { watched?: boolean } }>('/title/:type/:id/watched', async (req) => {
@@ -331,11 +369,15 @@ export async function apiRoutes(app: FastifyInstance) {
     // Cancel a request before anything is on disk: whoever asked for it, or an admin.
     api.delete<{ Params: TitleParams }>('/title/:type/:id/request', async (req) => {
       const { mediaType, tmdbId } = mediaTitle(req);
-      return cancelRequest(userOf(req), mediaType, tmdbId);
+      const done = await cancelRequest(userOf(req), mediaType, tmdbId);
+      logTitle(mediaType, tmdbId, (name) => `${userOf(req).name} cancelled the request for ${name}`);
+      return done;
     });
     api.post<{ Params: TitleParams; Body: { seasons?: number[] } }>('/title/:type/:id/redownload', { preHandler: requireAdmin }, async (req) => {
       const { mediaType, tmdbId } = mediaTitle(req);
-      return downloadAgain(userOf(req), mediaType, tmdbId, seasonsOf(req.body));
+      const done = await downloadAgain(userOf(req), mediaType, tmdbId, seasonsOf(req.body));
+      logTitle(mediaType, tmdbId, (name) => `${userOf(req).name} is downloading ${name} again${seasonsSaid(seasonsOf(req.body))}`);
+      return done;
     });
     api.get<{ Querystring: { type?: string; sort?: string } }>('/library/removed', async (req) => ({
       items: await removedTitles(userOf(req), req.query.type === 'tv' ? 'tv' : 'movie', clean(req.query.sort, 20) || 'added'),
@@ -366,9 +408,11 @@ export async function apiRoutes(app: FastifyInstance) {
       openLive(userOf(req), reply, req.query);
       return reply;
     });
-    api.post<{ Body: { itemId?: string; position?: number } }>('/together', async (req) =>
-      createRoom(userOf(req), clean(req.body?.itemId, 64), Number.isFinite(req.body?.position) ? Number(req.body?.position) : undefined),
-    );
+    api.post<{ Body: { itemId?: string; position?: number } }>('/together', async (req) => {
+      const room = await createRoom(userOf(req), clean(req.body?.itemId, 64), Number.isFinite(req.body?.position) ? Number(req.body?.position) : undefined);
+      log.info('together', `${userOf(req).name} opened a room for "${[room.title, room.subtitle].filter(Boolean).join(' · ')}"`);
+      return room;
+    });
     api.get<Room>('/together/:id', async (req) => getRoom(clean(req.params.id, 12)));
     api.get<Room & { Querystring: { client?: string; role?: string } }>('/together/:id/events', async (req, reply) => {
       openStream(userOf(req), clean(req.params.id, 12), req.query.client, reply, req.query.role === 'remote');
@@ -381,7 +425,11 @@ export async function apiRoutes(app: FastifyInstance) {
       setWaiting(userOf(req), clean(req.params.id, 12), req.body?.clientId, Boolean(req.body?.waiting)),
     );
     api.post<Room & { Body: { clientId?: string } }>('/together/:id/leave', async (req) => leave(userOf(req), clean(req.params.id, 12), req.body?.clientId));
-    api.delete<Room>('/together/:id', async (req) => endRoom(userOf(req), clean(req.params.id, 12)));
+    api.delete<Room>('/together/:id', async (req) => {
+      const done = endRoom(userOf(req), clean(req.params.id, 12));
+      log.info('together', `${userOf(req).name} ended a room for everyone`);
+      return done;
+    });
     api.post<Room & { Body: { clientId?: string; tracks?: TogetherTracks } }>('/together/:id/tracks', async (req) =>
       setTracks(userOf(req), clean(req.params.id, 12), req.body?.clientId, req.body?.tracks),
     );
@@ -403,23 +451,15 @@ export async function apiRoutes(app: FastifyInstance) {
     api.post<{ Params: { itemId: string }; Body: PlaybackRequest }>('/play/:itemId/session', async (req) => {
       const user = userOf(req);
       const session = await startPlayback(user, clean(req.params.itemId, 64), req.body);
-      if (session.method !== 'DirectPlay') {
-        // So "why is ffmpeg busy on the Pi?" has an answer in the container log.
-        const item = await settle(jellyfin.item(user.token, user.id, session.itemId), undefined);
-        const audio = session.audioTracks.find((t) => t.index === session.audioStreamIndex);
-        const subtitle = session.subtitleTracks.find((t) => t.index === session.subtitleStreamIndex);
-        req.log.info(
-          {
-            title: item ? [item.SeriesName, item.Name].filter(Boolean).join(' · ') : session.itemId,
-            user: user.name,
-            method: session.method === 'Transcode' ? 'transcoding (heavy)' : 'repackaging (light)',
-            reasons: session.transcodeReasons,
-            audio: audio ? `${audio.label} [${audio.codec}]` : undefined,
-            subtitles: subtitle ? `${subtitle.label} [${subtitle.codec}]` : 'off',
-          },
-          'Playback needs the server to work',
-        );
-      }
+      // Who's watching what, where, and how: "why is ffmpeg busy on the Pi?" has an answer here.
+      const audio = session.audioTracks.find((t) => t.index === session.audioStreamIndex);
+      const subtitle = session.subtitleTracks.find((t) => t.index === session.subtitleStreamIndex);
+      const reasons = session.transcodeReasons?.length ? `: ${session.transcodeReasons.join(', ')}` : '';
+      const how =
+        session.method === 'DirectPlay' ? 'plays as it is' : session.method === 'Transcode' ? `converted by the server (heavy)${reasons}` : `repackaged by the server (light)${reasons}`;
+      const tracks = [audio && `audio ${audio.label} [${audio.codec}]`, subtitle && `subtitles ${subtitle.label}`].filter(Boolean).join(', ');
+      const where = req.body?.cast ? 'Chromecast' : appOf(req);
+      logItem(user, session.itemId, 'playback', (name) => `${user.name} started ${name} on ${where}: ${how}${tracks ? ` · ${tracks}` : ''}`);
       return session;
     });
     // Channels (when they don't count as watching): the programme is over, the transcode can stop.
@@ -430,6 +470,11 @@ export async function apiRoutes(app: FastifyInstance) {
       reply.code(204);
     });
     api.post<{ Body: ProgressReport }>('/play/progress', async (req, reply) => {
+      if (req.body?.event === 'stop' && req.body.itemId) {
+        const at = Math.round(Number(req.body.positionSeconds) || 0);
+        const time = `${Math.floor(at / 3600)}:${String(Math.floor((at % 3600) / 60)).padStart(2, '0')}:${String(at % 60).padStart(2, '0')}`;
+        logItem(userOf(req), clean(req.body.itemId, 64), 'playback', (name) => `${userOf(req).name} stopped ${name} at ${time}`);
+      }
       if (req.body?.itemId && req.body.playSessionId) scrobble(userOf(req), req.body, req.log);
       // A new title for channels someone chose to watch: theirs now.
       if (req.body?.itemId && !req.body.channel) noteChosen(keyOfItem(req.body.itemId), userOf(req).name);
@@ -492,13 +537,33 @@ export async function apiRoutes(app: FastifyInstance) {
       await removeFresh(clean(req.body?.key, 40));
       return freshStatus();
     });
-    api.put<{ Body: Record<string, unknown> }>('/admin/channels', { preHandler: requireAdmin }, async (req) => updateChannels(userOf(req), req.body ?? {}));
-    api.post('/admin/channels/reset', { preHandler: requireAdmin }, async (req) => resetChannels(userOf(req)));
-    api.post('/admin/channels/rebuild', { preHandler: requireAdmin }, async (req) => rebuildGuide(userOf(req)));
-    api.put<{ Params: { id: string }; Body: ServiceConnectionUpdate }>('/admin/connections/:id', { preHandler: requireAdmin }, async (req) =>
-      updateConnection(req.params.id, req.body ?? {}),
-    );
-    api.delete<{ Params: { id: string } }>('/admin/connections/:id', { preHandler: requireAdmin }, async (req) => resetConnection(req.params.id));
+    api.put<{ Body: Record<string, unknown> }>('/admin/channels', { preHandler: requireAdmin }, async (req) => {
+      const done = await updateChannels(userOf(req), req.body ?? {});
+      // Every change also says the device's time zone: not a change worth a line.
+      const what = Object.keys(req.body ?? {}).filter((k) => k !== 'timeZone');
+      if (what.length) log.info('channels', `${userOf(req).name} changed the channel settings (${what.join(', ')})`);
+      return done;
+    });
+    api.post('/admin/channels/reset', { preHandler: requireAdmin }, async (req) => {
+      const done = await resetChannels(userOf(req));
+      log.info('channels', `${userOf(req).name} started over with automatic channels (${done.channels.length})`);
+      return done;
+    });
+    api.post('/admin/channels/rebuild', { preHandler: requireAdmin }, async (req) => {
+      const done = await rebuildGuide(userOf(req));
+      log.info('channels', `${userOf(req).name} rebuilt the guide`);
+      return done;
+    });
+    api.put<{ Params: { id: string }; Body: ServiceConnectionUpdate }>('/admin/connections/:id', { preHandler: requireAdmin }, async (req) => {
+      const done = await updateConnection(req.params.id, req.body ?? {});
+      log.info('settings', `${userOf(req).name} changed the ${clean(req.params.id, 30)} connection`);
+      return done;
+    });
+    api.delete<{ Params: { id: string } }>('/admin/connections/:id', { preHandler: requireAdmin }, async (req) => {
+      const done = await resetConnection(req.params.id);
+      log.info('settings', `${userOf(req).name} put the ${clean(req.params.id, 30)} connection back to the stack's`);
+      return done;
+    });
     api.post<{ Params: { id: string }; Body: ServiceConnectionUpdate }>('/admin/connections/:id/test', { preHandler: requireAdmin }, async (req) =>
       testConnection(req.params.id, req.body ?? undefined),
     );
@@ -515,6 +580,10 @@ export async function apiRoutes(app: FastifyInstance) {
     // Admin settings, stored on the server.
     api.get('/admin/settings', { preHandler: requireAdmin }, async () => getSettings());
     api.get('/admin/update', { preHandler: requireAdmin }, async (): Promise<ServerUpdate> => serverUpdate());
-    api.put<{ Body: Partial<ServerSettings> }>('/admin/settings', { preHandler: requireAdmin }, async (req) => updateSettings(req.body ?? {}));
+    api.put<{ Body: Partial<ServerSettings> }>('/admin/settings', { preHandler: requireAdmin }, async (req) => {
+      const done = await updateSettings(req.body ?? {});
+      log.info('settings', `${userOf(req).name} changed settings (${Object.keys(req.body ?? {}).join(', ')})`);
+      return done;
+    });
   });
 }

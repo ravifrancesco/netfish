@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Download, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
-import type { ChannelAdmin, ChannelSettings, FreshEvent, FreshSettings, FreshStatus, FreshTitle } from '@netfish/shared';
+import type { ChannelAdmin, ChannelSettings, FreshSettings, FreshStatus, FreshTitle } from '@netfish/shared';
 import { api } from '../api';
 import { Progress, Switch, useToast } from './ui';
 import { bytes } from '../lib/format';
@@ -67,10 +67,16 @@ function stateLabel(f: FreshTitle, fromHour: number): string {
 
 function stateText(f: FreshTitle, fromHour: number): string {
   switch (f.state) {
-    case 'planned':
-      if (f.airAt && f.downloadAt) return t('On {when} · downloads {download}', { when: when(f.airAt), download: when(f.downloadAt) });
+    case 'planned': {
+      // When it will start: its time, or the next download hours after it. Due now: after what's ahead of it.
+      const starts = f.startsAt ?? f.downloadAt;
+      if (starts && Date.parse(starts) <= Date.now() + 60_000) {
+        return f.airAt ? t('On {when} · in line to download', { when: when(f.airAt) }) : t('In line to download · not in the guide yet');
+      }
+      if (f.airAt && starts) return t('On {when} · downloads {download}', { when: when(f.airAt), download: when(starts) });
       // Not in the guide yet: it downloads all the same, and goes in once there's a slot.
-      return f.downloadAt ? t('Downloads {download} · not in the guide yet', { download: when(f.downloadAt) }) : t('Waiting for a slot');
+      return starts ? t('Downloads {download} · not in the guide yet', { download: when(starts) }) : t('Waiting for a slot');
+    }
     case 'downloading':
       // In Radarr/Sonarr, nothing grabbed yet: they look again every half hour.
       if (f.progress === undefined) return t('Looking for a download…');
@@ -104,22 +110,6 @@ function hoursText(last: NonNullable<FreshStatus['lastInHours']>): string {
       return t('{title} couldn’t be added', { title });
     case 'already-there':
       return t('{title} was already in Radarr or Sonarr', { title });
-  }
-}
-
-/** Something that happened to a new title. */
-function eventText(e: FreshEvent): string {
-  switch (e.what) {
-    case 'started':
-      return t('{title}: started downloading', { title: e.title });
-    case 'add-failed':
-      return t('{title}: couldn’t be added', { title: e.title });
-    case 'already-there':
-      return t('{title}: already in Radarr or Sonarr, dropped', { title: e.title });
-    case 'nothing-found':
-      return t('{title}: nothing found to download in 12 hours, dropped', { title: e.title });
-    case 'too-big':
-      return t('{title}: bigger than the space left, dropped', { title: e.title });
   }
 }
 
@@ -268,7 +258,9 @@ export function FreshTitles({ data, save, busy }: { data: ChannelAdmin; save: (p
             <label className="fresh__field">
               <span>{t('Which release')}</span>
               <select className="select" value={fresh.pick ?? 'smallest'} onChange={(e) => set({ pick: e.target.value as FreshSettings['pick'] })}>
+                <option value="smallest-720">{t('The smallest at 720p')}</option>
                 <option value="smallest">{t('The smallest at 1080p')}</option>
+                <option value="smallest-2160">{t('The smallest at 4K')}</option>
                 <option value="profile">{t('Radarr’s and Sonarr’s choice')}</option>
               </select>
               <span className="muted small">{fresh.pick === 'profile' ? t('The best their quality profile allows') : t('Among what their quality profile allows')}</span>
@@ -349,19 +341,6 @@ export function FreshTitles({ data, save, busy }: { data: ChannelAdmin; save: (p
                 </li>
               ))}
             </ul>
-          )}
-          {Boolean(s?.events.length) && (
-            <div className="fresh__events">
-              <strong className="small">{t('Lately')}</strong>
-              <ul>
-                {s!.events.slice(0, 10).map((e) => (
-                  <li key={`${e.at}${e.title}${e.what}`} className="small">
-                    <span className="muted">{when(e.at)}</span> {eventText(e)}
-                    {e.detail && <span className="muted"> · {e.detail}</span>}
-                  </li>
-                ))}
-              </ul>
-            </div>
           )}
         </>
       )}

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { ChannelDef, ChannelSettings, ChannelSource, FreshEvent, FreshNote, FreshNowResult, FreshSettings, FreshState, FreshStatus, FreshTitle, MediaType } from '@netfish/shared';
+import type { ChannelDef, ChannelSettings, ChannelSource, FreshNote, FreshNowResult, FreshSettings, FreshState, FreshStatus, FreshTitle, MediaType } from '@netfish/shared';
 import { config, has } from '../config';
 import { posterOf, radarr, sonarr, type ArrDisk, type ArrLookup, type ArrQueueRecord, type ArrRelease, type ArrRootFolder, type RadarrMovie, type SonarrSeries } from '../clients/arr';
 import { qbittorrent } from '../clients/qbittorrent';
@@ -10,6 +10,7 @@ import { tmdbImage } from '../lib/images';
 import { writeJson } from '../lib/storage';
 import { HttpError } from '../lib/upstream';
 import { t } from '../lib/i18n';
+import { gb, log, logTime } from '../lib/log';
 
 /**
  * New titles for channels. Every few minutes:
@@ -98,8 +99,6 @@ interface Stored {
   stopped: string[];
   /** How many each channel has picked, ever: its turn (Netfish's own takes a documentary every other one). */
   turns: Record<string, number>;
-  /** What happened lately (started, couldn't be added, nothing found), newest last. */
-  events: FreshEvent[];
 }
 
 function load(): Stored {
@@ -107,18 +106,15 @@ function load(): Stored {
     const data = JSON.parse(fs.readFileSync(FILE, 'utf8')) as Partial<Stored>;
     const titles = (data.titles ?? []).map((f) => ({ ...f, notBefore: f.notBefore ?? f.addedAt, seconds: f.seconds ?? 0, genres: f.genres ?? [] }));
     const log = (data.log ?? []).map((x) => (typeof x === 'number' ? { at: x, channelId: '' } : x));
-    return { titles, tried: data.tried ?? [], log, stopped: data.stopped ?? [], turns: data.turns ?? {}, events: data.events ?? [] };
+    return { titles, tried: data.tried ?? [], log, stopped: data.stopped ?? [], turns: data.turns ?? {} };
   } catch {
-    return { titles: [], tried: [], log: [], stopped: [], turns: {}, events: [] };
+    return { titles: [], tried: [], log: [], stopped: [], turns: {} };
   }
 }
 let stored = load();
 const save = () => writeJson(FILE, stored);
 
-/** Noted for Settings: what happened to a title (the last 30). */
-function noteEvent(f: Fresh, what: FreshEvent['what'], now: number, detail?: string) {
-  stored.events = [...stored.events, { at: new Date(now).toISOString(), title: f.title, what, ...(detail ? { detail: detail.slice(0, 300) } : {}) }].slice(-30);
-}
+const arrName = (f: Fresh) => (f.mediaType === 'movie' ? 'Radarr' : 'Sonarr');
 /** The last look inside the download hours (since the server started). */
 let lastInHours: { at: number; note: FreshNote; title?: string } | undefined;
 
@@ -195,6 +191,7 @@ export function keepFresh(key: string, by: string): { here: boolean } {
   f.keptBy ??= by;
   const here = f.state === 'ready' || f.state === 'aired';
   if (here) f.state = 'kept';
+  log.info('new titles', `${by} kept "${f.title}": it stays in the library${here ? '' : ' once it’s downloaded'}`);
   save();
   onChange();
   return { here };
@@ -210,6 +207,7 @@ export async function removeFresh(key: string) {
     await remove(f, queue);
   }
   stored.titles = stored.titles.filter((x) => x !== f);
+  log.info('new titles', `"${f.title}" taken off by an admin${f.arrId !== undefined ? ` (deleted from ${arrName(f)})` : ''}`);
   save();
   link?.drop([key]);
   onChange();
@@ -234,6 +232,14 @@ function localHour(at: number, timeZone?: string): number {
     return new Date(at).getHours();
   }
 }
+/** The first moment from `at` inside the download hours (`at` itself if it is), to the quarter hour. */
+function nextInHours(s: FreshSettings, at: number, timeZone?: string): number {
+  if (inHours(s, at, timeZone)) return at;
+  const QUARTER = 15 * 60_000;
+  for (let q = Math.ceil(at / QUARTER) * QUARTER; q < at + 2 * DAY; q += QUARTER) if (inHours(s, q, timeZone)) return q;
+  return at;
+}
+
 export function inHours(s: FreshSettings, at: number, timeZone?: string): boolean {
   if (s.fromHour === s.toHour) return true;
   const h = localHour(at, timeZone);
@@ -484,9 +490,16 @@ async function addShow(f: Fresh, s: FreshSettings): Promise<number | undefined> 
   return series.id;
 }
 
-/** The smallest at 1080p (then 720p), the well-shared ones first: a tiny release nobody seeds never finishes. */
-function smallestOf(list: ArrRelease[]): ArrRelease | undefined {
-  for (const resolution of [1080, 720]) {
+/** The resolutions to look at, in turn, for each choice: the one asked for, then the nearest. */
+const RESOLUTIONS: Record<Exclude<FreshSettings['pick'], 'profile' | undefined>, number[]> = {
+  'smallest-720': [720, 1080],
+  smallest: [1080, 720],
+  'smallest-2160': [2160, 1080, 720],
+};
+
+/** The smallest at the resolution asked for (then the nearest), the well-shared ones first: a tiny release nobody seeds never finishes. */
+function smallestOf(list: ArrRelease[], resolutions: number[]): ArrRelease | undefined {
+  for (const resolution of resolutions) {
     const at = list.filter((r) => r.quality?.quality?.resolution === resolution);
     const shared = at.filter((r) => r.protocol !== 'torrent' || (r.seeders ?? 0) >= 3);
     const pick = [...(shared.length ? shared : at)].sort((a, b) => a.size - b.size)[0];
@@ -500,16 +513,22 @@ function smallestOf(list: ArrRelease[]): ArrRelease | undefined {
  * 1080p release they'd take (a show's first season whole). "episodes": a show with no whole season
  * out there, only episodes (Sonarr picks those).
  */
-async function grabSmallest(f: Fresh, arrId: number): Promise<'grabbed' | 'episodes' | 'none'> {
+async function grabSmallest(f: Fresh, arrId: number, resolutions: number[]): Promise<'grabbed' | 'episodes' | 'none'> {
   const found = f.mediaType === 'movie' ? await radarr.releases(arrId) : await sonarr.releases(arrId, 1);
   // Ones they'd take, not a sample or a fake (a gigabyte at least), with someone to download from.
   const takes = found.filter((r) => !r.rejected && r.size >= GB && (r.protocol !== 'torrent' || (r.seeders ?? 0) > 0));
-  const pick = smallestOf(f.mediaType === 'movie' ? takes : takes.filter((r) => r.fullSeason));
+  const pick = smallestOf(f.mediaType === 'movie' ? takes : takes.filter((r) => r.fullSeason), resolutions);
   if (pick) {
     await (f.mediaType === 'movie' ? radarr : sonarr).grab(pick.guid, pick.indexerId);
+    log.info('new titles', `Grabbed "${pick.title}" for "${f.title}" (${gb(pick.size)}, ${pick.quality?.quality?.name ?? '?'}, ${pick.seeders ?? '?'} seeders)`);
     return 'grabbed';
   }
-  return f.mediaType === 'tv' && takes.length ? 'episodes' : 'none';
+  if (f.mediaType === 'tv' && takes.length) {
+    log.info('new titles', `No whole first season of "${f.title}" to take: Sonarr gets the episodes`);
+    return 'episodes';
+  }
+  log.info('new titles', `Nothing to take for "${f.title}" yet (${found.length} found, ${takes.length} ${arrName(f)} would take${takes.length ? `, none at ${resolutions.join('/')}p` : ''}): looking again in half an hour`);
+  return 'none';
 }
 
 /** Looks for it (again): Netfish's pick, the smallest at 1080p, or Radarr's (the film) or Sonarr's (its first season). */
@@ -519,11 +538,12 @@ async function searchAgain(f: Fresh, now: number, s: FreshSettings) {
   f.searchedAt = now;
   await settle(
     (async () => {
-      const mine = s.pick === 'profile' ? 'theirs' : await grabSmallest(f, arrId);
+      const mine = s.pick === 'profile' ? 'theirs' : await grabSmallest(f, arrId, RESOLUTIONS[s.pick ?? 'smallest']);
+      if (mine === 'theirs') log.info('new titles', `Asked ${arrName(f)} to search for "${f.title}"`);
       if (mine === 'theirs' || mine === 'episodes') await (f.mediaType === 'movie' ? radarr.search([arrId]) : sonarr.searchSeason(arrId, 1));
     })(),
     undefined,
-    (err) => console.warn('[fresh] searching', f.title, (err as Error).message),
+    (err) => log.warn('new titles', `Searching for "${f.title}" failed`, err),
   );
 }
 
@@ -565,7 +585,7 @@ export function runFresh(now?: number): Promise<void> {
     return queued;
   }
   running = step(now ?? Date.now())
-    .catch((err) => console.warn('[fresh]', (err as Error).message))
+    .catch((err) => log.error('new titles', 'The check failed', err))
     .finally(() => (running = undefined));
   return running;
 }
@@ -626,9 +646,10 @@ async function step(now: number) {
       if (f.state === 'downloading' && files) {
         f.state = 'ready';
         f.readyAt ??= now;
+        log.info('new titles', `"${f.title}" downloaded (${gb(f.size)})${f.airAt ? `, on ${logTime(f.airAt)}` : ''}`);
       } else if (f.state === 'downloading' && now - (f.startedAt ?? f.addedAt) > GIVE_UP) {
         // Nothing found to download in all this time: given up on.
-        noteEvent(f, 'nothing-found', now);
+        log.warn('new titles', `Nothing found to download for "${f.title}" in 12 hours: dropped (deleted from ${arrName(f)})`);
         await settle(remove(f, []), undefined);
         gone.push(f);
       } else if (f.state === 'downloading' && waited(f) > SEARCH_AGAIN) {
@@ -645,7 +666,7 @@ async function step(now: number) {
   const limit = s.maxGb * GB;
   const newest = stored.titles.filter((f) => f.state === 'downloading' && !f.keptBy && !gone.includes(f)).sort((a, b) => b.addedAt - a.addedAt)[0];
   if (newest && used() > limit * 1.05 && used() - newest.size <= limit) {
-    noteEvent(newest, 'too-big', now);
+    log.warn('new titles', `"${newest.title}" is bigger than the space left (${gb(newest.size)}, ${gb(used())} of ${gb(limit)} used): dropped`);
     await settle(remove(newest, queueOf(newest)), undefined);
     gone.push(newest);
   }
@@ -664,6 +685,7 @@ async function step(now: number) {
       if (f.state === 'kept' || f.state === 'planned' || !asked.has(f.key)) continue;
       f.state = 'kept';
       f.keptBy = 'requested';
+      log.info('new titles', `"${f.title}" was requested in Seerr: it stays in the library`);
     }
   }
 
@@ -689,6 +711,7 @@ async function step(now: number) {
     if (due || (!wanted && !link.onAir(f.key))) {
       const ok = await settle(remove(f, queue).then(() => true), false);
       if (ok) removed.push(f);
+      if (ok) log.info('new titles', due ? `"${f.title}" has aired: deleted (${gb(f.size)} freed)` : `"${f.title}": its channel no longer takes new titles, deleted`);
     }
   }
   if (removed.length) {
@@ -755,7 +778,18 @@ async function step(now: number) {
 async function startDue(s: FreshSettings, go: boolean, lowDisk: boolean, now: number, hours: boolean): Promise<FreshStatus['waiting']> {
   // Inside the download hours, what came of it is kept for Settings (outside them it would only say so).
   const noted = <T,>(result: T, note: FreshNote, f?: Fresh): T => {
-    if (hours) lastInHours = { at: now, note, title: f?.title };
+    if (!hours) return result;
+    // What holds them back, said once when it starts to.
+    if (note !== lastInHours?.note && (note === 'disk' || note === 'space' || note === 'services')) {
+      const why =
+        note === 'disk'
+          ? `the disk has ${gb(lastFree)} free, under the ${s.minFreeGb} GB to leave free`
+          : note === 'space'
+            ? `${gb(used())} of the ${s.maxGb} GB for them is used`
+            : `${arrName(f!)} isn't set up`;
+      log.warn('new titles', `"${f?.title}" is due but waits: ${why}`);
+    }
+    lastInHours = { at: now, note, title: f?.title };
     return result;
   };
   const busy = stored.titles.find((f) => f.state === 'downloading');
@@ -773,17 +807,17 @@ async function startDue(s: FreshSettings, go: boolean, lowDisk: boolean, now: nu
   let failed: string | undefined;
   const id = await settle(due.mediaType === 'movie' ? addMovie(due, s) : addShow(due, s), undefined, (err) => {
     failed = (err as Error).message;
-    console.warn('[fresh] adding', due.title, failed);
   });
   if (id === undefined) {
     // Someone has it in Radarr/Sonarr now, or it couldn't be added: off the guide.
-    noteEvent(due, failed ? 'add-failed' : 'already-there', now, failed);
+    if (failed) log.warn('new titles', `Couldn't add "${due.title}" to ${arrName(due)}: dropped`, failed);
+    else log.info('new titles', `"${due.title}" is in ${arrName(due)} already: dropped from the plan`);
     noted(undefined, failed ? 'add-failed' : 'already-there', due);
     stored.titles = stored.titles.filter((f) => f !== due);
     link?.drop([due.key]);
     return undefined;
   }
-  noteEvent(due, 'started', now);
+  log.info('new titles', `Added "${due.title}" to ${arrName(due)}${due.airAt ? `, on ${logTime(due.airAt)}` : ''}`);
   noted(undefined, 'started', due);
   due.arrId = id;
   due.startedAt = now;
@@ -840,16 +874,16 @@ export async function downloadNow(): Promise<FreshNowResult> {
       let reason: string | undefined;
       const id = await settle(f.mediaType === 'movie' ? addMovie(f, s) : addShow(f, s), undefined, (err) => {
         reason = (err as Error).message;
-        console.warn('[fresh] adding', f.title, reason);
       });
       if (id === undefined) {
-        noteEvent(f, reason ? 'add-failed' : 'already-there', now, reason);
+        if (reason) log.warn('new titles', `Couldn't add "${f.title}" to ${arrName(f)}: dropped`, reason);
+        else log.info('new titles', `"${f.title}" is in ${arrName(f)} already: dropped from the plan`);
         failed.push({ title: f.title, reason: reason ?? t('Already in Radarr or Sonarr.') });
         stored.titles = stored.titles.filter((x) => x !== f);
         link.drop([f.key]);
         continue;
       }
-      noteEvent(f, 'started', now);
+      log.info('new titles', `Added "${f.title}" to ${arrName(f)} (Download now)`);
       started.push(f.title);
       Object.assign(f, { arrId: id, startedAt: now, state: 'downloading', size: guess(f.mediaType), rush: true });
     }
@@ -859,6 +893,10 @@ export async function downloadNow(): Promise<FreshNowResult> {
   await running;
   // Straight on: torrents started, the ones paused outside the hours going again.
   await runFresh();
+  log.info(
+    'new titles',
+    `Download now: ${[started.length ? `started ${started.join(', ')}` : '', searched.length ? `looking again for ${searched.join(', ')}` : '', failed.length ? `couldn't start ${failed.map((f) => `${f.title} (${f.reason})`).join(', ')}` : ''].filter(Boolean).join('; ') || 'nothing to start'}`,
+  );
   return { status: await freshStatus(), started, searched, failed };
 }
 
@@ -904,9 +942,10 @@ async function planOne(s: FreshSettings, defs: ChannelDef[], now: number): Promi
         continue;
       }
       for (const r of (await candidates(want, now)).slice(0, 6)) {
-        const plan = await settle(planFor(r, want, def.id, notBefore, now), undefined, (err) => console.warn('[fresh] planning', r.title ?? r.name, (err as Error).message));
+        const plan = await settle(planFor(r, want, def.id, notBefore, now), undefined, (err) => log.warn('new titles', `Couldn't plan "${r.title ?? r.name}"`, err));
         if (plan) {
           stored.titles.push(plan);
+          log.info('new titles', `Picked "${plan.title}" for ${def.name}: downloads from ${logTime(downloadAt(plan, s))}, on from ${logTime(plan.notBefore)}`);
           stored.log.push({ at: now, channelId: def.id });
           stored.turns[def.id] = turn + 1;
           return undefined;
@@ -943,6 +982,7 @@ export async function freshStatus(): Promise<FreshStatus> {
     airAt: iso(f.airAt),
     // Asked for: as soon as it can.
     downloadAt: f.state === 'planned' ? iso(f.keptBy ? Date.now() : downloadAt(f, s)) : undefined,
+    startsAt: f.state === 'planned' ? iso(nextInHours(s, Math.max(Date.now(), f.keptBy ? 0 : downloadAt(f, s)), settings?.timeZone)) : undefined,
     keptBy: f.keptBy,
   }));
   const order: Record<FreshState, number> = { downloading: 0, planned: 1, ready: 1, aired: 2, kept: 3 };
@@ -952,7 +992,6 @@ export async function freshStatus(): Promise<FreshStatus> {
     addedThisWeek: pickedThisWeek(Date.now()),
     waiting: lastWaiting,
     lastInHours: lastInHours && { at: new Date(lastInHours.at).toISOString(), note: lastInHours.note, title: lastInHours.title },
-    events: [...stored.events].reverse(),
     titles: titles.sort((a, b) => order[a.state] - order[b.state] || (a.airAt ?? 'z').localeCompare(b.airAt ?? 'z')),
     services: { radarr: has.radarr(), sonarr: has.sonarr(), seerr: has.seerr(), qbittorrent: has.qbittorrent() },
     profiles: { movie: movieProfiles.map((p) => ({ id: p.id, name: p.name })), show: showProfiles.map((p) => ({ id: p.id, name: p.name })) },
@@ -978,7 +1017,7 @@ export function validFresh(v: unknown, current?: FreshSettings): FreshSettings {
     aheadDays: num(x.aheadDays, base.aheadDays, 1, 7),
     movieProfile: 'movieProfile' in x ? profile(x.movieProfile) : base.movieProfile,
     showProfile: 'showProfile' in x ? profile(x.showProfile) : base.showProfile,
-    pick: x.pick === 'smallest' || x.pick === 'profile' ? x.pick : (base.pick ?? 'smallest'),
+    pick: x.pick === 'smallest' || x.pick === 'smallest-720' || x.pick === 'smallest-2160' || x.pick === 'profile' ? x.pick : (base.pick ?? 'smallest'),
   };
 }
 

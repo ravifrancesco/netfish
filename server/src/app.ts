@@ -3,6 +3,7 @@ import cookie from '@fastify/cookie';
 import fastifyStatic from '@fastify/static';
 import { config } from './config';
 import { JF_PREFIX } from './lib/images';
+import { fastifyLogStream, log } from './lib/log';
 import { registerJellyfinProxy } from './lib/jellyfinProxy';
 import { HttpError, NotConfiguredError, UpstreamError } from './lib/upstream';
 import { apiRoutes } from './routes';
@@ -12,7 +13,8 @@ const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 export async function buildApp() {
   const app = Fastify({
-    logger: { level: config.logLevel },
+    // Readable lines in the container log, like Netfish's own (lib/log).
+    logger: { level: config.logLevel, stream: fastifyLogStream },
     // One line per request is noise on a Pi; errors and warnings still get logged.
     logController: new LogController({ disableRequestLogging: config.logLevel !== 'debug' }),
     trustProxy: config.trustProxy,
@@ -33,12 +35,12 @@ export async function buildApp() {
       // A rejected Jellyfin token means the session is over; anything else is the service's problem, not the user's.
       const status =
         err.service === 'Jellyfin' && err.status === 401 ? 401 : [400, 403, 404, 409, 422].includes(err.status) ? err.status : 502;
-      if (status === 502) req.log.warn({ service: err.service, status: err.status }, err.message);
+      if (status === 502) log.warn('services', `${err.service} failed (${err.status || 'no answer'}) for ${req.method} ${req.url.split('?')[0]}`, err.message);
       return reply.code(status).send({ error: err.message, service: err.service });
     }
     const status = (err as FastifyError).statusCode;
     if (status && status < 500) return reply.code(status).send({ error: err.message });
-    req.log.error(err);
+    log.error('server', `${req.method} ${req.url.split('?')[0]} failed`, err);
     return reply.code(500).send({ error: t('Something went wrong on the Netfish server') });
   });
 

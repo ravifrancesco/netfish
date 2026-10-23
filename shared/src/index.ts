@@ -985,10 +985,11 @@ export interface FreshSettings {
   movieProfile?: number;
   showProfile?: number;
   /**
-   * Which release: the smallest at 1080p that Radarr/Sonarr would take (Netfish picks it from what
-   * they find), or the one they'd pick themselves (the best their profile allows).
+   * Which release: the smallest that Radarr/Sonarr would take at 720p, 1080p ("smallest") or 4K
+   * (Netfish picks it from what they find), or the one they'd pick themselves (the best their
+   * profile allows).
    */
-  pick?: 'smallest' | 'profile';
+  pick?: 'smallest-720' | 'smallest' | 'smallest-2160' | 'profile';
 }
 
 /** planned: in the guide, not downloading yet. */
@@ -1010,9 +1011,12 @@ export interface FreshTitle {
   /** Paused outside the download hours. */
   paused?: boolean;
   addedAt: string;
-  /** When it's on (first), and when its download starts. */
+  /** When it's on (first). */
   airAt?: string;
+  /** The earliest it may start downloading (its days ahead before the earliest it can be on). */
   downloadAt?: string;
+  /** When it will start: the first moment from then inside the download hours (one due then waits its turn). */
+  startsAt?: string;
   /** Who kept it, if someone did ("watched" when someone chose to watch it, "requested"). */
   keptBy?: string;
 }
@@ -1027,8 +1031,6 @@ export interface FreshStatus {
   titles: FreshTitle[];
   /** The last look inside the download hours: what happened then (outside them, "outside the hours" says little). */
   lastInHours?: { at: string; note: FreshNote; title?: string };
-  /** What happened to new titles lately, newest first. */
-  events: FreshEvent[];
   /** What it can use: Radarr for films, Sonarr for shows, Seerr to find them, qBittorrent for hours and speed. */
   services: { radarr: boolean; sonarr: boolean; seerr: boolean; qbittorrent: boolean };
   profiles: { movie: Array<{ id: number; name: string }>; show: Array<{ id: number; name: string }> };
@@ -1045,15 +1047,6 @@ export interface FreshNowResult {
 
 /** What a look inside the download hours came to. */
 export type FreshNote = 'started' | 'downloading' | 'nothing-due' | 'disk' | 'space' | 'services' | 'add-failed' | 'already-there';
-
-/** Something that happened to a new title. */
-export interface FreshEvent {
-  at: string;
-  title: string;
-  what: 'started' | 'add-failed' | 'already-there' | 'nothing-found' | 'too-big';
-  /** What Radarr or Sonarr said, when adding it failed. */
-  detail?: string;
-}
 
 /** Settings → Channels (admins). */
 export interface ChannelSettings {

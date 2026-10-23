@@ -7,6 +7,29 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.29 (2026-10-22)
+
+### New
+- **A log you can read in Portainer** (Containers → netfish → Logs). One line for each thing that happened, in the household's time:
+
+  ```
+  2026-10-22 23:22:35  info   playback     Sam started "Reef Break" on Fire TV: plays as it is · audio English [aac]
+  2026-10-22 23:26:01  info   new titles   Grabbed "Brine.2024.1080p.BluRay.x264-WAL" for "Brine" (7.1 GB, Bluray-1080p, 17 seeders)
+  ```
+
+  - **Who did what:** sign-ins (and wrong passwords, with the address they came from), sign-outs, what someone started (on which app or the Chromecast, whether it plays as it is or the server converts it, and why), where they stopped, requests, cancelled requests, deleting from disk (and the space freed), downloading again, choosing another version, Watch together rooms, and admins' changes to channels, connections and settings.
+  - **What the server did by itself:** New titles picked (for which channel, when they download and air), added to Radarr or Sonarr, the release grabbed (or why none was), searching again, downloaded, deleted after airing, kept, dropped (and why), and what holds them back in the download hours (disk, space). A New title that misses its slot. A newer Netfish out.
+  - **What went wrong:** a service that failed (Radarr, Sonarr, Seerr…) and for what, and anything unexpected, with where it happened.
+  - The server's own messages are in the same format (no more JSON lines). Never passwords, keys or tokens. `LOG_LEVEL` (debug, info, warn, error) still sets how much.
+- **New titles: the smallest at 720p, or at 4K.** *Which release* now offers *The smallest at 720p*, *at 1080p* (the default) and *at 4K*, besides *Radarr's and Sonarr's choice*. Each takes the nearest resolution when there's none at the one chosen.
+
+### Changed
+- **New titles: when each will really start downloading.** The list said the earliest a title may start ("downloads Wed 11:12 PM"), even when that was outside the download hours or already past. It now says when it will start: the first download hours from then (*Downloads Fri 02:00 AM*), or *In line to download* when it's due now and waits for the one ahead of it.
+- **Settings → New titles: no *Lately* list.** What happened to each New title is in the log now, with more detail.
+
+### Update
+- **Server.**
+
 ## 0.7.28 (2026-10-22)
 
 ### Changed

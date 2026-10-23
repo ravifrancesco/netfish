@@ -5771,18 +5771,6 @@ html.is-desktop.is-mac.is-fullscreen .channel__top {
   margin: 0;
   padding: 0;
 }
-/* What happened to new titles lately. */
-.fresh__events {
-  display: grid;
-  gap: 6px;
-}
-.fresh__events ul {
-  display: grid;
-  gap: 4px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
 .fresh__item {
   display: flex;
   align-items: center;

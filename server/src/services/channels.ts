@@ -10,6 +10,7 @@ import { writeJson } from '../lib/storage';
 import { HttpError } from '../lib/upstream';
 import { inLanguage, t } from '../lib/i18n';
 import { FRESH_DEFAULTS, freshHidden, freshPlans, freshRetired, linkChannels, onFreshChange, runFresh, validFresh, type FreshPlan } from './fresh';
+import { log, setLogTimeZone } from '../lib/log';
 
 /**
  * Channels: the library as old-school TV, made only of what's already on the server. Each
@@ -116,6 +117,8 @@ function load(): Stored {
 }
 
 let stored = load();
+// The log's times are the household's (where the 9pm film is at 9pm).
+setLogTimeZone(stored.settings.timeZone);
 const save = () => writeJson(FILE, stored);
 
 export const channelsEnabled = () => stored.settings.enabled;
@@ -937,6 +940,7 @@ function extend(def: ChannelDef, real: Library, now: number, timeZone: string): 
   const late = sched.entries.find((e) => isPlaceholder(e.itemId) && e.start > now && e.start - now < 90 * 60_000);
   if (late) {
     const missed = placeholderKey(late.itemId);
+    log.warn('channels', `"${lib.byId.get(late.itemId)?.seriesTitle ?? lib.byId.get(late.itemId)?.title ?? missed}" isn't downloaded in time for its slot on ${def.name}: something from the library plays instead`);
     sched.freshMissed = [...new Set([...(sched.freshMissed ?? []), missed])];
     sched.freshRoom = sched.freshRoom?.filter((k) => k !== missed);
     truncate(sched, lib, late.start);
@@ -1252,6 +1256,7 @@ export async function updateChannels(user: SessionUser, patch: Partial<Record<ke
   if ('countWatched' in patch) next.countWatched = Boolean(patch.countWatched);
   if ('channels' in patch) next.channels = withNetfish(validChannels(patch.channels), stored.settings.channels.find((c) => c.builtIn));
   if ('timeZone' in patch) next.timeZone = validTimeZone(patch.timeZone) ?? next.timeZone;
+  setLogTimeZone(next.timeZone);
   if ('fresh' in patch) next.fresh = validFresh(patch.fresh, next.fresh);
   if ('enabled' in patch) {
     next.enabled = Boolean(patch.enabled);
