@@ -7,6 +7,23 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.30 (2026-10-22)
+
+### New
+- **New titles get Netfish's own quality profiles, with no upgrades.** With *Which release* on one of *The smallest at…*, Netfish makes a profile in Radarr and in Sonarr and adds New titles with it:
+  - **Netfish - New titles 720p** (720p, then 1080p), **Netfish - New titles 1080p** (1080p, then 720p) and **Netfish - New titles 4K** (4K, then 1080p, then 720p). Never a remux or a disc image.
+  - **Upgrades are off**, so Radarr and Sonarr don't swap the small release Netfish picked for a bigger one later (their RSS sync would, with an *Any* profile).
+  - It puts a profile right if someone changes it, and never touches yours. The *Film quality* and *Show quality* menus are only there for *Radarr's and Sonarr's choice* now.
+- **Kept New titles move to your own profile.** When someone keeps a New title (or requests it in Seerr), it becomes the household's: Netfish moves it in Radarr/Sonarr to the profile your own titles use (the one Seerr adds requests with, else the one most of your library has), so it upgrades like the rest.
+- **New titles: several at once.** *At the same time* (1–5, 2 by default) says how many download together. One a check starts, so indexers don't get a burst of searches.
+
+### Fixed
+- **A New title nobody could find a download for held up the rest.** One still *Looking for a download…* a quarter of an hour after it was added no longer takes a turn: the next one starts, and it keeps being looked for.
+- **A restart just after adding a New title could lose it.** Netfish noted a title added to Radarr/Sonarr only at the end of its check; restarted in those seconds, it found the title there "added by someone else" and dropped it, leaving it in Radarr/Sonarr for good. It now notes it straight away, and a title carrying Netfish's tag there is taken as its own.
+
+### Update
+- **Server.**
+
 ## 0.7.29 (2026-10-22)
 
 ### New

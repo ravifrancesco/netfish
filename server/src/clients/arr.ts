@@ -94,6 +94,7 @@ export interface RadarrMovie {
   monitored?: boolean;
   sizeOnDisk?: number;
   tags?: number[];
+  qualityProfileId?: number;
 }
 
 export interface SonarrSeason {
@@ -147,6 +148,7 @@ export interface SonarrSeries {
   nextAiring?: string;
   images?: ArrImage[];
   tags?: number[];
+  qualityProfileId?: number;
 }
 
 export interface ArrTag {
@@ -157,6 +159,19 @@ export interface ArrTag {
 export interface ArrProfile {
   id: number;
   name: string;
+  /** The whole profile (from /qualityprofile, and its schema): what it allows, upgrading or not. */
+  upgradeAllowed?: boolean;
+  cutoff?: number;
+  items?: ArrProfileItem[];
+}
+
+/** A quality in a profile, or a group of them (Sonarr's and Radarr's "WEB 1080p"). */
+export interface ArrProfileItem {
+  id?: number;
+  name?: string;
+  quality?: { id: number; name?: string; resolution?: number };
+  items?: ArrProfileItem[];
+  allowed: boolean;
 }
 
 /** What Radarr/Sonarr's lookup returns: the title as they'd add it. */
@@ -217,6 +232,11 @@ export const radarr = {
   tags: () => arrRequest<ArrTag[]>('radarr', '/tag'),
   addTag: (label: string) => arrRequest<ArrTag>('radarr', '/tag', { method: 'POST', body: { label } }),
   qualityProfiles: () => arrRequest<ArrProfile[]>('radarr', '/qualityprofile'),
+  profileSchema: () => arrRequest<ArrProfile>('radarr', '/qualityprofile/schema'),
+  addProfile: (profile: Omit<ArrProfile, 'id'>) => arrRequest<ArrProfile>('radarr', '/qualityprofile', { method: 'POST', body: profile }),
+  updateProfile: (profile: ArrProfile) => arrRequest<ArrProfile>('radarr', `/qualityprofile/${profile.id}`, { method: 'PUT', body: profile }),
+  setProfile: (movieIds: number[], qualityProfileId: number) =>
+    arrRequest<unknown>('radarr', '/movie/editor', { method: 'PUT', body: { movieIds, qualityProfileId } }),
   lookup: (tmdbId: number) => arrRequest<ArrLookup>('radarr', '/movie/lookup/tmdb', { query: { tmdbId }, timeoutMs: 30_000 }),
   add: (movie: ArrLookup) => arrRequest<RadarrMovie>('radarr', '/movie', { method: 'POST', body: movie, timeoutMs: 30_000 }),
   /** Gone for good: the movie and its files. */
@@ -269,6 +289,11 @@ export const sonarr = {
   tags: () => arrRequest<ArrTag[]>('sonarr', '/tag'),
   addTag: (label: string) => arrRequest<ArrTag>('sonarr', '/tag', { method: 'POST', body: { label } }),
   qualityProfiles: () => arrRequest<ArrProfile[]>('sonarr', '/qualityprofile'),
+  profileSchema: () => arrRequest<ArrProfile>('sonarr', '/qualityprofile/schema'),
+  addProfile: (profile: Omit<ArrProfile, 'id'>) => arrRequest<ArrProfile>('sonarr', '/qualityprofile', { method: 'POST', body: profile }),
+  updateProfile: (profile: ArrProfile) => arrRequest<ArrProfile>('sonarr', `/qualityprofile/${profile.id}`, { method: 'PUT', body: profile }),
+  setProfile: (seriesIds: number[], qualityProfileId: number) =>
+    arrRequest<unknown>('sonarr', '/series/editor', { method: 'PUT', body: { seriesIds, qualityProfileId } }),
   /** Sonarr 3 needs one when adding a show; Sonarr 4 has none. */
   languageProfiles: () => arrRequest<ArrProfile[]>('sonarr', '/languageprofile'),
   lookup: (tvdbId: number) => arrRequest<ArrLookup[]>('sonarr', '/series/lookup', { query: { term: `tvdb:${tvdbId}` }, timeoutMs: 30_000 }),

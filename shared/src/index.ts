@@ -990,6 +990,8 @@ export interface FreshSettings {
    * profile allows).
    */
   pick?: 'smallest-720' | 'smallest' | 'smallest-2160' | 'profile';
+  /** How many download at the same time (1–5). */
+  parallel?: number;
 }
 
 /** planned: in the guide, not downloading yet. */

@@ -200,6 +200,11 @@ export type DiscoverKind = 'trending' | 'movies' | 'tv' | 'movies/upcoming' | 't
 
 export const seerr = {
   status: () => seerrRequest<{ version: string }>('/status', { timeoutMs: 5000 }),
+  /** The quality profile Seerr adds requests to Radarr or Sonarr with (its default, not-4K server). */
+  requestProfile: async (service: 'radarr' | 'sonarr') => {
+    const servers = await seerrRequest<Array<{ isDefault?: boolean; is4k?: boolean; activeProfileId?: number }>>(`/settings/${service}`);
+    return (servers.find((x) => x.isDefault && !x.is4k) ?? servers.find((x) => !x.is4k))?.activeProfileId;
+  },
 
   search: (query: string, page = 1) => seerrRequest<SeerrPage>('/search', { query: { query, page, ...lang() } }),
   discover: (kind: DiscoverKind, page = 1, extra: Record<string, string | number> = {}) =>

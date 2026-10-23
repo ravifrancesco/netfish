@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { ChannelDef, ChannelSettings, ChannelSource, FreshNote, FreshNowResult, FreshSettings, FreshState, FreshStatus, FreshTitle, MediaType } from '@netfish/shared';
 import { config, has } from '../config';
-import { posterOf, radarr, sonarr, type ArrDisk, type ArrLookup, type ArrQueueRecord, type ArrRelease, type ArrRootFolder, type RadarrMovie, type SonarrSeries } from '../clients/arr';
+import { posterOf, radarr, sonarr, type ArrDisk, type ArrLookup, type ArrProfile, type ArrProfileItem, type ArrQueueRecord, type ArrRelease, type ArrRootFolder, type RadarrMovie, type SonarrSeries } from '../clients/arr';
 import { qbittorrent } from '../clients/qbittorrent';
 import { seerr, type SeerrResult } from '../clients/seerr';
 import { settle } from '../lib/async';
@@ -34,6 +34,8 @@ const WEEK = 7 * DAY;
 const GUESS: Record<MediaType, number> = { movie: 5 * GB, tv: 9 * GB };
 /** No release found for this long: given up on. */
 const GIVE_UP = 12 * 3600_000;
+/** Just added: being looked for (a release grabbed in a few minutes). Past it, still nothing: it no longer takes a turn. */
+const LOOKING = 15 * 60_000;
 /**
  * Nothing grabbed yet: Radarr/Sonarr asked to look again this often (until GIVE_UP), one title
  * per check at most: indexers turn away bursts of searches (Prowlarr's "too many requests").
@@ -42,7 +44,7 @@ const SEARCH_AGAIN = 30 * 60_000;
 /** Deleted this long after its last airing ends. */
 const AFTER_AIRING = 15 * 60_000;
 
-export const FRESH_DEFAULTS: FreshSettings = { enabled: false, maxGb: 60, minFreeGb: 50, fromHour: 1, toHour: 8, maxSpeed: 0, perWeek: 3, aheadDays: 3, pick: 'smallest' };
+export const FRESH_DEFAULTS: FreshSettings = { enabled: false, maxGb: 60, minFreeGb: 50, fromHour: 1, toHour: 8, maxSpeed: 0, perWeek: 3, aheadDays: 3, pick: 'smallest', parallel: 2 };
 
 interface Episode {
   season: number;
@@ -192,6 +194,7 @@ export function keepFresh(key: string, by: string): { here: boolean } {
   const here = f.state === 'ready' || f.state === 'aired';
   if (here) f.state = 'kept';
   log.info('new titles', `${by} kept "${f.title}": it stays in the library${here ? '' : ' once it’s downloaded'}`);
+  keptToHousehold(f);
   save();
   onChange();
   return { here };
@@ -442,11 +445,15 @@ async function tagFor(service: 'radarr' | 'sonarr'): Promise<number> {
   return found.id;
 }
 
-/** Into Radarr (tagged), searching straight away. Undefined if someone has added it there since. */
+/**
+ * Into Radarr (tagged). Undefined if someone else has added it there since; one with Netfish's tag
+ * is its own (added just before a restart, before it was noted here).
+ */
 async function addMovie(f: Fresh, s: FreshSettings): Promise<number | undefined> {
-  if (await settle(radarr.movieByTmdb(f.tmdbId), undefined)) return undefined;
+  const there = await settle(radarr.movieByTmdb(f.tmdbId), undefined);
+  if (there) return there.tags?.includes(await tagFor('radarr')) ? there.id : undefined;
   const [lookup, roots, profiles, tag] = await Promise.all([radarr.lookup(f.tmdbId), radarr.rootFolders(), radarr.qualityProfiles(), tagFor('radarr')]);
-  const profile = profiles.find((p) => p.id === s.movieProfile) ?? profiles[0];
+  const profile = await profileFor('radarr', s, profiles);
   if (!roots[0] || !profile) throw new HttpError(502, t('Radarr has no library folder or quality profile'));
   const movie = await radarr.add({
     ...lookup,
@@ -462,9 +469,11 @@ async function addMovie(f: Fresh, s: FreshSettings): Promise<number | undefined>
   return movie.id;
 }
 
-/** Into Sonarr (tagged), the first season only, searching straight away. */
+/** Into Sonarr (tagged), the first season only. Someone else's there already: undefined; Netfish's own: it. */
 async function addShow(f: Fresh, s: FreshSettings): Promise<number | undefined> {
-  if (!f.tvdbId || (await settle(sonarr.seriesByTvdb(f.tvdbId), undefined))) return undefined;
+  if (!f.tvdbId) return undefined;
+  const there = await settle(sonarr.seriesByTvdb(f.tvdbId), undefined);
+  if (there) return there.tags?.includes(await tagFor('sonarr')) ? there.id : undefined;
   const [found, roots, profiles, languages, tag] = await Promise.all([
     sonarr.lookup(f.tvdbId),
     sonarr.rootFolders(),
@@ -473,7 +482,7 @@ async function addShow(f: Fresh, s: FreshSettings): Promise<number | undefined> 
     tagFor('sonarr'),
   ]);
   const lookup = found[0];
-  const profile = profiles.find((p) => p.id === s.showProfile) ?? profiles[0];
+  const profile = await profileFor('sonarr', s, profiles);
   if (!lookup || !roots[0] || !profile) throw new HttpError(502, t('Sonarr has no library folder or quality profile'));
   const series = await sonarr.add({
     ...lookup,
@@ -489,6 +498,107 @@ async function addShow(f: Fresh, s: FreshSettings): Promise<number | undefined> 
   f.poster ??= posterOf(series.images);
   return series.id;
 }
+
+// ---------- Quality profiles ----------
+
+type Smallest = Exclude<FreshSettings['pick'], 'profile' | undefined>;
+const SERVICE_NAME = { radarr: 'Radarr', sonarr: 'Sonarr' } as const;
+
+/** Netfish's own profiles in Radarr and Sonarr, one for each choice of "the smallest at…". */
+const PROFILE_NAMES: Record<Smallest, string> = {
+  'smallest-720': 'Netfish - New titles 720p',
+  smallest: 'Netfish - New titles 1080p',
+  'smallest-2160': 'Netfish - New titles 4K',
+};
+
+/**
+ * One of Netfish's profiles, from Radarr's/Sonarr's template: the resolutions its choice looks at
+ * (never a disc image or a remux: huge, and these are wanted small), and no upgrades, so what
+ * Netfish picked is never swapped for something bigger.
+ */
+function netfishProfileFrom(schema: ArrProfile, name: string, resolutions: number[]): Omit<ArrProfile, 'id'> {
+  const wanted = (item: ArrProfileItem) =>
+    Boolean(item.quality && resolutions.includes(item.quality.resolution ?? 0) && !/remux|br-?disk|raw-?hd/i.test(item.quality.name ?? ''));
+  const items = (schema.items ?? []).map((item) => {
+    if (!item.items?.length) return { ...item, allowed: wanted(item) };
+    const inside = item.items.map((x) => ({ ...x, allowed: wanted(x) }));
+    return { ...item, items: inside, allowed: inside.some((x) => x.allowed) };
+  });
+  const first = items.find((x) => x.allowed);
+  return { ...schema, name, upgradeAllowed: false, cutoff: first ? (first.items?.length ? first.id : first.quality?.id) : schema.cutoff, items };
+}
+const allowedIds = (p: Pick<ArrProfile, 'items'>) =>
+  (p.items ?? []).flatMap((i) => (i.items?.length ? i.items : [i])).flatMap((i) => (i.allowed && i.quality ? [i.quality.id] : [])).sort((a, b) => a - b);
+
+/** Netfish's profile for this choice in Radarr or Sonarr: made, or put right if someone changed it. */
+const profileIds = new Map<string, number>();
+async function netfishProfile(service: 'radarr' | 'sonarr', pick: Smallest): Promise<number> {
+  const key = `${service}:${pick}`;
+  const known = profileIds.get(key);
+  if (known !== undefined) return known;
+  const api = service === 'radarr' ? radarr : sonarr;
+  const name = PROFILE_NAMES[pick];
+  const [profiles, schema] = await Promise.all([api.qualityProfiles(), api.profileSchema()]);
+  const wanted = netfishProfileFrom(schema, name, RESOLUTIONS[pick]);
+  const there = profiles.find((p) => p.name === name);
+  let id: number;
+  if (!there) {
+    id = (await api.addProfile(wanted)).id;
+    log.info('new titles', `Made the "${name}" profile in ${SERVICE_NAME[service]} (${RESOLUTIONS[pick].map((r) => (r === 2160 ? '4K' : `${r}p`)).join(', ')}, no upgrades)`);
+  } else {
+    id = there.id;
+    if (there.upgradeAllowed !== false || allowedIds(there).join() !== allowedIds(wanted).join()) {
+      await api.updateProfile({ ...there, upgradeAllowed: false, cutoff: wanted.cutoff, items: wanted.items });
+      log.info('new titles', `Put the "${name}" profile in ${SERVICE_NAME[service]} right (its qualities, no upgrades)`);
+    }
+  }
+  profileIds.set(key, id);
+  return id;
+}
+
+/** The profile a new title goes in with: Netfish's own for "the smallest at…", else the one chosen (their first otherwise). */
+async function profileFor(service: 'radarr' | 'sonarr', s: FreshSettings, profiles: ArrProfile[]): Promise<ArrProfile | undefined> {
+  const chosen = profiles.find((p) => p.id === (service === 'radarr' ? s.movieProfile : s.showProfile)) ?? profiles[0];
+  if (s.pick === 'profile') return chosen;
+  const pick = s.pick ?? 'smallest';
+  const id = await settle(netfishProfile(service, pick), undefined, (err) =>
+    log.warn('new titles', `Couldn't make the "${PROFILE_NAMES[pick]}" profile in ${SERVICE_NAME[service]}: using "${chosen?.name}"`, err),
+  );
+  return id !== undefined ? { id, name: PROFILE_NAMES[pick] } : chosen;
+}
+
+/**
+ * The profile the household's own titles have: the one Seerr adds requests with, else the one
+ * most of Radarr's/Sonarr's titles have (not one of Netfish's).
+ */
+async function householdProfile(service: 'radarr' | 'sonarr'): Promise<ArrProfile | undefined> {
+  const api = service === 'radarr' ? radarr : sonarr;
+  const profiles = await api.qualityProfiles();
+  const fromSeerr = has.seerr() ? await settle(seerr.requestProfile(service), undefined) : undefined;
+  const seerrs = profiles.find((p) => p.id === fromSeerr);
+  if (seerrs) return seerrs;
+  const ours = new Set(Object.values(PROFILE_NAMES));
+  const titles: Array<{ qualityProfileId?: number }> = service === 'radarr' ? await radarr.movies() : await sonarr.allSeries();
+  const count = new Map<number, number>();
+  for (const x of titles) {
+    const p = profiles.find((y) => y.id === x.qualityProfileId);
+    if (p && !ours.has(p.name)) count.set(p.id, (count.get(p.id) ?? 0) + 1);
+  }
+  const most = [...count].sort((a, b) => b[1] - a[1])[0]?.[0];
+  return profiles.find((p) => p.id === most) ?? profiles.find((p) => !ours.has(p.name));
+}
+
+/** Kept: it's the household's now, in their profile (upgrading as theirs do), not Netfish's. */
+async function toHouseholdProfile(f: Fresh) {
+  if (f.arrId === undefined) return;
+  const service = f.mediaType === 'movie' ? 'radarr' : 'sonarr';
+  const profile = await householdProfile(service);
+  if (!profile) return;
+  await (service === 'radarr' ? radarr.setProfile([f.arrId], profile.id) : sonarr.setProfile([f.arrId], profile.id));
+  log.info('new titles', `"${f.title}" is kept: moved to the "${profile.name}" profile in ${SERVICE_NAME[service]}`);
+}
+const keptToHousehold = (f: Fresh) =>
+  void settle(toHouseholdProfile(f), undefined, (err) => log.warn('new titles', `Couldn't move "${f.title}" to the household's profile`, err));
 
 /** The resolutions to look at, in turn, for each choice: the one asked for, then the nearest. */
 const RESOLUTIONS: Record<Exclude<FreshSettings['pick'], 'profile' | undefined>, number[]> = {
@@ -686,6 +796,7 @@ async function step(now: number) {
       f.state = 'kept';
       f.keptBy = 'requested';
       log.info('new titles', `"${f.title}" was requested in Seerr: it stays in the library`);
+      keptToHousehold(f);
     }
   }
 
@@ -774,7 +885,7 @@ async function step(now: number) {
   save();
 }
 
-/** Starts the download of the planned title whose day has come (one at a time). */
+/** Starts the download of the planned title whose day has come (one a check, as many at once as the settings say). */
 async function startDue(s: FreshSettings, go: boolean, lowDisk: boolean, now: number, hours: boolean): Promise<FreshStatus['waiting']> {
   // Inside the download hours, what came of it is kept for Settings (outside them it would only say so).
   const noted = <T,>(result: T, note: FreshNote, f?: Fresh): T => {
@@ -792,8 +903,10 @@ async function startDue(s: FreshSettings, go: boolean, lowDisk: boolean, now: nu
     lastInHours = { at: now, note, title: f?.title };
     return result;
   };
-  const busy = stored.titles.find((f) => f.state === 'downloading');
-  if (busy) return noted(undefined, 'downloading', busy);
+  // Downloading: a release on its way, or just added (being looked for). One looked for in vain a
+  // while already doesn't hold the next one up.
+  const busy = stored.titles.filter((f) => f.state === 'downloading' && (f.progress !== undefined || now - (f.startedAt ?? f.addedAt) < LOOKING));
+  if (busy.length >= (s.parallel ?? 2)) return noted(undefined, 'downloading', busy[0]);
   // Asked for by someone: due now (with or without a slot of its own still to come).
   const due = stored.titles
     .filter((f) => f.state === 'planned' && (f.keptBy || now >= downloadAt(f, s)))
@@ -823,6 +936,9 @@ async function startDue(s: FreshSettings, go: boolean, lowDisk: boolean, now: nu
   due.startedAt = now;
   due.state = 'downloading';
   due.size = guess(due.mediaType);
+  // Noted straight away: a restart now mustn't forget it's in Radarr/Sonarr.
+  save();
+  if (due.keptBy) keptToHousehold(due);
   // Netfish's pick: it looks for the smallest release now (Radarr/Sonarr didn't search on adding).
   if (s.pick !== 'profile') void searchAgain(due, now, s);
   return undefined;
@@ -886,6 +1002,8 @@ export async function downloadNow(): Promise<FreshNowResult> {
       log.info('new titles', `Added "${f.title}" to ${arrName(f)} (Download now)`);
       started.push(f.title);
       Object.assign(f, { arrId: id, startedAt: now, state: 'downloading', size: guess(f.mediaType), rush: true });
+      save();
+      if (f.keptBy) keptToHousehold(f);
     }
     save();
     onChange();
@@ -1018,6 +1136,7 @@ export function validFresh(v: unknown, current?: FreshSettings): FreshSettings {
     movieProfile: 'movieProfile' in x ? profile(x.movieProfile) : base.movieProfile,
     showProfile: 'showProfile' in x ? profile(x.showProfile) : base.showProfile,
     pick: x.pick === 'smallest' || x.pick === 'smallest-720' || x.pick === 'smallest-2160' || x.pick === 'profile' ? x.pick : (base.pick ?? 'smallest'),
+    parallel: num(x.parallel, base.parallel ?? 2, 1, 5),
   };
 }
 

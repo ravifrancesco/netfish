@@ -869,6 +869,14 @@ void app.register(
   },
   { prefix: '/seerr/api/v1' },
 );
+// Seerr's Radarr and Sonarr: the profile requests are added with.
+void app.register(
+  async (r) => {
+    r.get('/settings/radarr', async () => [{ id: 0, name: 'Radarr', isDefault: true, is4k: false, activeProfileId: 4, activeProfileName: 'HD-1080p' }]);
+    r.get('/settings/sonarr', async () => [{ id: 0, name: 'Sonarr', isDefault: true, is4k: false, activeProfileId: 4, activeProfileName: 'HD-1080p', activeAnimeProfileId: 4 }]);
+  },
+  { prefix: '/seerr/api/v1' },
+);
 
 // ======================================================================
 // Radarr / Sonarr
@@ -986,6 +994,29 @@ const seasonsDto = (t: Title) =>
 const arrTags = { radarr: [] as Array<{ id: number; label: string }>, sonarr: [] as Array<{ id: number; label: string }> };
 const titleTags = new Map<string, number[]>();
 const PROFILES = [{ id: 1, name: 'Any' }, { id: 4, name: 'HD-1080p' }, { id: 6, name: 'HD-720p' }];
+// Quality profiles as Radarr/Sonarr have them: qualities one by one, the WEB ones in groups.
+const QUALITIES: Array<[number, string, number]> = [
+  [0, 'Unknown', 0], [1, 'SDTV', 480], [4, 'HDTV-720p', 720], [6, 'Bluray-720p', 720], [9, 'HDTV-1080p', 1080], [7, 'Bluray-1080p', 1080],
+  [30, 'Remux-1080p', 1080], [16, 'HDTV-2160p', 2160], [19, 'Bluray-2160p', 2160], [31, 'Remux-2160p', 2160], [22, 'BR-DISK', 1080], [10, 'Raw-HD', 1080],
+];
+const WEB_GROUPS: Array<[number, number, number, number]> = [[1001, 720, 5, 14], [1002, 1080, 3, 15], [1003, 2160, 18, 17]];
+type MockProfile = { id?: number; name: string; upgradeAllowed: boolean; cutoff: number; items: Array<{ id?: number; name?: string; quality?: { id: number; name: string; resolution: number }; items: MockProfile['items']; allowed: boolean }> };
+function profileSchema(): MockProfile {
+  const q = (id: number, name: string, resolution: number) => ({ quality: { id, name, resolution }, items: [], allowed: false });
+  return {
+    name: '', upgradeAllowed: false, cutoff: 0,
+    items: [
+      ...QUALITIES.map(([id, name, res]) => q(id, name, res)),
+      ...WEB_GROUPS.map(([id, res, dl, rip]) => ({ id, name: `WEB ${res}p`, allowed: false, items: [q(dl, `WEBDL-${res}p`, res), q(rip, `WEBRip-${res}p`, res)] })),
+    ],
+  };
+}
+const arrProfiles: Record<'radarr' | 'sonarr', MockProfile[]> = {
+  radarr: PROFILES.map((p) => ({ ...profileSchema(), ...p, upgradeAllowed: true, items: profileSchema().items.map((i) => ({ ...i, allowed: true })) })),
+  sonarr: PROFILES.map((p) => ({ ...profileSchema(), ...p, upgradeAllowed: true, items: profileSchema().items.map((i) => ({ ...i, allowed: true })) })),
+};
+/** Each title's quality profile in Radarr/Sonarr (the household's, HD-1080p, unless added with another). */
+const titleProfile = new Map<string, number>();
 /** Gone for good (deleteFiles): the title, its files, its download. */
 function forgetTitle(t: Title) {
   arrKnown.delete(`${t.type}-${t.tmdbId}`);
@@ -1001,7 +1032,30 @@ const tagRoutes = (r: import('fastify').FastifyInstance, service: 'radarr' | 'so
     arrTags[service].push(tag);
     return tag;
   });
-  r.get('/qualityprofile', async () => PROFILES);
+  r.get('/qualityprofile', async () => arrProfiles[service]);
+  r.get('/qualityprofile/schema', async () => profileSchema());
+  // Like Radarr/Sonarr: a name of its own, and the cutoff one of what it allows.
+  const check = (p: MockProfile) => {
+    const allowed = p.items.flatMap((i) => (i.allowed ? [i.quality?.id ?? i.id] : []));
+    if (!p.name) return 'Name is required';
+    if (!allowed.includes(p.cutoff)) return 'Cutoff must be an allowed quality or group';
+    return undefined;
+  };
+  r.post<{ Body: MockProfile }>('/qualityprofile', async (req, reply) => {
+    const error = check(req.body) ?? (arrProfiles[service].some((x) => x.name === req.body.name) ? 'Must be unique' : undefined);
+    if (error) return reply.code(400).send([{ errorMessage: error }]);
+    const p = { ...req.body, id: 100 + arrProfiles[service].length };
+    arrProfiles[service].push(p);
+    return reply.code(201).send(p);
+  });
+  r.put<{ Params: { id: string }; Body: MockProfile }>('/qualityprofile/:id', async (req, reply) => {
+    const i = arrProfiles[service].findIndex((x) => x.id === Number(req.params.id));
+    if (i < 0) return reply.code(404).send({});
+    const error = check(req.body);
+    if (error) return reply.code(400).send([{ errorMessage: error }]);
+    arrProfiles[service][i] = { ...req.body, id: Number(req.params.id) };
+    return reply.code(202).send(arrProfiles[service][i]);
+  });
 };
 
 const fileDto = (t: Title, season?: number) => ({
@@ -1018,6 +1072,7 @@ void app.register(
       id: t.n, title: t.title, tmdbId: t.tmdbId, hasFile: inLibrary(t), images: [{ coverType: 'poster', remoteUrl: posterUrl(t) }],
       movieFile: inLibrary(t) ? fileDto(t) : undefined, ...releaseOf(t), year: t.year,
       monitored: !unmonitored.has(`movie-${t.tmdbId}`), sizeOnDisk: inLibrary(t) ? fileSize(t) : 0, tags: titleTags.get(`movie-${t.tmdbId}`) ?? [],
+      qualityProfileId: titleProfile.get(`movie-${t.tmdbId}`) ?? 4,
     });
     r.get<{ Querystring: Q }>('/movie', async (req) =>
       TITLES.filter((t) => t.type === 'movie' && managed(t) && (!req.query.tmdbId || t.tmdbId === Number(req.query.tmdbId))).map(movieDto),
@@ -1034,6 +1089,7 @@ void app.register(
       if (!req.body.qualityProfileId || !req.body.rootFolderPath) return reply.code(400).send([{ errorMessage: 'Quality profile and root folder are required' }]);
       arrKnown.add(`movie-${t.tmdbId}`);
       titleTags.set(`movie-${t.tmdbId}`, req.body.tags ?? []);
+      titleProfile.set(`movie-${t.tmdbId}`, req.body.qualityProfileId);
       // MOCK_EMPTY_FIRST_SEARCH=1: the search when it's added finds nothing (indexers busy); a later one does.
       if (req.body.addOptions?.searchForMovie && isOut(t) && process.env.MOCK_EMPTY_FIRST_SEARCH !== '1') startDownload(t, { durationMs: 45_000 });
       return reply.code(201).send(movieDto(t));
@@ -1055,10 +1111,12 @@ void app.register(
       }
       return {};
     });
-    r.put<{ Body: { movieIds: number[]; monitored: boolean } }>('/movie/editor', async (req) => {
+    r.put<{ Body: { movieIds: number[]; monitored?: boolean; qualityProfileId?: number } }>('/movie/editor', async (req) => {
       for (const n of req.body.movieIds) {
         const t = TITLES.find((x) => x.type === 'movie' && x.n === n);
         if (!t) continue;
+        if (req.body.qualityProfileId) titleProfile.set(`movie-${t.tmdbId}`, req.body.qualityProfileId);
+        if (req.body.monitored === undefined) continue;
         arrKnown.add(`movie-${t.tmdbId}`);
         if (req.body.monitored) unmonitored.delete(`movie-${t.tmdbId}`);
         else unmonitored.add(`movie-${t.tmdbId}`);
@@ -1116,6 +1174,7 @@ void app.register(
     const seriesDto = (t: Title) => ({
       id: t.n, title: t.title, tvdbId: t.tvdbId, tmdbId: t.tmdbId, images: [{ coverType: 'poster', remoteUrl: posterUrl(t) }], ...releaseOf(t),
       year: t.year, monitored: !unmonitored.has(`tv-${t.tmdbId}`), seasons: seasonsDto(t), tags: titleTags.get(`tv-${t.tmdbId}`) ?? [],
+      qualityProfileId: titleProfile.get(`tv-${t.tmdbId}`) ?? 4,
       statistics: { sizeOnDisk: librarySeasons(t).reduce((n, s) => n + fileSize(t, s), 0), episodeFileCount: librarySeasons(t).length * EPISODES_PER_SEASON },
     });
     r.get<{ Querystring: Q }>('/series', async (req) =>
@@ -1136,6 +1195,7 @@ void app.register(
         if (!req.body.qualityProfileId || !req.body.rootFolderPath) return reply.code(400).send([{ errorMessage: 'Quality profile and root folder are required' }]);
         arrKnown.add(`tv-${t.tmdbId}`);
         titleTags.set(`tv-${t.tmdbId}`, req.body.tags ?? []);
+        titleProfile.set(`tv-${t.tmdbId}`, req.body.qualityProfileId!);
         const wanted = (req.body.seasons ?? []).filter((x) => x.monitored).map((x) => x.seasonNumber);
         for (let season = 1; season <= t.seasons; season++) if (!wanted.includes(season)) unmonitored.add(`tv-${t.tmdbId}-${season}`);
         if (req.body.addOptions?.searchForMissingEpisodes && isOut(t) && process.env.MOCK_EMPTY_FIRST_SEARCH !== '1') for (const season of wanted) startDownload(t, { season, durationMs: 50_000 });
@@ -1179,10 +1239,12 @@ void app.register(
       }
       return [];
     });
-    r.put<{ Body: { seriesIds: number[]; monitored: boolean } }>('/series/editor', async (req) => {
+    r.put<{ Body: { seriesIds: number[]; monitored?: boolean; qualityProfileId?: number } }>('/series/editor', async (req) => {
       for (const n of req.body.seriesIds) {
         const t = TITLES.find((x) => x.type === 'tv' && x.n === n);
         if (!t) continue;
+        if (req.body.qualityProfileId) titleProfile.set(`tv-${t.tmdbId}`, req.body.qualityProfileId);
+        if (req.body.monitored === undefined) continue;
         if (req.body.monitored) unmonitored.delete(`tv-${t.tmdbId}`);
         else unmonitored.add(`tv-${t.tmdbId}`);
       }
