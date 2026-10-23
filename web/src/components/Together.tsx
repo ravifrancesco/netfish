@@ -356,10 +356,6 @@ export function TogetherNotes({ together }: { together: Together }) {
     lastHere.current = here;
   }, [room]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (together.ended) say(t('Room ended. Still playing for you.'));
-  }, [together.ended]);
-
   if (!note) return null;
   return (
     <div className="together-note" role="status">

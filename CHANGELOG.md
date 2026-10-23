@@ -7,6 +7,14 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.23 (2026-10-22)
+
+### Changed
+- **Watch together: ending a room takes everyone out of it.** When the host presses *End for everyone* (or the room closes), each player leaves the room by itself, the same as pressing *Leave*: the room pill goes, the room's link drops from the address and the film carries on from where it is. A note says *Room ended. Still playing for you.* for a few seconds. Before, everyone stayed in a room that no longer existed, with a "Room ended" pill, until they left it themselves. You can start a new room from the player straight away.
+
+### Update
+- **Server.**
+
 ## 0.7.22 (2026-10-20)
 
 ### Changed

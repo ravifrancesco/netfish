@@ -654,6 +654,19 @@ function Player() {
   useEffect(() => {
     if (remote && together.ended) leavePlayer();
   }, [remote, together.ended, leavePlayer]);
+  // The room ended (ended for everyone, or closed): out of it, as with Leave, still watching from here.
+  const [roomEnded, setRoomEnded] = useState(false);
+  useEffect(() => {
+    if (!roomId || remote || !together.ended) return;
+    setRoomEnded(true);
+    setRoomPanel(false);
+    navigate(`/watch/${itemId}`, { replace: true });
+  }, [together.ended]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!roomEnded) return;
+    const timer = setTimeout(() => setRoomEnded(false), 4000);
+    return () => clearTimeout(timer);
+  }, [roomEnded]);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -940,6 +953,11 @@ function Player() {
       }
     >
       {roomId && !remote && <TogetherNotes together={together} />}
+      {roomEnded && (
+        <div className="together-note" role="status">
+          <FishPair size={22} still /> {t('Room ended. Still playing for you.')}
+        </div>
+      )}
       {roomId && !remote && together.room?.playback.action === 'start' && !playing && !together.ended && (
         <div className="together-hint">{t("Press play when everyone's here.")}</div>
       )}
