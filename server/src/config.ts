@@ -40,8 +40,8 @@ export const config = {
   /** Where Netfish keeps its own small state (settings). A Docker volume in production. */
   dataDir: env('NETFISH_DATA_DIR') ?? path.resolve(process.cwd(), 'data'),
   trustProxy: env('TRUST_PROXY') === 'true',
-  /** After starting the channels over (or turning New titles on): hours New titles download whatever the download hours. */
-  freshRushHours: Math.max(0, Number(env('FRESH_RUSH_HOURS') ?? 3) || 0),
+  /** After Start: how far ahead New titles catch up, downloading whatever the hours (unset: the days ahead they download; 0: no catching up). */
+  freshRushHours: env('FRESH_RUSH_HOURS') === undefined ? undefined : Math.max(0, Number(env('FRESH_RUSH_HOURS')) || 0),
 
   jellyfin: {
     url: url('JELLYFIN_URL'),

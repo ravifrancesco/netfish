@@ -10,7 +10,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.7.35"
+    MARKETING_VERSION: "0.7.36"
     CURRENT_PROJECT_VERSION: "1"
 targets:
   Netfish:

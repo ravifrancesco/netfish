@@ -7,6 +7,18 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.36 (2026-10-23)
+
+### Changed
+- **Start catches up the next days, so the guide is complete straight away.** Instead of three hours of downloading whatever the hours, Start now:
+  - picks the whole week's New titles at once, the first of them for the coming days (from a few hours on), not days ahead as usual;
+  - downloads everything that's on in the next days (as many days as *Download ahead* says) straight away, whatever the download hours;
+  - leaves the rest to the usual schedule: each title its days ahead, in the download hours.
+  - `FRESH_RUSH_HOURS` in the stack now sets how far it catches up, in hours (0: no catching up).
+
+### Update
+- **Server.**
+
 ## 0.7.35 (2026-10-23)
 
 ### New

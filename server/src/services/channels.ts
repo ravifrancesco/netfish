@@ -9,7 +9,7 @@ import { jfImage } from '../lib/images';
 import { writeJson } from '../lib/storage';
 import { HttpError } from '../lib/upstream';
 import { inLanguage, t } from '../lib/i18n';
-import { FRESH_DEFAULTS, freshHidden, freshPlans, freshRetired, linkChannels, onFreshChange, runFresh, rushFresh, validFresh, type FreshPlan } from './fresh';
+import { FRESH_DEFAULTS, freshHidden, freshPlans, freshRetired, linkChannels, onFreshChange, runFresh, startFresh, validFresh, type FreshPlan } from './fresh';
 import { log, setLogTimeZone } from '../lib/log';
 
 /**
@@ -1629,18 +1629,18 @@ export async function rebuildGuide(user: SessionUser): Promise<ChannelAdmin> {
 }
 
 /**
- * Start (once the channels and New titles are set up): the guide made again from now, New titles
- * picked straight away, and what's due downloading straight away, whatever the hours, for a few
- * hours, so the guide fills with the real thing.
+ * Start (once the channels and New titles are set up): the guide made again from now, and New
+ * titles catching up: the week's picked now, what's on in the next days downloading straight
+ * away whatever the hours, so the guide is complete with the real thing.
  */
 export async function startChannels(user: SessionUser): Promise<ChannelAdmin> {
   if (!stored.settings.enabled) throw new HttpError(404, t('Channels are off'));
-  if (stored.settings.fresh?.enabled) {
-    stored.settings = { ...stored.settings, fresh: { ...stored.settings.fresh, running: true } };
-    rushFresh('Started');
-  }
+  const fresh = Boolean(stored.settings.fresh?.enabled);
+  if (fresh) stored.settings = { ...stored.settings, fresh: { ...stored.settings.fresh!, running: true } };
   save();
-  return rebuildGuide(user);
+  const done = await rebuildGuide(user);
+  if (fresh) void startFresh('Started');
+  return done;
 }
 
 /** Starts over with the automatic line-up (the library has changed a lot, or to undo edits). */

@@ -34,8 +34,10 @@ const WEEK = 7 * DAY;
 const GUESS: Record<MediaType, number> = { movie: 5 * GB, tv: 9 * GB };
 /** No release found for this long: given up on. */
 const GIVE_UP = 12 * 3600_000;
-/** After starting over: this long downloading whatever the hours (FRESH_RUSH_HOURS, 3 unless set). */
-const RUSH = config.freshRushHours * 3600_000;
+/** After Start: the catch-up, as far ahead as titles download (or FRESH_RUSH_HOURS). */
+const catchUpFor = (s: FreshSettings) => (config.freshRushHours ?? s.aheadDays * 24) * 3600_000;
+/** Catching up: the first new titles from this far ahead (time to download before they're on). */
+const CATCH_UP_LEAD = 6 * 3600_000;
 /** Just added: being looked for (a release grabbed in a few minutes). Past it, still nothing: it no longer takes a turn. */
 const LOOKING = 15 * 60_000;
 /**
@@ -103,7 +105,7 @@ interface Stored {
   stopped: string[];
   /** How many each channel has picked, ever: its turn (Netfish's own takes a documentary every other one). */
   turns: Record<string, number>;
-  /** Until then, what's due downloads whatever the hours (the channels were just started over, or New titles turned on). */
+  /** Until then (the days ahead after Start), catching up: picked for the next days, downloading whatever the hours. */
   rushUntil?: number;
 }
 
@@ -725,6 +727,8 @@ function byTurn(defs: ChannelDef[]): ChannelDef[] {
 let running: Promise<void> | undefined;
 let queued: Promise<void> | undefined;
 let lastWaiting: FreshStatus['waiting'];
+/** What the last look's picking came to (nothing more to pick: why). */
+let lastPlanning: FreshStatus['waiting'];
 let lastFree: number | undefined;
 
 /** One look (asked again while one is going: another straight after, with the latest settings). */
@@ -882,9 +886,7 @@ async function step(now: number) {
 
   // The download hours and speed, through qBittorrent (lowest priority too). A full disk stops them as well.
   const hours = inHours(s, now, settings.timeZone);
-  // Just started over (or New titles just turned on): the guide's to fill, whatever the hours.
-  const rushing = now < (stored.rushUntil ?? 0);
-  const go = (hours || rushing) && !lowDisk;
+  const go = hours && !lowDisk;
   if (has.qbittorrent()) {
     // In the order they'll be on: the title that airs first, and a show's episodes from the first.
     const hashes = stored.titles
@@ -923,10 +925,11 @@ async function step(now: number) {
   // The next one due to download (its airing is the admin's days away), then something new for the
   // guide. Not before Start: the channels are being set up.
   stored.log = stored.log.filter((x) => x.at > now - WEEK);
-  if (s.enabled && s.running === false) lastWaiting = 'not-started';
+  if (s.enabled && s.running === false) lastWaiting = lastPlanning = 'not-started';
   else {
     const starting = defs.length ? await startDue(s, go, lowDisk, now, hours) : undefined;
     const planning = await planOne(s, defs, now, settings.timeZone);
+    lastPlanning = planning;
     lastWaiting = starting ?? planning;
   }
   if (JSON.stringify(stored.titles.map((f) => [f.key, f.state, f.airAt])) !== before) onChange();
@@ -936,18 +939,32 @@ async function step(now: number) {
 /** When a planned title will start downloading: its time, in the download hours (straight away, just after starting over). */
 function startsAt(s: FreshSettings, f: Fresh, timeZone?: string): number {
   const at = Math.max(Date.now(), f.keptBy ? 0 : downloadAt(f, s));
-  return at < (stored.rushUntil ?? 0) ? at : nextInHours(s, at, timeZone);
+  return catchingUp(f, at) ? at : nextInHours(s, at, timeZone);
 }
 
+/** Caught up after Start: on in the days it catches up (downloading whatever the hours). */
+const catchingUp = (f: Fresh, now: number) => now < (stored.rushUntil ?? 0) && Math.min(f.notBefore, f.airAt ?? Infinity) < stored.rushUntil!;
+
 /**
- * The channels were just started over, or New titles turned on: for a few hours what's due
- * downloads whatever the hours, so the guide fills with them.
+ * Start: catching up, so the guide is complete straight away. The week's new titles are picked
+ * now, the first for the next days (not days ahead, as usual), and what's on in those days
+ * downloads at once, whatever the hours. After that, the usual: each its days ahead, in the hours.
  */
-export function rushFresh(why: string) {
-  if (!RUSH) return;
-  stored.rushUntil = Date.now() + RUSH;
-  log.info('new titles', `${why}: what's due downloads straight away for the next ${RUSH / 3600_000} hours, whatever the download hours`);
+export async function startFresh(why: string) {
+  if (!link) return;
+  const s = settingsOf(link.settings());
+  const span = catchUpFor(s);
+  if (!span) return void runFresh();
+  stored.rushUntil = Date.now() + span;
+  const days = Math.round((span / DAY) * 10) / 10;
+  log.info('new titles', `${why}: catching up the next ${days} day${days === 1 ? '' : 's'}: the week's new titles picked now, and what's on in them downloads straight away, whatever the download hours`);
   save();
+  // The week's picks (one a look), then everything due at once.
+  for (let i = 0; i < 60; i++) {
+    await runFresh();
+    if (lastPlanning !== undefined) break;
+  }
+  await downloadNow();
 }
 
 /** Starts the download of the planned title whose day has come (one a check, as many at once as the settings say). */
@@ -978,7 +995,8 @@ async function startDue(s: FreshSettings, go: boolean, lowDisk: boolean, now: nu
     .sort((a, b) => (a.airAt ?? a.notBefore) - (b.airAt ?? b.notBefore))[0];
   if (!due) return noted(undefined, 'nothing-due');
   if (lowDisk) return noted('disk', 'disk', due);
-  if (!go) return 'hours';
+  // Catching up after Start: what's on in those days, whatever the hours.
+  if (!go && !catchingUp(due, now)) return 'hours';
   if (used() + guess(due.mediaType) > s.maxGb * GB) return noted('space', 'space', due);
   const api = due.mediaType === 'movie' ? has.radarr() : has.sonarr();
   if (!api) return noted('services', 'services', due);
@@ -1129,9 +1147,11 @@ async function planOne(s: FreshSettings, defs: ChannelDef[], now: number, timeZo
   for (const def of order) {
     // Not more than its share: one finding nothing doesn't hand the week to another.
     if (pickedThisWeek(now, def.id) >= Math.ceil(share(def))) continue;
-    // Spread over the channel's week (its share of it), each far enough ahead to download in good time.
+    // Spread over the channel's week (its share of it), each far enough ahead to download in good
+    // time; catching up after Start, from a few hours on (it downloads straight away).
     const last = Math.max(0, ...mine(def.id).map((f) => f.notBefore));
-    const spread = Math.max(now + s.aheadDays * DAY, last + WEEK / Math.max(1, share(def)));
+    const soonest = now < (stored.rushUntil ?? 0) ? now + CATCH_UP_LEAD : now + s.aheadDays * DAY;
+    const spread = Math.max(soonest, last + WEEK / Math.max(1, share(def)));
     const turn = turnOf(def.id);
     for (const want of wantsOf(def.source, turn, def.source.kind === 'mix' ? (link?.short() ?? []) : [])) {
       // Netfish's own films: Friday's and Saturday's nine o'clock first.

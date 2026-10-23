@@ -253,7 +253,13 @@ export function ChannelSettings() {
               <button className="btn btn--primary" onClick={() => start.mutate()} disabled={start.isPending || save.isPending}>
                 {start.isPending ? <Spinner size={14} /> : <Play size={14} />} {start.isPending ? t('Starting…') : t('Start')}
               </button>
-              <span className="muted small">{t('When the channels and New titles are set up: makes the guide again, picks New titles and downloads what’s due straight away (whatever the download hours, for the next three hours).')}</span>
+              <span className="muted small">
+                {tn(
+                  data.fresh.aheadDays,
+                  'When the channels and New titles are set up: makes the guide again and catches up the next day, picking the week’s New titles now and downloading what’s on in it straight away, whatever the download hours.',
+                  'When the channels and New titles are set up: makes the guide again and catches up the next {n} days, picking the week’s New titles now and downloading what’s on in them straight away, whatever the download hours.',
+                )}
+              </span>
             </div>
           )}
           <div className="row-gap">
