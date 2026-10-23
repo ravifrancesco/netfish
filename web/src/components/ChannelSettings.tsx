@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, Eye, EyeOff, History, Plus, RadioTower, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Eye, EyeOff, History, Plus, RadioTower, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
 import type { ChannelAdmin, ChannelDef, ChannelSettings as Settings, ChannelSource } from '@netfish/shared';
 import { api } from '../api';
 import { ErrorState, Modal, Spinner, Switch, useToast } from './ui';
@@ -124,6 +124,15 @@ export function ChannelSettings() {
   // Every change also says where this device is, so the timetable follows the household's clock.
   const save = useMutation({ mutationFn: (patch: Partial<Settings>) => api.saveChannels({ ...patch, timeZone: zone() }), onSuccess: done, onError: (e) => toast('error', (e as Error).message) });
   const reset = useMutation({ mutationFn: api.resetChannels, onSuccess: done, onError: (e) => toast('error', (e as Error).message) });
+  // The guide made again from now: the channels as they are.
+  const rebuild = useMutation({
+    mutationFn: api.rebuildGuide,
+    onSuccess: (data) => {
+      done(data);
+      toast('ok', t('Guide made again from now.'));
+    },
+    onError: (e) => toast('error', (e as Error).message),
+  });
   const [confirmReset, setConfirmReset] = useState(false);
 
   if (q.isError) return <ErrorState error={q.error} retry={() => void q.refetch()} />;
@@ -222,9 +231,14 @@ export function ChannelSettings() {
           </ul>
           <AddChannel data={data} busy={save.isPending} onAdd={(def) => setChannels([...channels, { id: '', number: channels.length + 1, ...def }])} />
           <FreshTitles data={data} busy={save.isPending} save={(patch) => save.mutate(patch)} />
-          <button className="btn btn--ghost btn--sm" onClick={() => setConfirmReset(true)}>
-            {t('Start over with automatic channels')}
-          </button>
+          <div className="row-gap">
+            <button className="btn btn--ghost btn--sm" onClick={() => rebuild.mutate()} disabled={rebuild.isPending} title={t('Keeps your channels; what’s on now carries on')}>
+              {rebuild.isPending ? <Spinner size={14} /> : <RotateCcw size={14} />} {t('Rebuild the guide')}
+            </button>
+            <button className="btn btn--ghost btn--sm" onClick={() => setConfirmReset(true)}>
+              {t('Start over with automatic channels')}
+            </button>
+          </div>
         </>
       )}
       {confirmReset && (

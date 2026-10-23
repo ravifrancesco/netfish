@@ -1029,6 +1029,13 @@ export interface FreshStatus {
   profiles: { movie: Array<{ id: number; name: string }>; show: Array<{ id: number; name: string }> };
 }
 
+/** Settings → "Download now": what started, and what couldn't (and why). */
+export interface FreshNowResult {
+  status: FreshStatus;
+  started: string[];
+  failed: Array<{ title: string; reason: string }>;
+}
+
 /** What a look inside the download hours came to. */
 export type FreshNote = 'started' | 'downloading' | 'nothing-due' | 'disk' | 'space' | 'services' | 'add-failed' | 'already-there';
 

@@ -54,8 +54,8 @@ import { hideFromContinue, setPosition, setWatched } from './services/watched';
 import { readyToWatch } from './services/ready';
 import { command, control, createRoom, endRoom, getRoom, leave, listRooms, openStream, setTracks, setWaiting } from './services/together';
 import { listDevices, listScreens, openLive, playOn } from './services/screens';
-import { channelAdmin, channelsEnabled, keyOfItem, listChannels, resetChannels, updateChannels, watching } from './services/channels';
-import { freshRequested, freshStatus, keepFresh, noteChosen, removeFresh, runFresh } from './services/fresh';
+import { channelAdmin, channelsEnabled, keyOfItem, listChannels, rebuildGuide, resetChannels, updateChannels, watching } from './services/channels';
+import { downloadNow, freshRequested, freshStatus, keepFresh, noteChosen, removeFresh, runFresh } from './services/fresh';
 import { catalog } from './services/catalog';
 import { cleanupSuggestions, keepForGood } from './services/cleanup';
 import { playbackPrefs, setPlaybackPrefs } from './services/playbackPrefs';
@@ -479,6 +479,7 @@ export async function apiRoutes(app: FastifyInstance) {
     });
     api.get('/admin/channels', { preHandler: requireAdmin }, async (req) => channelAdmin(userOf(req)));
     api.get('/admin/channels/fresh', { preHandler: requireAdmin }, async () => freshStatus());
+    api.post('/admin/channels/fresh/now', { preHandler: requireAdmin }, async () => downloadNow());
     api.post('/admin/channels/fresh/run', { preHandler: requireAdmin }, async () => {
       await runFresh();
       return freshStatus();
@@ -493,6 +494,7 @@ export async function apiRoutes(app: FastifyInstance) {
     });
     api.put<{ Body: Record<string, unknown> }>('/admin/channels', { preHandler: requireAdmin }, async (req) => updateChannels(userOf(req), req.body ?? {}));
     api.post('/admin/channels/reset', { preHandler: requireAdmin }, async (req) => resetChannels(userOf(req)));
+    api.post('/admin/channels/rebuild', { preHandler: requireAdmin }, async (req) => rebuildGuide(userOf(req)));
     api.put<{ Params: { id: string }; Body: ServiceConnectionUpdate }>('/admin/connections/:id', { preHandler: requireAdmin }, async (req) =>
       updateConnection(req.params.id, req.body ?? {}),
     );

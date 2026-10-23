@@ -3,6 +3,7 @@ import type {
   AppConfig,
   Card,
   ChannelAdmin,
+  FreshNowResult,
   FreshStatus,
   ChannelSettings,
   ChannelsResponse,
@@ -174,6 +175,8 @@ export const api = {
   keepChannelTitle: (itemId: string) => call<{ ok: true; here: boolean }>('/channels/keep', { body: { itemId } }),
   freshStatus: () => call<FreshStatus>('/admin/channels/fresh'),
   freshRun: () => call<FreshStatus>('/admin/channels/fresh/run', { method: 'POST' }),
+  freshNow: () => call<FreshNowResult>('/admin/channels/fresh/now', { method: 'POST' }),
+  rebuildGuide: () => call<ChannelAdmin>('/admin/channels/rebuild', { method: 'POST' }),
   freshKeep: (key: string) => call<FreshStatus>('/admin/channels/fresh/keep', { body: { key } }),
   freshRemove: (key: string) => call<FreshStatus>('/admin/channels/fresh/remove', { body: { key } }),
 

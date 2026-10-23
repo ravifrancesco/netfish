@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { ChannelDef, ChannelSettings, ChannelSource, FreshEvent, FreshNote, FreshSettings, FreshState, FreshStatus, FreshTitle, MediaType } from '@netfish/shared';
+import type { ChannelDef, ChannelSettings, ChannelSource, FreshEvent, FreshNote, FreshNowResult, FreshSettings, FreshState, FreshStatus, FreshTitle, MediaType } from '@netfish/shared';
 import { config, has } from '../config';
 import { posterOf, radarr, sonarr, type ArrDisk, type ArrLookup, type ArrQueueRecord, type ArrRootFolder, type RadarrMovie, type SonarrSeries } from '../clients/arr';
 import { qbittorrent } from '../clients/qbittorrent';
@@ -77,6 +77,8 @@ interface Fresh {
   image?: string;
   genres: string[];
   episodes?: Episode[];
+  /** Started with "Download now": downloads whatever the hours. */
+  rush?: boolean;
 }
 
 interface Stored {
@@ -649,13 +651,20 @@ async function step(now: number) {
           .flatMap((q) => (q.downloadId ? [q.downloadId.toLowerCase()] : [])),
       );
     const unique = [...new Set(hashes)];
-    if (!go && unique.length) {
-      const fresh = unique.filter((h) => !stored.stopped.includes(h));
+    // Started with "Download now": not held to the hours.
+    const rushed = new Set(
+      stored.titles.filter((f) => f.rush && f.state === 'downloading').flatMap((f) => queueOf(f).flatMap((q) => (q.downloadId ? [q.downloadId.toLowerCase()] : []))),
+    );
+    const held = unique.filter((h) => !rushed.has(h));
+    if (!go && held.length) {
+      const fresh = held.filter((h) => !stored.stopped.includes(h));
       if (fresh.length) await settle(qbittorrent.stop(fresh), undefined);
-      stored.stopped = [...new Set([...stored.stopped, ...unique])];
-    } else if (go && stored.stopped.length) {
-      await settle(qbittorrent.start(stored.stopped), undefined);
-      stored.stopped = [];
+      stored.stopped = [...new Set([...stored.stopped, ...held])];
+    }
+    const release = stored.stopped.filter((h) => go || rushed.has(h));
+    if (release.length) {
+      await settle(qbittorrent.start(release), undefined);
+      stored.stopped = stored.stopped.filter((h) => !release.includes(h));
     }
     if (unique.length) {
       await settle(qbittorrent.limit(unique, s.maxSpeed > 0 ? (s.maxSpeed * MB) / unique.length : 0), undefined);
@@ -714,6 +723,64 @@ async function startDue(s: FreshSettings, go: boolean, lowDisk: boolean, now: nu
   due.state = 'downloading';
   due.size = guess(due.mediaType);
   return undefined;
+}
+
+/**
+ * Settings → "Download now": every planned title whose download time has passed (or kept)
+ * starts now, whatever the hours and more than one at a time, and paused ones carry on: to see
+ * that they come. The space limits still hold.
+ */
+export async function downloadNow(): Promise<FreshNowResult> {
+  while (running) await running;
+  const started: string[] = [];
+  const failed: FreshNowResult['failed'] = [];
+  running = (async () => {
+    if (!link) return;
+    const s = settingsOf(link.settings());
+    const now = Date.now();
+    for (const f of stored.titles) {
+      f.airAt = link.airAt(f.key);
+      if (f.state === 'downloading') f.rush = true;
+    }
+    const due = stored.titles
+      .filter((f) => f.state === 'planned' && (f.keptBy || (f.airAt !== undefined && now >= downloadAt(f, s)!)))
+      .sort((a, b) => (a.airAt ?? now) - (b.airAt ?? now));
+    for (const f of due) {
+      if (lastFree !== undefined && lastFree < s.minFreeGb * GB) {
+        failed.push({ title: f.title, reason: t('Disk nearly full.') });
+        continue;
+      }
+      if (used() + guess(f.mediaType) > s.maxGb * GB) {
+        failed.push({ title: f.title, reason: t('No space left for it.') });
+        continue;
+      }
+      if (!(f.mediaType === 'movie' ? has.radarr() : has.sonarr())) {
+        failed.push({ title: f.title, reason: t('Needs Radarr (films) or Sonarr (shows).') });
+        continue;
+      }
+      let reason: string | undefined;
+      const id = await settle(f.mediaType === 'movie' ? addMovie(f, s) : addShow(f, s), undefined, (err) => {
+        reason = (err as Error).message;
+        console.warn('[fresh] adding', f.title, reason);
+      });
+      if (id === undefined) {
+        noteEvent(f, reason ? 'add-failed' : 'already-there', now, reason);
+        failed.push({ title: f.title, reason: reason ?? t('Already in Radarr or Sonarr.') });
+        stored.titles = stored.titles.filter((x) => x !== f);
+        link.drop([f.key]);
+        continue;
+      }
+      noteEvent(f, 'started', now);
+      started.push(f.title);
+      Object.assign(f, { arrId: id, startedAt: now, state: 'downloading', size: guess(f.mediaType), rush: true });
+    }
+    save();
+    onChange();
+  })().finally(() => (running = undefined));
+  await running;
+  // Straight on: torrents started, the ones paused outside the hours going again.
+  await runFresh();
+  return { status: await freshStatus(), started, failed };
 }
 
 /**
@@ -792,7 +859,7 @@ export async function freshStatus(): Promise<FreshStatus> {
     state: f.state,
     size: f.state === 'planned' ? guess(f.mediaType) : f.size,
     progress: f.progress,
-    paused: f.state === 'downloading' && settings ? !inHours(s, Date.now(), settings.timeZone) && has.qbittorrent() : undefined,
+    paused: f.state === 'downloading' && settings ? !f.rush && !inHours(s, Date.now(), settings.timeZone) && has.qbittorrent() : undefined,
     addedAt: new Date(f.addedAt).toISOString(),
     airAt: iso(f.airAt),
     // Asked for: as soon as it can.

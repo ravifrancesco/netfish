@@ -123,6 +123,10 @@ const IT: Record<string, string> = {
   Stereo: 'Stereo',
   Mono: 'Mono',
   Forced: 'Forzati',
+  'Disk nearly full.': 'Disco quasi pieno.',
+  'No space left for it.': 'Non c’è più spazio.',
+  'Needs Radarr (films) or Sonarr (shows).': 'Serve Radarr (film) o Sonarr (serie).',
+  'Already in Radarr or Sonarr.': 'Già in Radarr o Sonarr.',
   'Track {n}': 'Traccia {n}',
   Unknown: 'Sconosciuta',
 

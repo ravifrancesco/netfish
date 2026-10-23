@@ -7,6 +7,15 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.25 (2026-10-22)
+
+### New
+- **Settings → Channels → New titles: *Download now*.** Starts straight away every New title whose download time has passed (and any kept one), whatever the download hours and more than one at a time, and lets ones paused outside the hours carry on. The button says how many (*Download 2 now*), and afterwards what started and what couldn't, with the reason (disk nearly full, no space left, or what Radarr or Sonarr said). What it starts isn't paused again outside the hours. The space limits still hold.
+- **Settings → Channels: *Rebuild the guide*.** Makes every channel's schedule again from now, keeping your channels and settings (unlike *Start over with automatic channels*). What's on now carries on; everything after it is picked again, New titles placed again too, and their download times follow.
+
+### Update
+- **Server.**
+
 ## 0.7.24 (2026-10-22)
 
 ### Changed

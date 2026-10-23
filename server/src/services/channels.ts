@@ -1269,6 +1269,27 @@ export async function updateChannels(user: SessionUser, patch: Partial<Record<ke
   return channelAdmin(user);
 }
 
+/**
+ * Makes the guide again from now, channels and settings as they are: what's on now carries on,
+ * everything after it is picked again (new titles placed again too).
+ */
+export async function rebuildGuide(user: SessionUser): Promise<ChannelAdmin> {
+  if (!stored.settings.enabled) throw new HttpError(404, t('Channels are off'));
+  const now = Date.now();
+  const real = await getLibrary(user, true);
+  const lib = withPlans(real);
+  for (const sched of Object.values(stored.schedules)) {
+    truncate(sched, lib, now + 1);
+    sched.freshRoom = [];
+  }
+  const visible = stored.settings.channels.filter((c) => !c.hidden);
+  for (const def of visible) extend(def, real, now, timeZone());
+  save();
+  // The new titles' times follow the new guide straight away.
+  void runFresh();
+  return channelAdmin(user);
+}
+
 /** Starts over with the automatic line-up (the library has changed a lot, or to undo edits). */
 export async function resetChannels(user: SessionUser): Promise<ChannelAdmin> {
   const channels = automatic(await getLibrary(user, true));

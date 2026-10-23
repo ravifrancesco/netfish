@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
+import { Check, Download, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 import type { ChannelAdmin, ChannelSettings, FreshEvent, FreshSettings, FreshStatus, FreshTitle } from '@netfish/shared';
 import { api } from '../api';
 import { Progress, Switch, useToast } from './ui';
@@ -172,6 +172,21 @@ export function FreshTitles({ data, save, busy }: { data: ChannelAdmin; save: (p
     },
     onError: (e) => toast('error', (e as Error).message),
   });
+  // "Download now": what's past its download time (or kept) and what's paused outside the hours.
+  const now = useMutation({
+    mutationFn: api.freshNow,
+    onSuccess: (r) => {
+      qc.setQueryData(['freshStatus'], r.status);
+      void qc.invalidateQueries({ queryKey: ['channels'] });
+      const said = [
+        r.started.length ? t('Started: {list}.', { list: r.started.join(', ') }) : '',
+        ...r.failed.map((f) => t('{title}: {reason}', { title: f.title, reason: f.reason })),
+      ].filter(Boolean);
+      toast(r.failed.length && !r.started.length ? 'error' : 'ok', said.join(' ') || t('Nothing to start: everything due is downloading.'));
+    },
+    onError: (e) => toast('error', (e as Error).message),
+  });
+  const dueNow = (s?.titles ?? []).filter((f) => (f.state === 'planned' && f.downloadAt && Date.parse(f.downloadAt) <= Date.now()) || (f.state === 'downloading' && f.paused)).length;
   const services = s?.services;
   const canFind = services ? services.seerr && (services.radarr || services.sonarr) : true;
   const names = new Map(data.channels.map((c) => [c.id, `${c.number} · ${c.name}`]));
@@ -279,6 +294,14 @@ export function FreshTitles({ data, save, busy }: { data: ChannelAdmin; save: (p
               )}
             </span>
             <span className="spacer" />
+            <button
+              className="btn btn--ghost btn--sm"
+              onClick={() => now.mutate()}
+              disabled={now.isPending || !dueNow}
+              title={t('Starts what’s past its download time now, whatever the hours')}
+            >
+              <Download size={14} /> {now.isPending ? t('Starting…') : dueNow ? tn(dueNow, 'Download {n} now', 'Download {n} now') : t('Nothing due')}
+            </button>
             <button className="btn btn--ghost btn--sm" onClick={() => check.mutate()} disabled={check.isPending}>
               <RefreshCw size={14} className={check.isPending ? 'spin' : undefined} /> {check.isPending ? t('Checking…') : t('Check now')}
             </button>
