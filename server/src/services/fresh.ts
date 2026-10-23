@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { ChannelDef, ChannelSettings, ChannelSource, FreshEvent, FreshNote, FreshNowResult, FreshSettings, FreshState, FreshStatus, FreshTitle, MediaType } from '@netfish/shared';
 import { config, has } from '../config';
-import { posterOf, radarr, sonarr, type ArrDisk, type ArrLookup, type ArrQueueRecord, type ArrRootFolder, type RadarrMovie, type SonarrSeries } from '../clients/arr';
+import { posterOf, radarr, sonarr, type ArrDisk, type ArrLookup, type ArrQueueRecord, type ArrRelease, type ArrRootFolder, type RadarrMovie, type SonarrSeries } from '../clients/arr';
 import { qbittorrent } from '../clients/qbittorrent';
 import { seerr, type SeerrResult } from '../clients/seerr';
 import { settle } from '../lib/async';
@@ -41,7 +41,7 @@ const SEARCH_AGAIN = 30 * 60_000;
 /** Deleted this long after its last airing ends. */
 const AFTER_AIRING = 15 * 60_000;
 
-export const FRESH_DEFAULTS: FreshSettings = { enabled: false, maxGb: 60, minFreeGb: 50, fromHour: 1, toHour: 8, maxSpeed: 0, perWeek: 3, aheadDays: 3 };
+export const FRESH_DEFAULTS: FreshSettings = { enabled: false, maxGb: 60, minFreeGb: 50, fromHour: 1, toHour: 8, maxSpeed: 0, perWeek: 3, aheadDays: 3, pick: 'smallest' };
 
 interface Episode {
   season: number;
@@ -449,7 +449,8 @@ async function addMovie(f: Fresh, s: FreshSettings): Promise<number | undefined>
     monitored: true,
     minimumAvailability: 'released',
     tags: [tag],
-    addOptions: { searchForMovie: true },
+    // Netfish's pick: it looks up the releases itself (searchAgain), so Radarr doesn't grab its own.
+    addOptions: { searchForMovie: s.pick === 'profile' },
   } as ArrLookup);
   f.poster ??= posterOf(movie.images);
   return movie.id;
@@ -477,18 +478,52 @@ async function addShow(f: Fresh, s: FreshSettings): Promise<number | undefined> 
     seasonFolder: true,
     tags: [tag],
     seasons: (lookup.seasons ?? []).map((x) => ({ seasonNumber: x.seasonNumber, monitored: x.seasonNumber === 1 })),
-    addOptions: { monitor: 'firstSeason', searchForMissingEpisodes: true },
+    addOptions: { monitor: 'firstSeason', searchForMissingEpisodes: s.pick === 'profile' },
   } as ArrLookup);
   f.poster ??= posterOf(series.images);
   return series.id;
 }
 
-/** Asks Radarr (the film) or Sonarr (its first season) to look for it again. */
-async function searchAgain(f: Fresh, now: number) {
+/** The smallest at 1080p (then 720p), the well-shared ones first: a tiny release nobody seeds never finishes. */
+function smallestOf(list: ArrRelease[]): ArrRelease | undefined {
+  for (const resolution of [1080, 720]) {
+    const at = list.filter((r) => r.quality?.quality?.resolution === resolution);
+    const shared = at.filter((r) => r.protocol !== 'torrent' || (r.seeders ?? 0) >= 3);
+    const pick = [...(shared.length ? shared : at)].sort((a, b) => a.size - b.size)[0];
+    if (pick) return pick;
+  }
+  return undefined;
+}
+
+/**
+ * Netfish's pick: what Radarr/Sonarr find for it (as Interactive Search lists it), the smallest
+ * 1080p release they'd take (a show's first season whole). "episodes": a show with no whole season
+ * out there, only episodes (Sonarr picks those).
+ */
+async function grabSmallest(f: Fresh, arrId: number): Promise<'grabbed' | 'episodes' | 'none'> {
+  const found = f.mediaType === 'movie' ? await radarr.releases(arrId) : await sonarr.releases(arrId, 1);
+  // Ones they'd take, not a sample or a fake (a gigabyte at least), with someone to download from.
+  const takes = found.filter((r) => !r.rejected && r.size >= GB && (r.protocol !== 'torrent' || (r.seeders ?? 0) > 0));
+  const pick = smallestOf(f.mediaType === 'movie' ? takes : takes.filter((r) => r.fullSeason));
+  if (pick) {
+    await (f.mediaType === 'movie' ? radarr : sonarr).grab(pick.guid, pick.indexerId);
+    return 'grabbed';
+  }
+  return f.mediaType === 'tv' && takes.length ? 'episodes' : 'none';
+}
+
+/** Looks for it (again): Netfish's pick, the smallest at 1080p, or Radarr's (the film) or Sonarr's (its first season). */
+async function searchAgain(f: Fresh, now: number, s: FreshSettings) {
   if (f.arrId === undefined) return;
+  const arrId = f.arrId;
   f.searchedAt = now;
-  await settle(f.mediaType === 'movie' ? radarr.search([f.arrId]) : sonarr.searchSeason(f.arrId, 1), undefined, (err) =>
-    console.warn('[fresh] searching again', f.title, (err as Error).message),
+  await settle(
+    (async () => {
+      const mine = s.pick === 'profile' ? 'theirs' : await grabSmallest(f, arrId);
+      if (mine === 'theirs' || mine === 'episodes') await (f.mediaType === 'movie' ? radarr.search([arrId]) : sonarr.searchSeason(arrId, 1));
+    })(),
+    undefined,
+    (err) => console.warn('[fresh] searching', f.title, (err as Error).message),
   );
 }
 
@@ -557,6 +592,9 @@ async function step(now: number) {
   const queueOf = (f: Fresh) => (f.mediaType === 'movie' ? movieQueue.filter((q) => q.movieId === f.arrId) : showQueue.filter((q) => q.seriesId === f.arrId));
   const gone: Fresh[] = [];
   const looking: Fresh[] = [];
+  // How long since it was last looked for (Netfish's pick: one not looked for yet, straight away).
+  const waited = (f: Fresh) =>
+    f.searchedAt !== undefined ? now - f.searchedAt : s.pick === 'profile' ? now - (f.startedAt ?? f.addedAt) : Infinity;
 
   for (const f of stored.titles) {
     f.airAt = link.airAt(f.key);
@@ -593,15 +631,16 @@ async function step(now: number) {
         noteEvent(f, 'nothing-found', now);
         await settle(remove(f, []), undefined);
         gone.push(f);
-      } else if (f.state === 'downloading' && now - (f.searchedAt ?? f.startedAt ?? f.addedAt) > SEARCH_AGAIN) {
-        // The search when it was added can find nothing it takes (indexers busy, many added at once): again.
+      } else if (f.state === 'downloading' && waited(f) > SEARCH_AGAIN) {
+        // Not looked for yet (Netfish picks it), or the last look found nothing it takes (indexers
+        // busy, many added at once): looked for (again).
         looking.push(f);
       }
     }
   }
   // One looked for again (the one waiting longest): never a burst of searches.
   const next = looking.sort((a, b) => (a.searchedAt ?? a.startedAt ?? a.addedAt) - (b.searchedAt ?? b.startedAt ?? b.addedAt))[0];
-  if (next && !gone.includes(next)) await searchAgain(next, now);
+  if (next && !gone.includes(next)) void searchAgain(next, now, s);
   // Bigger than the space left, now the release is known: the newest download goes.
   const limit = s.maxGb * GB;
   const newest = stored.titles.filter((f) => f.state === 'downloading' && !f.keptBy && !gone.includes(f)).sort((a, b) => b.addedAt - a.addedAt)[0];
@@ -750,6 +789,8 @@ async function startDue(s: FreshSettings, go: boolean, lowDisk: boolean, now: nu
   due.startedAt = now;
   due.state = 'downloading';
   due.size = guess(due.mediaType);
+  // Netfish's pick: it looks for the smallest release now (Radarr/Sonarr didn't search on adding).
+  if (s.pick !== 'profile') void searchAgain(due, now, s);
   return undefined;
 }
 
@@ -771,13 +812,13 @@ export async function downloadNow(): Promise<FreshNowResult> {
       f.airAt = link.airAt(f.key);
       if (f.state === 'downloading') f.rush = true;
     }
-    // Added, but nothing grabbed yet: the one on first looked for again now (the rest, one a
-    // check: indexers turn away bursts of searches).
+    // Added, but nothing grabbed yet: one looked for again now, the one waiting longest (the rest
+    // one a check: indexers turn away bursts of searches).
     const looking = stored.titles
-      .filter((f) => f.state === 'downloading' && f.progress === undefined && now - (f.searchedAt ?? 0) > 5 * 60_000)
-      .sort((a, b) => (a.airAt ?? a.notBefore) - (b.airAt ?? b.notBefore))[0];
+      .filter((f) => f.state === 'downloading' && f.progress === undefined)
+      .sort((a, b) => (a.searchedAt ?? 0) - (b.searchedAt ?? 0) || (a.airAt ?? a.notBefore) - (b.airAt ?? b.notBefore))[0];
     if (looking) {
-      await searchAgain(looking, now);
+      void searchAgain(looking, now, s);
       searched.push(looking.title);
     }
     const due = stored.titles
@@ -937,6 +978,7 @@ export function validFresh(v: unknown, current?: FreshSettings): FreshSettings {
     aheadDays: num(x.aheadDays, base.aheadDays, 1, 7),
     movieProfile: 'movieProfile' in x ? profile(x.movieProfile) : base.movieProfile,
     showProfile: 'showProfile' in x ? profile(x.showProfile) : base.showProfile,
+    pick: x.pick === 'smallest' || x.pick === 'profile' ? x.pick : (base.pick ?? 'smallest'),
   };
 }
 

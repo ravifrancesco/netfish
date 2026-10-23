@@ -984,6 +984,11 @@ export interface FreshSettings {
   /** Radarr's and Sonarr's quality profiles for them (their first one otherwise). */
   movieProfile?: number;
   showProfile?: number;
+  /**
+   * Which release: the smallest at 1080p that Radarr/Sonarr would take (Netfish picks it from what
+   * they find), or the one they'd pick themselves (the best their profile allows).
+   */
+  pick?: 'smallest' | 'profile';
 }
 
 /** planned: in the guide, not downloading yet. */

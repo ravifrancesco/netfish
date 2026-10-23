@@ -7,6 +7,17 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.28 (2026-10-22)
+
+### Changed
+- **New titles: the smallest release at 1080p.** They're on for a few days and then deleted, so Netfish now picks their release itself instead of leaving it to Radarr and Sonarr, which go for the best their quality profile allows (with *Any*, a 40 GB 4K season).
+  - It adds the title without letting Radarr/Sonarr grab, looks at what they find (the list Interactive Search shows), and grabs the **smallest 1080p release they'd take**: not turned down by the profile, at least 1 GB (no samples or fakes), with people sharing it (3 seeders or more first). No 1080p: the smallest 720p. A show: its first season as one download. If there's no whole season out there, Sonarr gets the episodes as it would.
+  - Found nothing it would take (indexers busy, nothing out yet): it looks again every half hour, one title per check, as before.
+  - **Settings → New titles → Which release**: *The smallest at 1080p* (new default) or *Radarr's and Sonarr's choice* (as before). Film and show quality still decide what they'd take.
+
+### Update
+- **Server.**
+
 ## 0.7.27 (2026-10-22)
 
 ### Fixed

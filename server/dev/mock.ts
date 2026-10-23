@@ -912,6 +912,14 @@ function queueRecords(type: 'movie' | 'tv') {
     });
 }
 
+/** MOCK_EMPTY_FIRST_SEARCH=1: a title's first search finds nothing (indexers busy); later ones do. */
+const searchedOnce = new Set<string>();
+function emptyFirst(key: string) {
+  if (process.env.MOCK_EMPTY_FIRST_SEARCH !== '1' || searchedOnce.has(key)) return false;
+  searchedOnce.add(key);
+  return true;
+}
+
 function fakeReleases(t: Title, season?: number, episode?: number) {
   const ep = episode ? `E${String(episode).padStart(2, '0')}` : '';
   const base = `${t.title.replace(/[^A-Za-z0-9]+/g, '.')}.${season ? `S${String(season).padStart(2, '0')}${ep}` : t.year}`;
@@ -933,7 +941,7 @@ function fakeReleases(t: Title, season?: number, episode?: number) {
     const guid = `mock-${crypto.createHash('md5').update(title).digest('hex').slice(0, 12)}`;
     releaseCache.set(guid, { title: t, season, release: title, quality, languages });
     return {
-      guid, indexerId: 1 + (i % 3), indexer: ['FishTracker', 'ReefNZB', 'TidalTorrents'][i % 3], title, size: (season ? 14 : 6) * 1024 ** 3 + i * 3e8,
+      guid, indexerId: 1 + (i % 3), indexer: ['FishTracker', 'ReefNZB', 'TidalTorrents'][i % 3], title, size: (season ? 14 : 6) * 1024 ** 3 + ((i * 7 + 5) % 12) * 3e8, // sizes in no particular order
       seeders, leechers: Math.round(seeders / 3), quality: { quality: { name: quality, resolution: Number(quality.match(/\d{3,4}/)?.[0] ?? 0) } },
       languages: langList(languages), ageHours: 24 * (i + 2), protocol: 'torrent',
       rejected: !languages.includes('English'), rejections: languages.includes('English') ? [] : ['Language is not wanted in profile'],
@@ -1033,7 +1041,7 @@ void app.register(
     r.get<{ Querystring: Q }>('/release', async (req) => {
       await sleep(1500);
       const t = TITLES.find((x) => x.type === 'movie' && x.n === Number(req.query.movieId));
-      if (!t) return [];
+      if (!t || emptyFirst(`movie-${t.n}`)) return [];
       // Like Radarr: before a movie is available, every release is turned down for it.
       return isOut(t) ? fakeReleases(t) : fakeReleases(t).map((r) => ({ ...r, rejected: true, rejections: [...(r.rejections ?? []), `Movie ${t.title} is not available`] }));
     });
@@ -1228,6 +1236,7 @@ void app.register(
         return t ? fakeReleases(t, season, episode) : [];
       }
       const t = TITLES.find((x) => x.type === 'tv' && x.n === Number(req.query.seriesId));
+      if (t && emptyFirst(`tv-${t.n}`)) return [];
       return t ? fakeReleases(t, Number(req.query.seasonNumber ?? 1)) : [];
     });
     r.post<{ Body: { guid: string } }>('/release', async (req, reply) => {

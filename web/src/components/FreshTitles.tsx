@@ -265,6 +265,14 @@ export function FreshTitles({ data, save, busy }: { data: ChannelAdmin; save: (p
                 ))}
               </select>
             </label>
+            <label className="fresh__field">
+              <span>{t('Which release')}</span>
+              <select className="select" value={fresh.pick ?? 'smallest'} onChange={(e) => set({ pick: e.target.value as FreshSettings['pick'] })}>
+                <option value="smallest">{t('The smallest at 1080p')}</option>
+                <option value="profile">{t('Radarr’s and Sonarr’s choice')}</option>
+              </select>
+              <span className="muted small">{fresh.pick === 'profile' ? t('The best their quality profile allows') : t('Among what their quality profile allows')}</span>
+            </label>
             {services?.radarr && Boolean(s?.profiles.movie.length) && (
               <label className="fresh__field">
                 <span>{t('Film quality')}</span>
