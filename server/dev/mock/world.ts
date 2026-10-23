@@ -23,6 +23,8 @@ export interface Title {
   lang: string;
   seasons: number;
   rating: number;
+  /** A show's episodes, in minutes (48 if not given). */
+  runtime?: number;
 }
 
 function hash(s: string) {
@@ -83,6 +85,22 @@ export const TITLES: Title[] = [
   T(109, 'Salt Marsh', 2022, 2, ['Mystery'], 'A missing birdwatcher, a marsh full of secrets, and a village that would rather not know.'),
   T(110, 'Krill Chill', 2026, 1, ['Animation', 'Comedy'], 'Very small creatures, very big feelings.'),
   { ...T(111, 'Blue Worlds', 2020, 1, ['Documentary'], "The planet's oceans, from coral reefs to the deep sea, and the wildlife that lives there."), rating: 8.7 },
+  // MOCK_MORE_FRESH=1: well-liked titles nobody has, for New titles to share out between channels.
+  ...(process.env.MOCK_MORE_FRESH
+    ? [
+        { ...M(40, 'Undertow', 2021, ['Drama', 'Thriller'], 'A lifeguard who saw too much is pulled into a town that would rather forget.'), rating: 8.1 },
+        { ...M(41, 'The Lighthouse Keeper', 2019, ['Drama'], 'Thirty winters alone on a rock, and one storm that brings a stranger ashore.'), rating: 7.9 },
+        { ...M(42, 'Cold Harbour', 2022, ['Crime', 'Thriller'], 'A customs officer finds a container that was never meant to be opened.'), rating: 7.8 },
+        { ...M(43, 'Second Wind', 2020, ['Drama', 'Comedy'], 'Two retired sailors steal back the boat they lost forty years ago.'), rating: 7.7 },
+        { ...M(44, 'The Long Swim', 2023, ['Drama'], 'A swimmer attempts the channel crossing her mother never finished.'), rating: 7.6 },
+        { ...M(45, 'Deadwater', 2018, ['Thriller', 'Mystery'], 'A sailing race, a missing crew member, and six suspects on one boat.'), rating: 7.5 },
+        { ...T(120, 'Shore Leave', 2021, 2, ['Comedy'], 'A ferry crew with too much time between crossings.'), rating: 8.2, runtime: 22 },
+        { ...T(122, 'Bait & Tackle', 2019, 3, ['Comedy'], 'A family fishing shop, and the regulars who never buy anything.'), rating: 8.0, runtime: 22 },
+        { ...T(123, 'Harbour Masters', 2022, 1, ['Comedy'], 'The worst-run marina on the coast, and the inspector sent to close it.'), rating: 7.9, runtime: 24 },
+        { ...T(124, 'Squid Club', 2020, 2, ['Animation', 'Comedy'], 'Grown-up cephalopods with grown-up problems.'), rating: 8.1, runtime: 22 },
+        { ...T(125, 'Deep Fried', 2023, 1, ['Animation', 'Comedy'], 'A seaside chip shop run by a very stressed crab.'), rating: 7.8, runtime: 22 },
+      ]
+    : []),
 ];
 
 export const titleByTmdb = new Map(TITLES.map((t) => [`${t.type}-${t.tmdbId}`, t]));

@@ -308,6 +308,8 @@ interface Want {
   recent?: boolean;
   /** Sitcoms: short episodes. */
   shortEpisodes?: boolean;
+  /** Genres it must have as well (all of them): grown-up cartoons are animation and comedy. */
+  need?: number[];
   /** About nature (wildlife, oceans, the planet): Netfish's documentaries. */
   nature?: boolean;
   /** How well liked, at least (TMDB's score and its number of votes): 6.8 by 200 people unless said. */
@@ -319,13 +321,19 @@ interface Want {
 export function wantsOf(source: ChannelSource, turn = 0): Want[] {
   switch (source.kind) {
     case 'mix': {
-      // Every other one a nature documentary, and a much-liked one: a series' first season for
-      // the weekday one o'clock, or a film for the documentary nights (each in turn; the other
-      // if there's none, then a film). Otherwise a film for nine o'clock.
-      const series: Want = { mediaType: 'tv', genres: [DOCUMENTARY], avoid: [...GRIM, ...NOT_NATURE], nature: true, minRating: 8, minVotes: 80 };
-      const film: Want = { mediaType: 'movie', genres: [DOCUMENTARY], avoid: [...GRIM, ...NOT_NATURE], nature: true, minRating: 7.5, minVotes: 150 };
-      const documentaries = turn % 2 === 1 ? (Math.floor(turn / 2) % 2 ? [film, series] : [series, film]) : [];
-      return [...documentaries, { mediaType: 'movie', genres: [], avoid: [ANIMATION, FAMILY, DOCUMENTARY, HORROR] }];
+      // Something of every kind it plays, in turn: a film for nine o'clock (Friday's and
+      // Saturday's first), a much-liked nature documentary (a series' first season for one
+      // o'clock, or a film for a documentary night, each in turn), a sitcom for the afternoon,
+      // another film, grown-up animation for the evening. A film if none of those can be found.
+      const film: Want = { mediaType: 'movie', genres: [], avoid: [ANIMATION, FAMILY, DOCUMENTARY, HORROR] };
+      const docSeries: Want = { mediaType: 'tv', genres: [DOCUMENTARY], avoid: [...GRIM, ...NOT_NATURE], nature: true, minRating: 8, minVotes: 80 };
+      const docFilm: Want = { mediaType: 'movie', genres: [DOCUMENTARY], avoid: [...GRIM, ...NOT_NATURE], nature: true, minRating: 7.5, minVotes: 150 };
+      const sitcom: Want = { mediaType: 'tv', genres: [COMEDY], avoid: [ANIMATION, KIDS, DOCUMENTARY], shortEpisodes: true };
+      // ("Family" is fine: The Simpsons is Animation, Comedy, Family. Kids isn't.)
+      const cartoon: Want = { mediaType: 'tv', genres: [ANIMATION], need: [COMEDY], avoid: [KIDS] };
+      const documentaries = Math.floor(turn / 5) % 2 ? [docFilm, docSeries] : [docSeries, docFilm];
+      const kinds = [[film], documentaries, [sitcom], [film], [cartoon]][turn % 5];
+      return kinds.includes(film) ? kinds : [...kinds, film];
     }
     case 'cartoons':
       return [{ mediaType: 'tv', genres: [ANIMATION], avoid: [] }];
@@ -356,6 +364,7 @@ const dateOf = (r: SeerrResult) => Date.parse((r.mediaType === 'tv' ? r.firstAir
 export function suits(r: SeerrResult, want: Want, now: number): boolean {
   const genres = r.genreIds ?? [];
   if (want.genres.length && !genres.some((g) => want.genres.includes(g))) return false;
+  if (want.need?.some((g) => !genres.includes(g))) return false;
   if (genres.some((g) => want.avoid.includes(g))) return false;
   if ((r.voteAverage ?? 0) < (want.minRating ?? 6.8) || (r.voteCount ?? 0) < (want.minVotes ?? 200)) return false;
   if (want.nature && !NATURE.test(`${r.title ?? r.name ?? ''} ${r.overview ?? ''}`)) return false;
@@ -879,7 +888,7 @@ async function step(now: number) {
   // The next one due to download (its airing is the admin's days away), then something new for the guide.
   stored.log = stored.log.filter((x) => x.at > now - WEEK);
   const starting = defs.length ? await startDue(s, go, lowDisk, now, hours) : undefined;
-  const planning = await planOne(s, defs, now);
+  const planning = await planOne(s, defs, now, settings.timeZone);
   lastWaiting = starting ?? planning;
   if (JSON.stringify(stored.titles.map((f) => [f.key, f.state, f.airAt])) !== before) onChange();
   save();
@@ -1018,37 +1027,59 @@ export async function downloadNow(): Promise<FreshNowResult> {
   return { status: await freshStatus(), started, searched, failed };
 }
 
+/** A channel's turn: how many new titles it has picked (Netfish's own goes round its kinds by it). */
+const turnOf = (channelId: string) => stored.turns[channelId] ?? 0;
+
 /**
- * A channel's turn (Netfish's own takes a documentary on odd ones): a documentary when its last
- * new title wasn't one, so it alternates from what came before (not from a count started when
- * Netfish was updated); which kind of documentary, series or film, still goes by the count.
+ * A new film's evening on Netfish's own channel: the next Friday or Saturday at nine (the
+ * household's), from `after`, that none of its other new films has. Both that week's taken:
+ * undefined (a weekday's, then).
  */
-function turnOf(channelId: string): number {
-  const count = stored.turns[channelId] ?? 0;
-  const last = stored.titles.filter((f) => f.channelId === channelId).sort((a, b) => b.addedAt - a.addedAt)[0];
-  if (!last) return count;
-  const documentaryNext = !last.genres.some((g) => TMDB_GENRES[g.toLowerCase()] === DOCUMENTARY);
-  return count % 2 === (documentaryNext ? 1 : 0) ? count : count + 1;
+function weekendNight(after: number, taken: number[], timeZone?: string): number | undefined {
+  let fmt: Intl.DateTimeFormat;
+  try {
+    fmt = new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  } catch {
+    fmt = new Intl.DateTimeFormat('en-US', { weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  }
+  const QUARTER = 15 * 60_000;
+  for (let at = Math.ceil(after / QUARTER) * QUARTER; at < after + 7 * DAY; at += QUARTER) {
+    const p = Object.fromEntries(fmt.formatToParts(at).map((x) => [x.type, x.value]));
+    if ((p.weekday === 'Fri' || p.weekday === 'Sat') && p.hour === '21' && p.minute === '00' && !taken.some((t) => Math.abs(t - at) < 12 * 3600_000)) return at;
+  }
+  return undefined;
 }
 
-/** Picks something new for a channel's guide, if its week has room (`perWeek` is each channel's). */
-async function planOne(s: FreshSettings, defs: ChannelDef[], now: number): Promise<FreshStatus['waiting']> {
+/**
+ * Picks something new for a channel's guide, if the week has room. `perWeek` is in all, shared
+ * between the channels: Netfish's own takes as many as all the others together (it's the one to
+ * watch for new things), and the one furthest behind its share goes first.
+ */
+async function planOne(s: FreshSettings, defs: ChannelDef[], now: number, timeZone?: string): Promise<FreshStatus['waiting']> {
   if (!s.enabled) return 'off';
   if (!defs.length) return 'no-channels';
   if (!has.seerr() || (!has.radarr() && !has.sonarr())) return 'services';
   const mine = (id: string) => upcoming().filter((f) => f.channelId === id);
-  // Channels with room this week, and less than a week's worth coming up.
-  const open = defs.filter((d) => pickedThisWeek(now, d.id) < s.perWeek);
-  if (!open.length) return 'week';
-  const order = byTurn(open.filter((d) => mine(d.id).length < s.perWeek));
-  if (!order.length) return 'enough';
+  if (pickedThisWeek(now) >= s.perWeek) return 'week';
+  if (upcoming().length >= s.perWeek) return 'enough';
+  const weight = (d: ChannelDef) => (d.source.kind === 'mix' ? Math.max(1, defs.length - 1) : 1);
+  const total = defs.reduce((n, d) => n + weight(d), 0);
+  const share = (d: ChannelDef) => (s.perWeek * weight(d)) / total;
+  const behind = (d: ChannelDef) => share(d) - pickedThisWeek(now, d.id);
+  const order = byTurn(defs).sort((a, b) => behind(b) - behind(a));
   let full: FreshStatus['waiting'];
   for (const def of order) {
-    // Spread over the channel's week, each far enough ahead to download in good time.
+    // Spread over the channel's week (its share of it), each far enough ahead to download in good time.
     const last = Math.max(0, ...mine(def.id).map((f) => f.notBefore));
-    const notBefore = Math.max(now + s.aheadDays * DAY, last + WEEK / s.perWeek);
+    const spread = Math.max(now + s.aheadDays * DAY, last + WEEK / Math.max(1, share(def)));
     const turn = turnOf(def.id);
     for (const want of wantsOf(def.source, turn)) {
+      // Netfish's own films: Friday's and Saturday's nine o'clock first.
+      const evening =
+        def.source.kind === 'mix' && want.mediaType === 'movie' && !want.genres.includes(DOCUMENTARY)
+          ? weekendNight(spread, mine(def.id).filter((f) => f.mediaType === 'movie').map((f) => f.notBefore), timeZone)
+          : undefined;
+      const notBefore = evening ?? spread;
       if ((want.mediaType === 'movie' && !has.radarr()) || (want.mediaType === 'tv' && !has.sonarr())) continue;
       const need = guess(want.mediaType);
       if (used() + planned() + need > s.maxGb * GB) {
@@ -1063,7 +1094,7 @@ async function planOne(s: FreshSettings, defs: ChannelDef[], now: number): Promi
         const plan = await settle(planFor(r, want, def.id, notBefore, now), undefined, (err) => log.warn('new titles', `Couldn't plan "${r.title ?? r.name}"`, err));
         if (plan) {
           stored.titles.push(plan);
-          log.info('new titles', `Picked "${plan.title}" for ${def.name}: downloads from ${logTime(downloadAt(plan, s))}, on from ${logTime(plan.notBefore)}`);
+          log.info('new titles', `Picked "${plan.title}" for ${def.name}: downloads from ${logTime(nextInHours(s, Math.max(now, downloadAt(plan, s)), timeZone))}, on from ${logTime(plan.notBefore)}`);
           stored.log.push({ at: now, channelId: def.id });
           stored.turns[def.id] = turn + 1;
           return undefined;
@@ -1131,7 +1162,7 @@ export function validFresh(v: unknown, current?: FreshSettings): FreshSettings {
     fromHour: num(x.fromHour, base.fromHour, 0, 23),
     toHour: num(x.toHour, base.toHour, 0, 23),
     maxSpeed: num(x.maxSpeed, base.maxSpeed, 0, 1000),
-    perWeek: num(x.perWeek, base.perWeek, 1, 21),
+    perWeek: num(x.perWeek, base.perWeek, 1, 60),
     aheadDays: num(x.aheadDays, base.aheadDays, 1, 7),
     movieProfile: 'movieProfile' in x ? profile(x.movieProfile) : base.movieProfile,
     showProfile: 'showProfile' in x ? profile(x.showProfile) : base.showProfile,

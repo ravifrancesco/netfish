@@ -136,7 +136,7 @@ The apps show the interface from your server, so most new features arrive by upd
 
 **1. Portainer → Stacks → Add stack**, name it `netfish`, paste [`docker-compose.yml`](docker-compose.yml), and **Deploy**. No variables are needed: Portainer pulls the ready-made image `ghcr.io/ravifrancesco/netfish:latest` (built by GitHub for Raspberry Pi and PCs).
 
-**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.7.30`.
+**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.7.31`.
 
 <details>
 <summary>Or build the image on the Pi yourself</summary>
@@ -152,7 +152,7 @@ If Netfish ever points at the wrong Jellyfin and nobody can sign in, use **Chang
 ### Admin settings in the app
 
 - **Connections:** addresses and API keys of every service, with live status. Keys are stored on the server in a file only Netfish can read and are never sent back to browsers. Stack variables, if you set any, are just starting values.
-- **Channels:** turn them on (Netfish starts with a line-up made from the library), then rename, reorder, hide, remove or add channels (a genre, one show in order, the newest films…). **New titles:** pick the channels with ✨, then set the space they may take, how much disk to always leave free, the download hours, a speed limit (needs qBittorrent), how many per channel each week, and how far ahead to download (1 day to a week). They're added to Radarr/Sonarr tagged `netfish-channel`, kept out of everyone's library and Activity in Netfish (Jellyfin's own apps still show them), and never include anything someone requested.
+- **Channels:** turn them on (Netfish starts with a line-up made from the library), then rename, reorder, hide, remove or add channels (a genre, one show in order, the newest films…). **New titles:** pick the channels with ✨, then set the space they may take, how much disk to always leave free, the download hours, a speed limit (needs qBittorrent), how many a week in all (shared between the channels, Netfish's own taking about half), how many download at once, how far ahead to download (1 day to a week), and which release: the smallest at 720p, 1080p or 4K (added with Netfish's own profiles in Radarr/Sonarr, no upgrades; a title someone keeps moves to your usual profile), or Radarr's and Sonarr's own choice. They're added to Radarr/Sonarr tagged `netfish-channel`, kept out of everyone's library and Activity in Netfish (Jellyfin's own apps still show them), and never include anything someone requested.
 - **Downloads:** who can pick specific versions (everyone or admins), and max release size for movies and per episode. Releases over the limit are hidden in Versions and refused by the server, and season packs count per episode. Admins can still show and pick them. Automatic downloads from requests follow Radarr/Sonarr's own size settings.
 
 Everything is kept in `/docker-data-volumes/netfish-data` on the Pi (change the path in the stack if you keep container data elsewhere), so updates don't lose it. Netfish creates that folder and gives it to `PUID`/`PGID` (1000 by default) on startup.

@@ -7,6 +7,26 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.31 (2026-10-23)
+
+### New
+- **Netfish's own channel: a new day, with nothing on twice.** From six in the morning to six the next, a show is on once (a short one, under about 40 minutes, for two episodes back to back) and a film once: no more The Simpsons in the morning and again in the evening. Its slots:
+  - **Morning:** films, dramas and thrillers, taking turns. Each starts on the quarter hour (10:00, 10:45, 11:30), so there can be a break of up to 15 minutes in between. Rather than repeat something or use up the sitcoms and cartoons early, it takes a longer break before 1pm or 3pm ("Coming up at 13:00").
+  - **1pm:** a documentary (a film at the weekend).
+  - **3pm to 6pm:** sitcoms. **6pm to 9pm:** grown-up cartoons, opening with the longest-running one.
+  - **9pm:** a film or a documentary (the best films on Friday and Saturday). **Then:** late-night shows that haven't been on, and a late film some nights.
+  - Nothing made for children (that's the Cartoons channel). The guide is made again for the new day.
+- **New things first on Netfish's own.** A New title in its slot; then what's arrived in the library in the last two weeks, before anything else.
+- **New titles a week: one number in all, shared out.** *New titles a week* is now the total for every ✨ channel together, not each one's. Netfish's own channel takes about half and the others share the rest, each in turn. What you had set per channel now counts as the total, so you may want to raise it.
+- **Netfish's own picks New titles of every kind:** films, documentaries, sitcoms and grown-up cartoons, well liked and not in your library yet. Its new films go on at **9pm on a Friday or Saturday**.
+
+### Changed
+- **Settings → Channels → New titles:** the note under *Which release* is gone for the "smallest" choices.
+- **The log** now says when a picked New title will really start downloading (inside the download hours).
+
+### Update
+- **Server.**
+
 ## 0.7.30 (2026-10-22)
 
 ### New

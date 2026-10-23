@@ -14,7 +14,7 @@ const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 function describe(source: ChannelSource, genres: string[]): string {
   switch (source.kind) {
     case 'mix':
-      return t('A day of TV: cartoons in the morning, sitcoms, a film at 9pm');
+      return t('A day of TV: a documentary at 1pm, sitcoms, cartoons, a film at 9pm');
     case 'cartoons':
       return t('Animated shows, and now and then a film');
     case 'sitcoms':

@@ -113,13 +113,6 @@ function hoursText(last: NonNullable<FreshStatus['lastInHours']>): string {
   }
 }
 
-/** Netfish's own quality profiles in Radarr and Sonarr (as the server names them). */
-const PROFILE_NAMES = {
-  'smallest-720': 'Netfish - New titles 720p',
-  smallest: 'Netfish - New titles 1080p',
-  'smallest-2160': 'Netfish - New titles 4K',
-} as const;
-
 function waitingText(waiting: FreshStatus['waiting']): string | undefined {
   switch (waiting) {
     case 'no-channels':
@@ -252,7 +245,14 @@ export function FreshTitles({ data, save, busy }: { data: ChannelAdmin; save: (p
               onSave={(maxSpeed) => set({ maxSpeed })}
             />
             <NumberField label={t('At the same time')} value={fresh.parallel ?? 2} min={1} max={5} hint={t('downloads at once')} onSave={(parallel) => set({ parallel })} />
-            <NumberField label={t('Per channel, per week')} value={fresh.perWeek} min={1} max={21} hint={s ? tn(s.addedThisWeek, '{n} this week', '{n} this week') : undefined} onSave={(perWeek) => set({ perWeek })} />
+            <NumberField
+              label={t('New titles a week')}
+              value={fresh.perWeek}
+              min={1}
+              max={60}
+              hint={s ? tn(s.addedThisWeek, '{n} this week, shared between channels', '{n} this week, shared between channels') : t('Shared between channels')}
+              onSave={(perWeek) => set({ perWeek })}
+            />
             <label className="fresh__field">
               <span>{t('Download ahead')}</span>
               <select className="select" value={fresh.aheadDays} onChange={(e) => set({ aheadDays: Number(e.target.value) })}>
@@ -271,11 +271,7 @@ export function FreshTitles({ data, save, busy }: { data: ChannelAdmin; save: (p
                 <option value="smallest-2160">{t('The smallest at 4K')}</option>
                 <option value="profile">{t('Radarr’s and Sonarr’s choice')}</option>
               </select>
-              <span className="muted small">
-                {fresh.pick === 'profile'
-                  ? t('The best their quality profile allows')
-                  : t('Added with Netfish’s own profile, “{name}”: no upgrades', { name: PROFILE_NAMES[fresh.pick ?? 'smallest'] })}
-              </span>
+              {fresh.pick === 'profile' && <span className="muted small">{t('The best their quality profile allows')}</span>}
             </label>
             {fresh.pick === 'profile' && services?.radarr && Boolean(s?.profiles.movie.length) && (
               <label className="fresh__field">

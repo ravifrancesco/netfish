@@ -778,7 +778,7 @@ void app.register(
         return { ...common, title: t.title, originalTitle: t.title, releaseDate: out.inCinemas.slice(0, 10), runtime: 104 + (t.n % 30), releases, externalIds: { imdbId: `tt${9000000 + t.n}` } };
       }
       return {
-        ...common, name: t.title, originalName: t.title, firstAirDate: (releaseOf(t).firstAired ?? '').slice(0, 10), episodeRunTime: [48], numberOfSeasons: t.seasons,
+        ...common, name: t.title, originalName: t.title, firstAirDate: (releaseOf(t).firstAired ?? '').slice(0, 10), episodeRunTime: [t.runtime ?? 48], numberOfSeasons: t.seasons,
         nextEpisodeToAir: releaseOf(t).nextAiring ? { airDate: releaseOf(t).nextAiring!.slice(0, 10) } : null,
         createdBy: [{ id: personId(creatorOf(t)), name: creatorOf(t) }], networks: [{ name: 'Mock+' }],
         contentRatings: { results: [{ iso_3166_1: 'US', rating: 'TV-14' }] }, externalIds: { tvdbId: t.tvdbId, imdbId: `tt${9100000 + t.n}` },

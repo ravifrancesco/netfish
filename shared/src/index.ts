@@ -977,7 +977,7 @@ export interface FreshSettings {
   toHour: number;
   /** Their download speed, at most (MB/s; 0: no limit). Needs qBittorrent. */
   maxSpeed: number;
-  /** New titles a week for each channel, at most. */
+  /** New titles a week, at most, in all: shared between the channels (Netfish's own taking about half). */
   perWeek: number;
   /** How long before it airs each one is downloaded (days: 1, 3, 7), in case a download has trouble. */
   aheadDays: number;
