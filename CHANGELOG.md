@@ -7,6 +7,21 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.38 (2026-10-23)
+
+### Changed
+- **Netfish's own channel: no breaks over five minutes.** Its day is now built block by block (the morning, one o'clock, the sitcoms, the cartoons, nine o'clock, late night), each filled back to back. The programmes are chosen so their lengths add up to the block, and what's left (a few minutes at most) is shared out between them.
+  - The shows keep their place and order every day, so they're on at about the same time; a few minutes either way now, rather than leaving a hole.
+  - Where the library has nothing that fits the rest of a block, the next one starts that much early, never with a long wait.
+- **New titles fill what the library can't.** Where Netfish's guide had nothing that fit, New titles look for something whose length does (a film for a long stretch, a short show for a short one) and put it right there; it downloads in time like the others. These come first and aren't counted in the week's.
+- **Start over resets everything again, New titles included**, as before 0.7.35: the channels from scratch (no ✨), New titles waiting or downloading deleted (kept ones stay), and what was picked forgotten, so the same ones may be picked again. Then press **Start**.
+
+### Fixed
+- **New titles: "Up to date: nothing new right now" for good.** Everything ever picked was never picked again, including titles deleted before they downloaded (by Start over, a channel's ✨ off, the kids' clean-up); after a few changes nothing was left near the top of the lists. Those can be picked again now, and it looks further down the lists when the first pages are used up. When nothing fits, Settings and the log say so.
+
+### Update
+- **Server.**
+
 ## 0.7.37 (2026-10-23)
 
 ### New

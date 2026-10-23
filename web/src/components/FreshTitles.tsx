@@ -127,6 +127,8 @@ function waitingText(waiting: FreshStatus['waiting']): string | undefined {
       return t('Disk nearly full.');
     case 'week':
       return t('Done for this week.');
+    case 'none':
+      return t('Nothing new found that fits right now: it looks again every 10 minutes.');
     case 'enough':
       return t('A week’s worth planned.');
     case 'services':
@@ -340,7 +342,8 @@ export function FreshTitles({ data, save, busy }: { data: ChannelAdmin; save: (p
                       {f.year ? ` (${f.year})` : ''}
                     </strong>
                     <span className="muted small">
-                      {names.get(f.channelId) ?? t('No channel')} · {f.state === 'planned' ? t('about {size}', { size: bytes(f.size) }) : bytes(f.size)}
+                      {names.get(f.channelId) ?? t('No channel')}
+                      {f.fillsGap ? ` · ${t('fills a gap in the guide')}` : ''} · {f.state === 'planned' ? t('about {size}', { size: bytes(f.size) }) : bytes(f.size)}
                     </span>
                     <span className="small fresh__state">{stateLabel(f, fresh.fromHour)}</span>
                     {f.state === 'downloading' && !f.paused && f.progress !== undefined && <Progress value={f.progress} />}

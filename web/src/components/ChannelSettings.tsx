@@ -313,7 +313,7 @@ export function ChannelSettings() {
         >
           <p className="muted">{t('Your channels are replaced by a new set made from the library, and every schedule starts again.')}</p>
           {data.fresh?.enabled && <p className="muted">{t('Nothing new is picked or downloaded until you press Start.')}</p>}
-          {data.fresh?.enabled && <p className="muted">{t('Channels made from the same thing keep their ✨ New titles; those of channels that go are deleted (ones someone kept stay).')}</p>}
+          {data.fresh?.enabled && <p className="muted">{t('New titles start again too: the ones waiting or downloading are deleted (ones someone kept stay).')}</p>}
         </Modal>
       )}
     </div>

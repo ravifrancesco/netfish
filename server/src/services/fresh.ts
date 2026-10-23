@@ -36,6 +36,8 @@ const GUESS: Record<MediaType, number> = { movie: 5 * GB, tv: 9 * GB };
 const GIVE_UP = 12 * 3600_000;
 /** After Start: the catch-up, as far ahead as titles download (or FRESH_RUSH_HOURS). */
 const catchUpFor = (s: FreshSettings) => (config.freshRushHours ?? s.aheadDays * 24) * 3600_000;
+/** A hole in Netfish's guide is filled to within this many minutes. */
+const MAX_BREAK_MINUTES = 5;
 /** Catching up: the first new titles from this far ahead (time to download before they're on). */
 const CATCH_UP_LEAD = 6 * 3600_000;
 /** Just added: being looked for (a release grabbed in a few minutes). Past it, still nothing: it no longer takes a turn. */
@@ -61,6 +63,8 @@ interface Episode {
 interface Fresh {
   key: string;
   mediaType: MediaType;
+  /** Picked to fill a hole in Netfish's own guide (when it starts): not one of the week's. */
+  hole?: number;
   tmdbId: number;
   tvdbId?: number;
   /** Radarr's or Sonarr's id, once it's been added there. */
@@ -107,6 +111,8 @@ interface Stored {
   turns: Record<string, number>;
   /** Until then (the days ahead after Start), catching up: picked for the next days, downloading whatever the hours. */
   rushUntil?: number;
+  /** Holes in Netfish's guide nothing new was found for (not looked for again). */
+  missedHoles?: number[];
 }
 
 function load(): Stored {
@@ -114,7 +120,7 @@ function load(): Stored {
     const data = JSON.parse(fs.readFileSync(FILE, 'utf8')) as Partial<Stored>;
     const titles = (data.titles ?? []).map((f) => ({ ...f, notBefore: f.notBefore ?? f.addedAt, seconds: f.seconds ?? 0, genres: f.genres ?? [] }));
     const log = (data.log ?? []).map((x) => (typeof x === 'number' ? { at: x, channelId: '' } : x));
-    return { titles, tried: data.tried ?? [], log, stopped: data.stopped ?? [], turns: data.turns ?? {}, rushUntil: data.rushUntil };
+    return { titles, tried: data.tried ?? [], log, stopped: data.stopped ?? [], turns: data.turns ?? {}, rushUntil: data.rushUntil, missedHoles: data.missedHoles };
   } catch {
     return { titles: [], tried: [], log: [], stopped: [], turns: {} };
   }
@@ -143,6 +149,8 @@ export interface ChannelsLink {
   drop(keys: string[]): void;
   /** What Netfish's own timetable is short of (fewer shows than times for them), most needed first. */
   short(): Array<'cartoon' | 'sitcom' | 'drama'>;
+  /** Where Netfish's own guide had nothing that fit (and how long): something new that fits goes there. */
+  holes(): Array<{ at: number; seconds: number }>;
 }
 let link: ChannelsLink | undefined;
 export const linkChannels = (l: ChannelsLink) => {
@@ -440,15 +448,19 @@ async function candidates(want: Want, now: number): Promise<SeerrResult[]> {
     voteAverageGte: want.minRating ?? 6.8,
   };
   if (want.genres.length) extra.genre = want.genres.join('|');
-  const pageNumbers = want.nature ? [1, 2, 3, 4, 5] : [1, 2, 3];
-  const pages = await Promise.all(pageNumbers.map((page) => settle(seerr.discover(kind, page, extra), undefined)));
   const seen = new Set<number>();
   const seed = Math.floor(now / DAY);
-  return pages
-    .flatMap((p) => p?.results ?? [])
-    .map((r) => ({ ...r, mediaType: want.mediaType }) as SeerrResult)
-    .filter((r) => !seen.has(r.id) && seen.add(r.id) && suits(r, want, now) && !stored.tried.includes(`${want.mediaType}-${r.id}`))
-    .sort((a, b) => score(b, seed) - score(a, seed));
+  const look = async (pageNumbers: number[]) => {
+    const pages = await Promise.all(pageNumbers.map((page) => settle(seerr.discover(kind, page, extra), undefined)));
+    return pages
+      .flatMap((p) => p?.results ?? [])
+      .map((r) => ({ ...r, mediaType: want.mediaType }) as SeerrResult)
+      .filter((r) => !seen.has(r.id) && seen.add(r.id) && suits(r, want, now) && !stored.tried.includes(`${want.mediaType}-${r.id}`))
+      .sort((a, b) => score(b, seed) - score(a, seed));
+  };
+  const first = await look(want.nature ? [1, 2, 3, 4, 5] : [1, 2, 3]);
+  // All of those picked before: further down the list.
+  return first.length ? first : look(want.nature ? [6, 7, 8, 9, 10] : [4, 5, 6, 7, 8]);
 }
 
 /** Its details for the guide (TMDB's), if nobody has it in Radarr/Sonarr already. */
@@ -907,6 +919,9 @@ async function step(now: number) {
   if (removed.length) {
     stored.titles = stored.titles.filter((f) => !removed.includes(f));
     link.drop(removed.map((f) => f.key));
+    // Gone before they were even added (the channels changed): they may be picked again.
+    const never = new Set(removed.filter((f) => f.state === 'planned').map((f) => f.key));
+    stored.tried = stored.tried.filter((k) => !never.has(k));
   }
 
   // How much room the disk has (where Radarr, or Sonarr, keeps the library).
@@ -961,11 +976,26 @@ async function step(now: number) {
   if (s.enabled && s.running === false) lastWaiting = lastPlanning = 'not-started';
   else {
     const starting = defs.length ? await startDue(s, go, lowDisk, now, hours) : undefined;
+    // A hole in Netfish's own guide first (the guide complete comes first), then the week's.
+    if (await fillHole(s, defs, now, settings.timeZone)) save();
     const planning = await planOne(s, defs, now, settings.timeZone);
     lastPlanning = planning;
     lastWaiting = starting ?? planning;
   }
   if (JSON.stringify(stored.titles.map((f) => [f.key, f.state, f.airAt])) !== before) onChange();
+  save();
+}
+
+/**
+ * Start over: New titles from scratch too. Those of the old channels go at the next look (none of
+ * the new channels has ✨ yet; kept ones stay); what was picked, and when, is forgotten.
+ */
+export function resetFresh() {
+  stored.log = [];
+  stored.turns = {};
+  stored.tried = [];
+  stored.rushUntil = undefined;
+  log.info('new titles', 'Started over: New titles from scratch (the old channels\' ones go, kept ones stay)');
   save();
 }
 
@@ -1160,6 +1190,60 @@ function weekendNight(after: number, taken: number[], timeZone?: string): number
 }
 
 /**
+ * A hole in Netfish's own guide (the library had nothing that fit there, so what follows starts
+ * early): something new whose length fits it, within a few minutes — a film for a long one, a
+ * short show for a short one — put just there, downloaded in time like the rest. Not counted in
+ * the week's: the guide complete comes first. One a look.
+ */
+async function fillHole(s: FreshSettings, defs: ChannelDef[], now: number, timeZone?: string): Promise<boolean> {
+  const mine = defs.find((d) => d.source.kind === 'mix');
+  if (!mine || !link || !has.seerr()) return false;
+  const aimed = new Set(stored.titles.map((f) => f.hole));
+  const hole = link
+    .holes()
+    .filter((h) => h.at > now + CATCH_UP_LEAD && !aimed.has(h.at) && !stored.missedHoles?.includes(h.at))
+    .sort((a, b) => a.at - b.at)[0];
+  if (!hole) return false;
+  const minutes = hole.seconds / 60;
+  const film: Want = { mediaType: 'movie', genres: [], avoid: [ANIMATION, FAMILY, DOCUMENTARY, HORROR] };
+  const sitcom: Want = { mediaType: 'tv', genres: [COMEDY], avoid: [ANIMATION, KIDS, DOCUMENTARY], shortEpisodes: true };
+  const cartoon: Want = { mediaType: 'tv', genres: [ANIMATION], need: [COMEDY], avoid: [KIDS] };
+  const drama: Want = { mediaType: 'tv', genres: [DRAMA, CRIME, MYSTERY], avoid: [ANIMATION, KIDS, DOCUMENTARY, COMEDY] };
+  const wants = minutes >= 75 ? [film] : minutes >= 40 ? [drama, sitcom, cartoon] : [sitcom, cartoon];
+  const fitsHole = (length: number) => length <= minutes - 0.25 && length >= minutes - MAX_BREAK_MINUTES;
+  for (const want of wants) {
+    if ((want.mediaType === 'movie' && !has.radarr()) || (want.mediaType === 'tv' && !has.sonarr())) continue;
+    if (used() + planned() + guess(want.mediaType) > s.maxGb * GB) return false;
+    for (const r of (await candidates(want, now)).slice(0, 12)) {
+      // Its length: a film's running time; a show's episode (two of a short one, back to back).
+      const length =
+        want.mediaType === 'movie'
+          ? ((await settle(seerr.movie(r.id), undefined))?.runtime ?? 0)
+          : await settle(
+              seerr.tv(r.id).then((d) => {
+                const runtime = Math.min(...(d.episodeRunTime?.length ? d.episodeRunTime : [0]));
+                return runtime < 40 ? 2 * runtime + 0.25 : runtime;
+              }),
+              0,
+            );
+      if (!length || !fitsHole(length)) continue;
+      const plan = await settle(planFor(r, want, mine.id, hole.at, now), undefined);
+      if (!plan) continue;
+      plan.hole = hole.at;
+      stored.titles.push(plan);
+      const end = new Date(hole.at + hole.seconds * 1000);
+      log.info('new titles', `Picked "${plan.title}" for ${mine.name} to fill ${logTime(hole.at).slice(11)}–${logTime(end.getTime()).slice(11)} on ${logTime(hole.at).slice(0, 10)} (${Math.round(minutes)} min, nothing in the library fit): downloads from ${logTime(startsAt(s, plan, timeZone))}`);
+      return true;
+    }
+  }
+  // Nothing that fits found: not looked for again (the guide starts the next block early there).
+  (stored.missedHoles ??= []).push(hole.at);
+  stored.missedHoles = stored.missedHoles.filter((at) => at > now);
+  log.info('new titles', `Nothing new found that fits ${Math.round(minutes)} min on ${logTime(hole.at)}: the next programmes there start that much early`);
+  return false;
+}
+
+/**
  * Picks something new for a channel's guide, if the week has room. `perWeek` is in all, shared
  * between the channels: Netfish's own takes as many as all the others together (it's the one to
  * watch for new things), and the one furthest behind its share goes first.
@@ -1170,7 +1254,8 @@ async function planOne(s: FreshSettings, defs: ChannelDef[], now: number, timeZo
   if (!has.seerr() || (!has.radarr() && !has.sonarr())) return 'services';
   const mine = (id: string) => upcoming().filter((f) => f.channelId === id);
   if (pickedThisWeek(now) >= s.perWeek) return 'week';
-  if (upcoming().length >= s.perWeek) return 'enough';
+  // (Those filling holes in Netfish's guide aren't the week's.)
+  if (upcoming().filter((f) => f.hole === undefined).length >= s.perWeek) return 'enough';
   const weight = (d: ChannelDef) => (d.source.kind === 'mix' ? Math.max(1, defs.length - 1) : 1);
   const total = defs.reduce((n, d) => n + weight(d), 0);
   const share = (d: ChannelDef) => (s.perWeek * weight(d)) / total;
@@ -1215,7 +1300,9 @@ async function planOne(s: FreshSettings, defs: ChannelDef[], now: number, timeZo
       }
     }
   }
-  return full;
+  // Nothing that fits (well liked, not in the library, not picked before) for any channel just now.
+  if (!full) log.info('new titles', `Nothing new found that fits for ${order.map((d) => d.name).join(', ')}: looking again in 10 minutes`);
+  return full ?? 'none';
 }
 
 // ---------- Settings → Channels ----------
@@ -1232,6 +1319,7 @@ export async function freshStatus(): Promise<FreshStatus> {
     key: f.key,
     mediaType: f.mediaType,
     tmdbId: f.tmdbId,
+    ...(f.hole !== undefined ? { fillsGap: true } : {}),
     title: f.title,
     year: f.year,
     poster: f.poster,

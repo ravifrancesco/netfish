@@ -1023,6 +1023,8 @@ export interface FreshTitle {
   addedAt: string;
   /** When it's on (first). */
   airAt?: string;
+  /** Picked to fill a gap in Netfish's own guide (not one of the week's). */
+  fillsGap?: boolean;
   /** The earliest it may start downloading (its days ahead before the earliest it can be on). */
   downloadAt?: string;
   /** When it will start: the first moment from then inside the download hours (one due then waits its turn). */
@@ -1037,7 +1039,7 @@ export interface FreshStatus {
   freeBytes?: number;
   addedThisWeek: number;
   /** Why nothing's being added right now. */
-  waiting?: 'off' | 'not-started' | 'no-channels' | 'hours' | 'space' | 'disk' | 'week' | 'enough' | 'services';
+  waiting?: 'off' | 'not-started' | 'no-channels' | 'hours' | 'space' | 'disk' | 'week' | 'enough' | 'services' | 'none';
   titles: FreshTitle[];
   /** The last look inside the download hours: what happened then (outside them, "outside the hours" says little). */
   lastInHours?: { at: string; note: FreshNote; title?: string };
