@@ -7,6 +7,16 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.33 (2026-10-23)
+
+### Fixed
+- **Long empty gaps on Netfish's own channel.** When a show ran late (a guide made again mid-morning, or a drama longer than its hour), the next show's time was left empty, up to an hour. Now it still goes on if it's over by the time after it, or something that fits takes its time.
+- **Dramas with long episodes pushed the next show out every day.** The dramas' times are now as long as nearly all their episodes (an hour, or longer). Fewer of them fit before 1pm, so mornings keep about four hours of films.
+- **New titles: "Done for this week" with nothing in the list.** Titles taken off before they downloaded (by Start over, by a channel no longer taking new titles, by an admin, or with no download found) still counted toward the week. Now only ones still there, or downloaded, count, so *Check now* picks again.
+
+### Update
+- **Server.**
+
 ## 0.7.32 (2026-10-23)
 
 ### New

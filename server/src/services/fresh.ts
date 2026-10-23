@@ -95,8 +95,8 @@ interface Stored {
   titles: Fresh[];
   /** Everything ever picked or turned down, so it isn't tried again. */
   tried: string[];
-  /** When each was picked, and for which channel (the last week's, for the weekly limit). */
-  log: Array<{ at: number; channelId: string }>;
+  /** When each was picked, for which channel, and which (the last week's, for the weekly limit). */
+  log: Array<{ at: number; channelId: string; key?: string; downloaded?: boolean }>;
   /** Downloads this stopped outside the hours (to start again, and only those). */
   stopped: string[];
   /** How many each channel has picked, ever: its turn (Netfish's own takes a documentary every other one). */
@@ -267,7 +267,20 @@ const used = () => stored.titles.filter((f) => f.state === 'downloading' || f.st
 /** And what's planned will take. */
 const planned = () => stored.titles.filter((f) => f.state === 'planned').reduce((n, f) => n + guess(f.mediaType), 0);
 const upcoming = () => stored.titles.filter((f) => f.state === 'planned' || f.state === 'downloading' || f.state === 'ready');
-const pickedThisWeek = (now: number, channelId?: string) => stored.log.filter((x) => x.at > now - WEEK && (!channelId || x.channelId === channelId)).length;
+/**
+ * Picked in the last week, still here or downloaded: one taken off before it was (by an admin, by
+ * Start over or a channel no longer taking new titles, or no download found) doesn't count.
+ */
+function pickedThisWeek(now: number, channelId?: string): number {
+  const here = new Map(stored.titles.map((f) => [f.key, f]));
+  return stored.log.filter((x) => {
+    if (x.at <= now - WEEK || (channelId && x.channelId !== channelId)) return false;
+    // (Picks noted before they said which: the title picked then, if it's still here.)
+    const f = x.key ? here.get(x.key) : stored.titles.find((t) => t.channelId === x.channelId && Math.abs(t.addedAt - x.at) < 60_000);
+    if (f && (f.state === 'ready' || f.state === 'aired' || f.state === 'kept')) x.downloaded = true;
+    return Boolean(f || x.downloaded);
+  }).length;
+}
 /**
  * When it downloads: its days ahead before the earliest it can be on (`notBefore`, fixed when it's
  * picked; the guide only ever puts it there or later). Not from its slot in the guide: that moves
@@ -1095,7 +1108,7 @@ async function planOne(s: FreshSettings, defs: ChannelDef[], now: number, timeZo
         if (plan) {
           stored.titles.push(plan);
           log.info('new titles', `Picked "${plan.title}" for ${def.name}: downloads from ${logTime(nextInHours(s, Math.max(now, downloadAt(plan, s)), timeZone))}, on from ${logTime(plan.notBefore)}`);
-          stored.log.push({ at: now, channelId: def.id });
+          stored.log.push({ at: now, channelId: def.id, key: plan.key });
           stored.turns[def.id] = turn + 1;
           return undefined;
         }

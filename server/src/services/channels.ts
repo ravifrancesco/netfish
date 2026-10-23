@@ -646,9 +646,11 @@ const PRIME = 21 * 60;
 const LATE = 23 * 60;
 const LATE_SLOT = 45;
 const LATE_SLOTS = 3;
-/** The other shows (dramas, thrillers): an hour each, up to three before one o'clock. */
+/** The other shows (dramas, thrillers): an hour each (longer if their episodes are), up to three before one o'clock. */
 const DRAMA_SLOT = 60;
 const DRAMA_SLOTS = 3;
+/** Mornings' films: at least four hours (two films) before the dramas. */
+const MORNING = 4 * 60;
 const SLACK = 10;
 /** A stretch's breaks: longer than this each, and a show fills in (the same at that place every day). */
 const MAX_GAP = 30;
@@ -905,7 +907,8 @@ function planDay(sched: Schedule, lib: Library, from: number, timeZone: string) 
   const fillerAt = (key: string, shows: string[], t: number, room: number): Unit | undefined => {
     const show = residentFor(key, [shows], t);
     const first = show && nextEpisode(sched, lib, show, false);
-    if (!show || !first || first.seconds > room) return undefined;
+    // Too long today: another that fits (rather than a long break).
+    if (!show || !first || first.seconds > room) return episodesIn(shows, room);
     return episodesFor(key, show, t, t + room * 1000, 0);
   };
 
@@ -922,7 +925,11 @@ function planDay(sched: Schedule, lib: Library, from: number, timeZone: string) 
     if (count < room) out.push({ at: start + Math.round(count * length), fill: { films: dayFilms, shows: late } });
     return out;
   };
-  const dramas = Math.min(DRAMA_SLOTS, others.length);
+  // Long enough for nearly all their episodes (three in four), so one doesn't push the next show
+  // out; as many as leave the morning four hours for its films.
+  const dramaMinutes = others.flatMap((id) => lib.bySeries.get(id)?.map((e) => e.seconds / 60) ?? []).sort((a, b) => a - b);
+  const dramaSlot = Math.max(DRAMA_SLOT, Math.ceil(((dramaMinutes[Math.floor(dramaMinutes.length * 0.75)] ?? 0) + 1) / 5) * 5);
+  const dramas = Math.min(DRAMA_SLOTS, others.length, Math.floor((MATINEE - DAY_START - MORNING) / dramaSlot));
   const afternoonDrama = !weekend && others.length > dramas;
   const sitcomSlots = slots('sitcom', sitcoms, SITCOMS, CARTOONS, [sitcoms]);
   const cartoonSlots = slots('cartoon', cartoons, CARTOONS, PRIME, [cartoons]);
@@ -941,9 +948,9 @@ function planDay(sched: Schedule, lib: Library, from: number, timeZone: string) 
     return (fit ? (filmOf(name, near) ?? filmOf(name, fits(ids, room))) : undefined) ?? filmOf(name, ids);
   };
   const anchors: Anchor[] = [
-    // Mornings: films.
-    { at: DAY_START, fill: { films: dayFilms, shows: others } },
-    ...Array.from({ length: dramas }, (_, i): Anchor => ({ at: MATINEE - DRAMA_SLOT * (dramas - i), slot: { key: `drama:${i}`, pools: [others] } })),
+    // Mornings: films (a long break: a drama, or a short show).
+    { at: DAY_START, fill: { films: dayFilms, shows: [...others, ...late] } },
+    ...Array.from({ length: dramas }, (_, i): Anchor => ({ at: MATINEE - dramaSlot * (dramas - i), slot: { key: `drama:${i}`, pools: [others] } })),
     // One o'clock: a documentary in the week, a film at the weekend (a comedy, an adventure).
     weekend
       ? {
@@ -962,7 +969,7 @@ function planDay(sched: Schedule, lib: Library, from: number, timeZone: string) 
           },
           fill: { films: [...k.docFilms, ...dayFilms], shows: late },
         },
-    ...(afternoonDrama ? [{ at: MATINEE + DRAMA_SLOT, slot: { key: 'drama:pm', pools: [others] } }] : []),
+    ...(afternoonDrama ? [{ at: Math.min(MATINEE + DRAMA_SLOT, SITCOMS - dramaSlot), slot: { key: 'drama:pm', pools: [others] } }] : []),
     ...sitcomSlots,
     ...cartoonSlots,
     // Nine o'clock: a film, a documentary, or at the weekend the best films (a new one first).
@@ -1054,13 +1061,16 @@ function planDay(sched: Schedule, lib: Library, from: number, timeZone: string) 
     if (cursor >= end) continue;
     const t = Math.max(cursor, start);
     if (anchor.slot) {
-      // At its time (a few minutes late at most, if what was before ran over; else not today, so
-      // it's always at its time). A channel just made: on straight away, if half its time is left.
-      if (cursor > start + (sched.entries.length ? SLACK * 60_000 : (end - start) / 2)) continue;
+      // At its time, or a few minutes late if what was before ran over (a channel just made: if
+      // half its time is left). Later than that, it's still on if it's over by the next time;
+      // else something that fits has its time (never a long wait).
       lib.slot = t;
       const show = residentFor(anchor.slot.key, anchor.slot.pools, t);
-      const unit = show ? took(episodesFor(anchor.slot.key, show, t, end)) : undefined;
-      cursor = unit ? spread([unit], t, t + unitLength(unit) + BREAK_SECONDS * 1000) : stretch(t, end, { at: anchor.at, fill: { films: dayFilms, shows: anchor.slot.pools.flat() } }, false);
+      const onTime = cursor <= start + (sched.entries.length ? SLACK * 60_000 : (end - start) / 2);
+      const first = show && nextEpisode(sched, lib, show, false);
+      const fits = first && t + first.seconds * 1000 <= end + SLACK * 60_000;
+      const unit = show && (onTime || fits) ? took(episodesFor(anchor.slot.key, show, t, end)) : undefined;
+      cursor = unit ? spread([unit], t, t + unitLength(unit) + BREAK_SECONDS * 1000) : stretch(t, end, { at: anchor.at, fill: { films: dayFilms, shows: [...anchor.slot.pools.flat(), ...late] } }, false);
       continue;
     }
     // Its lead only near its time (not nine o'clock's film at ten).
