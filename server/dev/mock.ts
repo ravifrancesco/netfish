@@ -1026,7 +1026,8 @@ void app.register(
       if (!req.body.qualityProfileId || !req.body.rootFolderPath) return reply.code(400).send([{ errorMessage: 'Quality profile and root folder are required' }]);
       arrKnown.add(`movie-${t.tmdbId}`);
       titleTags.set(`movie-${t.tmdbId}`, req.body.tags ?? []);
-      if (req.body.addOptions?.searchForMovie && isOut(t)) startDownload(t, { durationMs: 45_000 });
+      // MOCK_EMPTY_FIRST_SEARCH=1: the search when it's added finds nothing (indexers busy); a later one does.
+      if (req.body.addOptions?.searchForMovie && isOut(t) && process.env.MOCK_EMPTY_FIRST_SEARCH !== '1') startDownload(t, { durationMs: 45_000 });
       return reply.code(201).send(movieDto(t));
     });
     r.get<{ Querystring: Q }>('/release', async (req) => {
@@ -1129,7 +1130,7 @@ void app.register(
         titleTags.set(`tv-${t.tmdbId}`, req.body.tags ?? []);
         const wanted = (req.body.seasons ?? []).filter((x) => x.monitored).map((x) => x.seasonNumber);
         for (let season = 1; season <= t.seasons; season++) if (!wanted.includes(season)) unmonitored.add(`tv-${t.tmdbId}-${season}`);
-        if (req.body.addOptions?.searchForMissingEpisodes && isOut(t)) for (const season of wanted) startDownload(t, { season, durationMs: 50_000 });
+        if (req.body.addOptions?.searchForMissingEpisodes && isOut(t) && process.env.MOCK_EMPTY_FIRST_SEARCH !== '1') for (const season of wanted) startDownload(t, { season, durationMs: 50_000 });
         return reply.code(201).send(seriesDto(t));
       },
     );

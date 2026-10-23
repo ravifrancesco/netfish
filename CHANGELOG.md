@@ -7,6 +7,18 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.27 (2026-10-22)
+
+### Fixed
+- **New titles: a search that found nothing was never tried again.** When Netfish adds a New title, Radarr or Sonarr search for it once. If that search found nothing it would take, which is common when several are added together and Prowlarr's indexers turn the burst away ("429 Too Many Requests", "API Request Limit reached"), nothing searched again: after 12 hours the title was dropped, though releases were there all along.
+  - Now Netfish asks Radarr (the film) or Sonarr (the first season) to **search again every half hour** until something is grabbed, or the 12 hours are up.
+  - **One title per check at most** (checks are every 10 minutes), the one waiting longest, so it never sends a burst of searches itself.
+  - *Download now* also searches again for the one airing first.
+- **"Downloading, 0%" while nothing was grabbed.** A New title added to Radarr/Sonarr with nothing grabbed yet now says **Looking for a download…**, with no progress bar. *Downloading, n%* means a release is really on its way.
+
+### Update
+- **Server.**
+
 ## 0.7.26 (2026-10-22)
 
 ### Fixed

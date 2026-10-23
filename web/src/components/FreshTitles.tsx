@@ -72,6 +72,8 @@ function stateText(f: FreshTitle, fromHour: number): string {
       // Not in the guide yet: it downloads all the same, and goes in once there's a slot.
       return f.downloadAt ? t('Downloads {download} · not in the guide yet', { download: when(f.downloadAt) }) : t('Waiting for a slot');
     case 'downloading':
+      // In Radarr/Sonarr, nothing grabbed yet: they look again every half hour.
+      if (f.progress === undefined) return t('Looking for a download…');
       return f.paused ? t('Paused until {time}', { time: hourLabel(fromHour) }) : t('Downloading, {n}%', { n: Math.round((f.progress ?? 0) * 100) });
     case 'ready':
       return f.airAt ? t('Ready · on {when}', { when: when(f.airAt) }) : t('Ready');
@@ -180,13 +182,16 @@ export function FreshTitles({ data, save, busy }: { data: ChannelAdmin; save: (p
       void qc.invalidateQueries({ queryKey: ['channels'] });
       const said = [
         r.started.length ? t('Started: {list}.', { list: r.started.join(', ') }) : '',
+        r.searched.length ? t('Looking again: {list}.', { list: r.searched.join(', ') }) : '',
         ...r.failed.map((f) => t('{title}: {reason}', { title: f.title, reason: f.reason })),
       ].filter(Boolean);
       toast(r.failed.length && !r.started.length ? 'error' : 'ok', said.join(' ') || t('Nothing to start: everything due is downloading.'));
     },
     onError: (e) => toast('error', (e as Error).message),
   });
-  const dueNow = (s?.titles ?? []).filter((f) => (f.state === 'planned' && f.downloadAt && Date.parse(f.downloadAt) <= Date.now()) || (f.state === 'downloading' && f.paused)).length;
+  const dueNow = (s?.titles ?? []).filter(
+    (f) => (f.state === 'planned' && f.downloadAt && Date.parse(f.downloadAt) <= Date.now()) || (f.state === 'downloading' && (f.paused || f.progress === undefined)),
+  ).length;
   const services = s?.services;
   const canFind = services ? services.seerr && (services.radarr || services.sonarr) : true;
   const names = new Map(data.channels.map((c) => [c.id, `${c.number} · ${c.name}`]));
@@ -298,7 +303,7 @@ export function FreshTitles({ data, save, busy }: { data: ChannelAdmin; save: (p
               className="btn btn--ghost btn--sm"
               onClick={() => now.mutate()}
               disabled={now.isPending || !dueNow}
-              title={t('Starts what’s past its download time now, whatever the hours')}
+              title={t('Starts what’s past its download time now, whatever the hours, and looks again for what hasn’t been found')}
             >
               <Download size={14} /> {now.isPending ? t('Starting…') : dueNow ? tn(dueNow, 'Download {n} now', 'Download {n} now') : t('Nothing due')}
             </button>
@@ -320,7 +325,7 @@ export function FreshTitles({ data, save, busy }: { data: ChannelAdmin; save: (p
                       {names.get(f.channelId) ?? t('No channel')} · {f.state === 'planned' ? t('about {size}', { size: bytes(f.size) }) : bytes(f.size)}
                     </span>
                     <span className="small fresh__state">{stateLabel(f, fresh.fromHour)}</span>
-                    {f.state === 'downloading' && !f.paused && <Progress value={f.progress ?? 0} />}
+                    {f.state === 'downloading' && !f.paused && f.progress !== undefined && <Progress value={f.progress} />}
                   </span>
                   {/* Kept, or asked for: someone's, not to take off. */}
                   {f.state !== 'kept' && !f.keptBy && (

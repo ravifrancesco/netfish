@@ -1033,6 +1033,8 @@ export interface FreshStatus {
 export interface FreshNowResult {
   status: FreshStatus;
   started: string[];
+  /** Added already, nothing found yet: Radarr/Sonarr asked to look again. */
+  searched: string[];
   failed: Array<{ title: string; reason: string }>;
 }
 

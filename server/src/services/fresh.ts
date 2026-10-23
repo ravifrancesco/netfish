@@ -33,6 +33,11 @@ const WEEK = 7 * DAY;
 const GUESS: Record<MediaType, number> = { movie: 5 * GB, tv: 9 * GB };
 /** No release found for this long: given up on. */
 const GIVE_UP = 12 * 3600_000;
+/**
+ * Nothing grabbed yet: Radarr/Sonarr asked to look again this often (until GIVE_UP), one title
+ * per check at most: indexers turn away bursts of searches (Prowlarr's "too many requests").
+ */
+const SEARCH_AGAIN = 30 * 60_000;
 /** Deleted this long after its last airing ends. */
 const AFTER_AIRING = 15 * 60_000;
 
@@ -79,6 +84,8 @@ interface Fresh {
   episodes?: Episode[];
   /** Started with "Download now": downloads whatever the hours. */
   rush?: boolean;
+  /** When Radarr/Sonarr were last asked to look for it again (nothing grabbed yet). */
+  searchedAt?: number;
 }
 
 interface Stored {
@@ -476,6 +483,15 @@ async function addShow(f: Fresh, s: FreshSettings): Promise<number | undefined> 
   return series.id;
 }
 
+/** Asks Radarr (the film) or Sonarr (its first season) to look for it again. */
+async function searchAgain(f: Fresh, now: number) {
+  if (f.arrId === undefined) return;
+  f.searchedAt = now;
+  await settle(f.mediaType === 'movie' ? radarr.search([f.arrId]) : sonarr.searchSeason(f.arrId, 1), undefined, (err) =>
+    console.warn('[fresh] searching again', f.title, (err as Error).message),
+  );
+}
+
 /** Removes it from Radarr/Sonarr with its files (and from the torrent client, if still going). */
 async function remove(f: Fresh, queue: ArrQueueRecord[]) {
   if (f.arrId === undefined) return;
@@ -540,6 +556,7 @@ async function step(now: number) {
   const seriesById = new Map(seriesList.map((x) => [x.id, x]));
   const queueOf = (f: Fresh) => (f.mediaType === 'movie' ? movieQueue.filter((q) => q.movieId === f.arrId) : showQueue.filter((q) => q.seriesId === f.arrId));
   const gone: Fresh[] = [];
+  const looking: Fresh[] = [];
 
   for (const f of stored.titles) {
     f.airAt = link.airAt(f.key);
@@ -576,9 +593,15 @@ async function step(now: number) {
         noteEvent(f, 'nothing-found', now);
         await settle(remove(f, []), undefined);
         gone.push(f);
+      } else if (f.state === 'downloading' && now - (f.searchedAt ?? f.startedAt ?? f.addedAt) > SEARCH_AGAIN) {
+        // The search when it was added can find nothing it takes (indexers busy, many added at once): again.
+        looking.push(f);
       }
     }
   }
+  // One looked for again (the one waiting longest): never a burst of searches.
+  const next = looking.sort((a, b) => (a.searchedAt ?? a.startedAt ?? a.addedAt) - (b.searchedAt ?? b.startedAt ?? b.addedAt))[0];
+  if (next && !gone.includes(next)) await searchAgain(next, now);
   // Bigger than the space left, now the release is known: the newest download goes.
   const limit = s.maxGb * GB;
   const newest = stored.titles.filter((f) => f.state === 'downloading' && !f.keptBy && !gone.includes(f)).sort((a, b) => b.addedAt - a.addedAt)[0];
@@ -738,6 +761,7 @@ async function startDue(s: FreshSettings, go: boolean, lowDisk: boolean, now: nu
 export async function downloadNow(): Promise<FreshNowResult> {
   while (running) await running;
   const started: string[] = [];
+  const searched: string[] = [];
   const failed: FreshNowResult['failed'] = [];
   running = (async () => {
     if (!link) return;
@@ -746,6 +770,15 @@ export async function downloadNow(): Promise<FreshNowResult> {
     for (const f of stored.titles) {
       f.airAt = link.airAt(f.key);
       if (f.state === 'downloading') f.rush = true;
+    }
+    // Added, but nothing grabbed yet: the one on first looked for again now (the rest, one a
+    // check: indexers turn away bursts of searches).
+    const looking = stored.titles
+      .filter((f) => f.state === 'downloading' && f.progress === undefined && now - (f.searchedAt ?? 0) > 5 * 60_000)
+      .sort((a, b) => (a.airAt ?? a.notBefore) - (b.airAt ?? b.notBefore))[0];
+    if (looking) {
+      await searchAgain(looking, now);
+      searched.push(looking.title);
     }
     const due = stored.titles
       .filter((f) => f.state === 'planned' && (f.keptBy || now >= downloadAt(f, s)))
@@ -785,7 +818,7 @@ export async function downloadNow(): Promise<FreshNowResult> {
   await running;
   // Straight on: torrents started, the ones paused outside the hours going again.
   await runFresh();
-  return { status: await freshStatus(), started, failed };
+  return { status: await freshStatus(), started, searched, failed };
 }
 
 /**
