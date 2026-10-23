@@ -968,6 +968,12 @@ export interface ChannelDef {
  */
 export interface FreshSettings {
   enabled: boolean;
+  /**
+   * Started (Settings → Channels → Start): picking and downloading. Off while the channels are
+   * set up (New titles just turned on, or the channels started over), so nothing happens until
+   * then. Missing: started (set up before there was a Start).
+   */
+  running?: boolean;
   /** The most space they may take (GB), downloading ones included. */
   maxGb: number;
   /** Nothing new while the disk has less free than this (GB). */
@@ -1029,7 +1035,7 @@ export interface FreshStatus {
   freeBytes?: number;
   addedThisWeek: number;
   /** Why nothing's being added right now. */
-  waiting?: 'off' | 'no-channels' | 'hours' | 'space' | 'disk' | 'week' | 'enough' | 'services';
+  waiting?: 'off' | 'not-started' | 'no-channels' | 'hours' | 'space' | 'disk' | 'week' | 'enough' | 'services';
   titles: FreshTitle[];
   /** The last look inside the download hours: what happened then (outside them, "outside the hours" says little). */
   lastInHours?: { at: string; note: FreshNote; title?: string };

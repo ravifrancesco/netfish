@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Download, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
+import { Check, Download, Pause, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 import type { ChannelAdmin, ChannelSettings, FreshSettings, FreshStatus, FreshTitle } from '@netfish/shared';
 import { api } from '../api';
 import { Progress, Switch, useToast } from './ui';
@@ -115,6 +115,8 @@ function hoursText(last: NonNullable<FreshStatus['lastInHours']>): string {
 
 function waitingText(waiting: FreshStatus['waiting']): string | undefined {
   switch (waiting) {
+    case 'not-started':
+      return t('Not started: set up the channels and New titles, then press Start below.');
     case 'no-channels':
       return t('Pick channels with ✨ above.');
     case 'hours':
@@ -307,17 +309,25 @@ export function FreshTitles({ data, save, busy }: { data: ChannelAdmin; save: (p
               )}
             </span>
             <span className="spacer" />
-            <button
-              className="btn btn--ghost btn--sm"
-              onClick={() => now.mutate()}
-              disabled={now.isPending || !dueNow}
-              title={t('Starts what’s past its download time now, whatever the hours, and looks again for what hasn’t been found')}
-            >
-              <Download size={14} /> {now.isPending ? t('Starting…') : dueNow ? tn(dueNow, 'Download {n} now', 'Download {n} now') : t('Nothing due')}
-            </button>
-            <button className="btn btn--ghost btn--sm" onClick={() => check.mutate()} disabled={check.isPending}>
-              <RefreshCw size={14} className={check.isPending ? 'spin' : undefined} /> {check.isPending ? t('Checking…') : t('Check now')}
-            </button>
+            {/* Before Start, nothing to do here: the Start button (below) begins it all. */}
+            {fresh.running !== false && (
+              <>
+                <button className="btn btn--ghost btn--sm" onClick={() => set({ running: false })} disabled={busy} title={t('Nothing new is picked or started until you press Start; nothing is deleted')}>
+                  <Pause size={14} /> {t('Pause')}
+                </button>
+                <button
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => now.mutate()}
+                  disabled={now.isPending || !dueNow}
+                  title={t('Starts what’s past its download time now, whatever the hours, and looks again for what hasn’t been found')}
+                >
+                  <Download size={14} /> {now.isPending ? t('Starting…') : dueNow ? tn(dueNow, 'Download {n} now', 'Download {n} now') : t('Nothing due')}
+                </button>
+                <button className="btn btn--ghost btn--sm" onClick={() => check.mutate()} disabled={check.isPending}>
+                  <RefreshCw size={14} className={check.isPending ? 'spin' : undefined} /> {check.isPending ? t('Checking…') : t('Check now')}
+                </button>
+              </>
+            )}
           </div>
           {Boolean(s?.titles.length) && (
             <ul className="fresh__list">

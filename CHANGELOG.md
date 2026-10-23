@@ -7,6 +7,20 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.35 (2026-10-23)
+
+### New
+- **A Start button for the channels.** Setting up (choosing the ✨ channels, how many a week, the hours) no longer starts anything by itself. When it's all set, press **Start** (Settings → Channels): it makes the guide again, picks the New titles, and downloads what's due straight away, whatever the download hours, for the next three hours. Turning New titles on, or *Start over with automatic channels*, waits for Start again. **Pause** stops new picks and downloads without deleting anything. Set up before this version: it keeps running, nothing to press.
+
+### Fixed
+- **Start over lost every channel's ✨, and with it their New titles.** Channels made from the same thing as before (Netfish's own included) keep their ✨ and their new titles; only those of channels that go are deleted.
+- **One channel could take the whole week of New titles** (when it was the only one with ✨ left, or the others found nothing). Each channel now takes at most its share.
+- **Netfish's own picked mostly cartoons** after 0.7.34. What its timetable lacks is now every third pick, in turn, and it starts with a film, a documentary and a sitcom as before.
+- The guide is made again for the latest timetable after the update (0.7.33 and 0.7.34 needed *Rebuild the guide* for that).
+
+### Update
+- **Server.**
+
 ## 0.7.34 (2026-10-23)
 
 ### Fixed

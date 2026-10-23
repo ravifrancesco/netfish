@@ -177,6 +177,7 @@ export const api = {
   freshRun: () => call<FreshStatus>('/admin/channels/fresh/run', { method: 'POST' }),
   freshNow: () => call<FreshNowResult>('/admin/channels/fresh/now', { method: 'POST' }),
   rebuildGuide: () => call<ChannelAdmin>('/admin/channels/rebuild', { method: 'POST' }),
+  startChannels: () => call<ChannelAdmin>('/admin/channels/start', { method: 'POST' }),
   freshKeep: (key: string) => call<FreshStatus>('/admin/channels/fresh/keep', { body: { key } }),
   freshRemove: (key: string) => call<FreshStatus>('/admin/channels/fresh/remove', { body: { key } }),
 

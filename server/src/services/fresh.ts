@@ -341,7 +341,7 @@ interface Want {
 
 /**
  * What a channel would like new, given what it plays. `turn` varies Netfish's own channel;
- * `short`: what its timetable has too few shows for (those every other turn, so its times fill).
+ * `short`: what its timetable has too few shows for (those every third turn, so its times fill).
  */
 export function wantsOf(source: ChannelSource, turn = 0, short: Array<'cartoon' | 'sitcom' | 'drama'> = []): Want[] {
   switch (source.kind) {
@@ -357,11 +357,13 @@ export function wantsOf(source: ChannelSource, turn = 0, short: Array<'cartoon' 
       // ("Family" is fine: The Simpsons is Animation, Comedy, Family. Kids isn't.)
       const cartoon: Want = { mediaType: 'tv', genres: [ANIMATION], need: [COMEDY], avoid: [KIDS] };
       const drama: Want = { mediaType: 'tv', genres: [DRAMA, CRIME, MYSTERY], avoid: [ANIMATION, KIDS, DOCUMENTARY, COMEDY] };
-      if (short.length && turn % 2 === 0) {
-        const need = { cartoon, sitcom, drama }[short[(turn / 2) % short.length]];
+      // Every third: what the timetable's short of (the scarcest first, then the next), not more,
+      // so its new things stay of every kind.
+      if (short.length && turn % 3 === 2) {
+        const need = { cartoon, sitcom, drama }[short[Math.floor(turn / 3) % short.length]];
         return [need, film];
       }
-      const n = short.length ? Math.floor(turn / 2) : turn;
+      const n = short.length ? turn - Math.floor((turn + 1) / 3) : turn;
       const documentaries = Math.floor(n / 5) % 2 ? [docFilm, docSeries] : [docSeries, docFilm];
       const kinds = [[film], documentaries, [sitcom], [film], [cartoon]][n % 5];
       return kinds.includes(film) ? kinds : [...kinds, film];
@@ -918,11 +920,15 @@ async function step(now: number) {
     }
   }
 
-  // The next one due to download (its airing is the admin's days away), then something new for the guide.
+  // The next one due to download (its airing is the admin's days away), then something new for the
+  // guide. Not before Start: the channels are being set up.
   stored.log = stored.log.filter((x) => x.at > now - WEEK);
-  const starting = defs.length ? await startDue(s, go, lowDisk, now, hours) : undefined;
-  const planning = await planOne(s, defs, now, settings.timeZone);
-  lastWaiting = starting ?? planning;
+  if (s.enabled && s.running === false) lastWaiting = 'not-started';
+  else {
+    const starting = defs.length ? await startDue(s, go, lowDisk, now, hours) : undefined;
+    const planning = await planOne(s, defs, now, settings.timeZone);
+    lastWaiting = starting ?? planning;
+  }
   if (JSON.stringify(stored.titles.map((f) => [f.key, f.state, f.airAt])) !== before) onChange();
   save();
 }
@@ -1121,6 +1127,8 @@ async function planOne(s: FreshSettings, defs: ChannelDef[], now: number, timeZo
   const order = byTurn(defs).sort((a, b) => behind(b) - behind(a));
   let full: FreshStatus['waiting'];
   for (const def of order) {
+    // Not more than its share: one finding nothing doesn't hand the week to another.
+    if (pickedThisWeek(now, def.id) >= Math.ceil(share(def))) continue;
     // Spread over the channel's week (its share of it), each far enough ahead to download in good time.
     const last = Math.max(0, ...mine(def.id).map((f) => f.notBefore));
     const spread = Math.max(now + s.aheadDays * DAY, last + WEEK / Math.max(1, share(def)));
@@ -1207,8 +1215,11 @@ export function validFresh(v: unknown, current?: FreshSettings): FreshSettings {
     return value !== undefined && value !== null && Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
   };
   const profile = (value: unknown) => (Number.isInteger(value) && (value as number) > 0 ? (value as number) : undefined);
+  // Turned on: not started yet (the channels are set up first, then Start).
+  const turningOn = 'enabled' in x && Boolean(x.enabled) && !base.enabled;
   return {
     enabled: 'enabled' in x ? Boolean(x.enabled) : base.enabled,
+    running: turningOn ? false : 'running' in x ? Boolean(x.running) : base.running,
     maxGb: num(x.maxGb, base.maxGb, 5, 20_000),
     minFreeGb: num(x.minFreeGb, base.minFreeGb, 0, 100_000),
     fromHour: num(x.fromHour, base.fromHour, 0, 23),

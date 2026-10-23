@@ -5629,6 +5629,20 @@ html.is-desktop.is-mac.is-fullscreen .channel__top {
   flex: 1;
   min-width: 0;
 }
+/* Start, once the channels and New titles are set up. */
+.chanset__start {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.chanset__start .muted {
+  flex: 1;
+  min-width: 220px;
+}
 .chanset__list {
   display: grid;
   gap: 4px;

@@ -54,7 +54,7 @@ import { hideFromContinue, setPosition, setWatched } from './services/watched';
 import { readyToWatch } from './services/ready';
 import { command, control, createRoom, endRoom, getRoom, leave, listRooms, openStream, setTracks, setWaiting } from './services/together';
 import { listDevices, listScreens, openLive, playOn } from './services/screens';
-import { channelAdmin, channelsEnabled, keyOfItem, listChannels, rebuildGuide, resetChannels, updateChannels, watching } from './services/channels';
+import { channelAdmin, channelsEnabled, keyOfItem, listChannels, rebuildGuide, resetChannels, startChannels, updateChannels, watching } from './services/channels';
 import { downloadNow, freshRequested, freshStatus, keepFresh, noteChosen, removeFresh, runFresh } from './services/fresh';
 import { catalog } from './services/catalog';
 import { gb, log } from './lib/log';
@@ -547,6 +547,11 @@ export async function apiRoutes(app: FastifyInstance) {
     api.post('/admin/channels/reset', { preHandler: requireAdmin }, async (req) => {
       const done = await resetChannels(userOf(req));
       log.info('channels', `${userOf(req).name} started over with automatic channels (${done.channels.length})`);
+      return done;
+    });
+    api.post('/admin/channels/start', { preHandler: requireAdmin }, async (req) => {
+      const done = await startChannels(userOf(req));
+      log.info('channels', `${userOf(req).name} started the channels (guide made again, New titles on their way)`);
       return done;
     });
     api.post('/admin/channels/rebuild', { preHandler: requireAdmin }, async (req) => {

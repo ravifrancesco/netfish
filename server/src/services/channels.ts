@@ -58,7 +58,7 @@ interface Round {
  * The rules schedules are made by. Raised when they change (a new timetable for Netfish's own
  * channel, say), so a week already planned is made again, from a few minutes ahead.
  */
-const PLAN = 8;
+const PLAN = 9;
 
 interface Schedule {
   /** What the channel was built from: a different source starts a new schedule. */
@@ -1600,8 +1600,6 @@ export async function updateChannels(user: SessionUser, patch: Partial<Record<ke
   const ids = new Set(next.channels.map((c) => c.id));
   const movedZone = next.timeZone !== stored.settings.timeZone;
   for (const id of Object.keys(stored.schedules)) if (!ids.has(id) || movedZone) delete stored.schedules[id];
-  const freshOn = (x: ChannelSettings) => Boolean(x.enabled && x.fresh?.enabled && x.channels.some((c) => c.fresh));
-  if (!freshOn(stored.settings) && freshOn(next)) rushFresh('New titles turned on');
   stored = { ...stored, settings: next };
   save();
   // New titles follow the settings straight away (starting, or deleting what's no longer wanted).
@@ -1630,13 +1628,36 @@ export async function rebuildGuide(user: SessionUser): Promise<ChannelAdmin> {
   return channelAdmin(user);
 }
 
+/**
+ * Start (once the channels and New titles are set up): the guide made again from now, New titles
+ * picked straight away, and what's due downloading straight away, whatever the hours, for a few
+ * hours, so the guide fills with the real thing.
+ */
+export async function startChannels(user: SessionUser): Promise<ChannelAdmin> {
+  if (!stored.settings.enabled) throw new HttpError(404, t('Channels are off'));
+  if (stored.settings.fresh?.enabled) {
+    stored.settings = { ...stored.settings, fresh: { ...stored.settings.fresh, running: true } };
+    rushFresh('Started');
+  }
+  save();
+  return rebuildGuide(user);
+}
+
 /** Starts over with the automatic line-up (the library has changed a lot, or to undo edits). */
 export async function resetChannels(user: SessionUser): Promise<ChannelAdmin> {
   const real = await getLibrary(user, true);
-  const channels = automatic(real);
-  stored = { settings: { ...stored.settings, channels }, schedules: {} };
-  // New titles for the new channels download straight away, whatever the hours (once they're on).
-  rushFresh('Channels started over');
+  // A channel made from the same thing as before keeps what it was (its ✨ New titles, and so
+  // the new titles it has), Netfish's own too; only the others' go.
+  const before = [...stored.settings.channels];
+  const channels = automatic(real).map((c) => {
+    const i = before.findIndex((b) => sourceKey(b.source) === sourceKey(c.source) && Boolean(b.builtIn) === Boolean(c.builtIn));
+    if (i < 0) return c;
+    const [same] = before.splice(i, 1);
+    return { ...c, id: same.id, ...(same.fresh ? { fresh: true } : {}) };
+  });
+  // Set up again: New titles wait for Start (nothing new picked or started until then).
+  const fresh = stored.settings.fresh?.enabled ? { ...stored.settings.fresh, running: false } : stored.settings.fresh;
+  stored = { settings: { ...stored.settings, channels, fresh }, schedules: {} };
   // The new guide made straight away, so it's there when the guide's opened.
   if (stored.settings.enabled) {
     const now = Date.now();

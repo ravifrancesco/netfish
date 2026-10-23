@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, Eye, EyeOff, History, Plus, RadioTower, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Eye, EyeOff, History, Play, Plus, RadioTower, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
 import type { ChannelAdmin, ChannelDef, ChannelSettings as Settings, ChannelSource } from '@netfish/shared';
 import { api } from '../api';
 import { ErrorState, Modal, Spinner, Switch, useToast } from './ui';
@@ -141,6 +141,15 @@ export function ChannelSettings() {
     },
     onError: (e) => toast('error', (e as Error).message),
   });
+  // Start, once it's all set up: the guide made again, New titles picked and downloaded straight away.
+  const start = useMutation({
+    mutationFn: api.startChannels,
+    onSuccess: (data) => {
+      done(data);
+      toast('ok', data.fresh?.enabled ? t('Started: guide made again, New titles on their way.') : t('Started: guide made again.'));
+    },
+    onError: (e) => toast('error', (e as Error).message),
+  });
   const [confirmReset, setConfirmReset] = useState(false);
 
   if (q.isError) return <ErrorState error={q.error} retry={() => void q.refetch()} />;
@@ -239,6 +248,14 @@ export function ChannelSettings() {
           </ul>
           <AddChannel data={data} busy={save.isPending} onAdd={(def) => setChannels([...channels, { id: '', number: channels.length + 1, ...def }])} />
           <FreshTitles data={data} busy={save.isPending} save={(patch) => save.mutate(patch)} />
+          {data.fresh?.enabled && data.fresh.running === false && (
+            <div className="chanset__start">
+              <button className="btn btn--primary" onClick={() => start.mutate()} disabled={start.isPending || save.isPending}>
+                {start.isPending ? <Spinner size={14} /> : <Play size={14} />} {start.isPending ? t('Starting…') : t('Start')}
+              </button>
+              <span className="muted small">{t('When the channels and New titles are set up: makes the guide again, picks New titles and downloads what’s due straight away (whatever the download hours, for the next three hours).')}</span>
+            </div>
+          )}
           <div className="row-gap">
             <button className="btn btn--ghost btn--sm" onClick={() => rebuild.mutate()} disabled={rebuild.isPending} title={t('Keeps your channels; what’s on now carries on')}>
               {rebuild.isPending ? <Spinner size={14} /> : <RotateCcw size={14} />} {t('Rebuild the guide')}
@@ -277,7 +294,8 @@ export function ChannelSettings() {
           }
         >
           <p className="muted">{t('Your channels are replaced by a new set made from the library, and every schedule starts again.')}</p>
-          {data.fresh?.enabled && <p className="muted">{t('New titles waiting for their channel are deleted (ones someone kept stay).')}</p>}
+          {data.fresh?.enabled && <p className="muted">{t('Nothing new is picked or downloaded until you press Start.')}</p>}
+          {data.fresh?.enabled && <p className="muted">{t('Channels made from the same thing keep their ✨ New titles; those of channels that go are deleted (ones someone kept stay).')}</p>}
         </Modal>
       )}
     </div>
