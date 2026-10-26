@@ -236,6 +236,9 @@ function Episodes({ d, titleRef, onSheet, initialSeason }: { d: TitleDetail; tit
   const seasons = d.seasons ?? [];
   const [season, setSeason] = useState(initialSeason ?? seasons.find((s) => s.status === 'available' || s.status === 'partial')?.seasonNumber ?? seasons[0]?.seasonNumber ?? 1);
   const current = seasons.find((s) => s.seasonNumber === season);
+  // "On its way" with nothing downloading: Seerr says so as soon as Sonarr watches a season, found
+  // or not. It can be asked for (Sonarr looks for it now).
+  const stalled = current?.status === 'processing' && !d.downloads.some((x) => x.seasonNumber === undefined || x.seasonNumber === season);
   const q = useQuery({
     queryKey: ['season', titleRef.type, String(titleRef.id), season],
     queryFn: () => api.season(titleRef, season),
@@ -254,9 +257,9 @@ function Episodes({ d, titleRef, onSheet, initialSeason }: { d: TitleDetail; tit
             </option>
           ))}
         </select>
-        {current && <StatusChip status={current.status} />}
+        {current && !stalled && <StatusChip status={current.status} />}
         <span className="spacer" />
-        {current?.status === 'none' && d.tmdbId && <RequestSeason d={d} season={current} />}
+        {(current?.status === 'none' || stalled) && d.tmdbId && current && <RequestSeason d={d} season={current} />}
         {d.canChooseVersion && (
           <button className="btn btn--ghost btn--sm" onClick={() => onSheet({ kind: 'versions', seasonNumber: season })}>
             <Layers size={16} /> {t('Versions')}

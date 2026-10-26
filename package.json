@@ -1,6 +1,6 @@
 {
   "name": "netfish",
-  "version": "0.7.38",
+  "version": "0.7.39",
   "private": true,
   "description": "A Netflix-style front door for a Jellyfin + Seerr + *arr home media stack.",
   "license": "MIT",

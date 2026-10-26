@@ -261,6 +261,7 @@ const IT: Record<string, string> = {
   'Up to 99 channels': 'Al massimo 99 canali',
   'Channel {n}': 'Canale {n}',
   'Not a new title on a channel': 'Non è un titolo nuovo di un canale',
+  'Already requested': 'Già richiesto',
   'Radarr has no library folder or quality profile': 'Radarr non ha una cartella della libreria o un profilo di qualità',
   'Sonarr has no library folder or quality profile': 'Sonarr non ha una cartella della libreria o un profilo di qualità',
 };

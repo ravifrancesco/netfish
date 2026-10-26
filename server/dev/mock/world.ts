@@ -282,6 +282,8 @@ export function seasonStatus(t: Title, s: number): number {
   if (library.has(`tv-${t.tmdbId}-${s}`)) return 5;
   if (downloads.some((d) => d.title === t && d.season === s)) return 3;
   if (statusOverride.has(`tv-${t.tmdbId}`)) return statusOverride.get(`tv-${t.tmdbId}`)!;
+  // MOCK_STALLED_SEASON=1: Depth Charge's third season "on its way" (Sonarr watches it), nothing downloading, never requested.
+  if (process.env.MOCK_STALLED_SEASON && t.n === 101 && s === 3) return 3;
   const req = requests.find((r) => r.type === 'tv' && r.tmdbId === t.tmdbId && r.seasons.includes(s) && r.status !== 3);
   if (req) return req.status === 1 ? 2 : 3;
   return 1;

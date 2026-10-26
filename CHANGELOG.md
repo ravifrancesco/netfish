@@ -7,6 +7,14 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.39 (2026-10-25)
+
+### Fixed
+- **A season you never asked for said "On its way", with no way to request it.** Seerr calls a season on its way as soon as Sonarr watches it, whether or not anything was ever found (a show added with all its seasons watched, say), and then won't take a request for it. Such a season, with nothing downloading, now shows **Request season N** again; pressed, Sonarr looks for it straight away (the log says so). Seasons nobody has go through Seerr as before.
+
+### Update
+- **Server.**
+
 ## 0.7.38 (2026-10-23)
 
 ### Changed

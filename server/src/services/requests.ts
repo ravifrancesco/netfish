@@ -1,6 +1,10 @@
 import type { CreateRequest, DownloadItem, RequestItem, RequestStatus, RequestSummary } from '@netfish/shared';
 import type { SessionUser } from '../auth';
 import { seerr, type SeerrRequest } from '../clients/seerr';
+import { sonarr } from '../clients/arr';
+import { has } from '../config';
+import { log } from '../lib/log';
+import { t } from '../lib/i18n';
 import { mapLimit, settle } from '../lib/async';
 import { SECOND, TTLCache } from '../lib/cache';
 import { HttpError } from '../lib/upstream';
@@ -104,6 +108,23 @@ export async function myRequestKeys(user: SessionUser): Promise<Set<string>> {
   return new Set(requests.flatMap((r) => [`${r.type}-${r.media.tmdbId}`, ...(r.media.tvdbId ? [`tvdb-${r.media.tvdbId}`] : [])]));
 }
 
+/** In Sonarr already: these seasons watched, and looked for now. False if Sonarr hasn't the show. */
+async function searchSeasons(tmdbId: number, seasons: number[]): Promise<boolean> {
+  if (!has.sonarr()) return false;
+  const tvdbId = (await settle(catalog.tv(tmdbId), undefined))?.externalIds?.tvdbId;
+  const series = tvdbId ? await settle(sonarr.seriesByTvdb(tvdbId), undefined) : undefined;
+  if (!series) return false;
+  const episodes = await sonarr.episodes(series.id);
+  await sonarr.setEpisodesMonitored(
+    episodes.filter((e) => seasons.includes(e.seasonNumber)).map((e) => e.id),
+    true,
+  );
+  await sonarr.setSeriesMonitored([series.id], true);
+  for (const season of seasons) await sonarr.searchSeason(series.id, season);
+  log.info('requests', `Sonarr is looking for ${series.title} season ${seasons.join(', ')} now`);
+  return true;
+}
+
 export async function createRequest(user: SessionUser, body: CreateRequest): Promise<RequestSummary> {
   if ((body.mediaType !== 'movie' && body.mediaType !== 'tv') || !Number.isInteger(body.tmdbId)) {
     throw new HttpError(400, 'mediaType and tmdbId are required');
@@ -111,7 +132,23 @@ export async function createRequest(user: SessionUser, body: CreateRequest): Pro
   const seerrId = await seerrUserId(user);
   const seasons =
     body.mediaType === 'tv' ? (body.seasons?.length ? body.seasons.filter((n) => Number.isInteger(n)) : 'all') : undefined;
-  const created = await seerr.createRequest({ mediaType: body.mediaType, mediaId: body.tmdbId, seasons }, seerrId);
+  let refused: unknown;
+  let created = await settle(seerr.createRequest({ mediaType: body.mediaType, mediaId: body.tmdbId, seasons }, seerrId), undefined, (err) => {
+    refused = err;
+  });
+  // Seerr's "No seasons available to request" (they're already "on its way" to it): no request made.
+  if (created && typeof created.id !== 'number') {
+    refused = new HttpError(409, (created as { message?: string }).message ?? t('Already requested'));
+    created = undefined;
+  }
+  // Seerr wouldn't take it: seasons it calls "on its way" because Sonarr watches them, found or
+  // not. Sonarr has the show, so it looks for them now (when Seerr takes it, Seerr has Sonarr look).
+  if (!created) {
+    const searched = body.mediaType === 'tv' && Array.isArray(seasons) && seasons.length ? await settle(searchSeasons(body.tmdbId, seasons), false) : false;
+    if (!searched) throw refused;
+    catalog.invalidate(body.mediaType, body.tmdbId);
+    return { id: 0, status: 'approved', requestedBy: user.name, mine: true, createdAt: new Date().toISOString(), seasons: seasons as number[] };
+  }
   catalog.invalidate(body.mediaType, body.tmdbId);
   // Seerr has just handed it to Radarr/Sonarr: look again instead of trusting "not managed".
   if (body.mediaType === 'movie') forgetRadarrMovie(body.tmdbId);
