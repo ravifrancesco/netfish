@@ -281,12 +281,13 @@ const guess = (type: MediaType) => {
 /** On disk or on the way. */
 const used = () => stored.titles.filter((f) => f.state === 'downloading' || f.state === 'ready' || f.state === 'aired').reduce((n, f) => n + f.size, 0);
 /**
- * And what's planned will take: the ones on the disk with what's there now (they download in the
- * next few days). A week's worth isn't all there at once (each goes once it has aired), so picking
- * isn't held up by space that'll be free by then. (A download still waits if the disk is full.)
+ * And what's planned will take: the ones on within the days Download ahead says (so due to
+ * download now), on the disk with what's there. Each is deleted once it has aired (unless someone
+ * keeps it), so the week's further out don't count yet: picking isn't held up by space that'll be
+ * free by then. (A download still waits if the disk is full.)
  */
 const plannedSoon = (s: FreshSettings, now: number) =>
-  stored.titles.filter((f) => f.state === 'planned' && downloadAt(f, s) < now + (s.aheadDays + 2) * DAY).reduce((n, f) => n + guess(f.mediaType), 0);
+  stored.titles.filter((f) => f.state === 'planned' && downloadAt(f, s) <= now).reduce((n, f) => n + guess(f.mediaType), 0);
 const upcoming = () => stored.titles.filter((f) => f.state === 'planned' || f.state === 'downloading' || f.state === 'ready');
 /**
  * Picked in the last week, still here or downloaded: one taken off before it was (by an admin, by
@@ -1258,23 +1259,35 @@ async function planOne(s: FreshSettings, defs: ChannelDef[], now: number, timeZo
   if (!defs.length) return 'no-channels';
   if (!has.seerr() || (!has.radarr() && !has.sonarr())) return 'services';
   const mine = (id: string) => upcoming().filter((f) => f.channelId === id);
-  if (pickedThisWeek(now) >= s.perWeek) return 'week';
-  // (Those filling holes in Netfish's guide aren't the week's.)
-  if (upcoming().filter((f) => f.hole === undefined).length >= s.perWeek) return 'enough';
   const weight = (d: ChannelDef) => (d.source.kind === 'mix' ? Math.max(1, defs.length - 1) : 1);
   const total = defs.reduce((n, d) => n + weight(d), 0);
   const share = (d: ChannelDef) => (s.perWeek * weight(d)) / total;
+  // Catching up (after Start, Rebuild the guide, a channel given ✨): each channel's share of the
+  // days caught up first, spread over them, whatever the week's count, so the guide's full of new
+  // titles from the start; they download straight away.
+  const until = stored.rushUntil ?? 0;
+  const inWindow = (d: ChannelDef) => mine(d.id).filter((f) => f.notBefore < until);
+  const windowShare = (d: ChannelDef) => Math.max(1, Math.round((share(d) * (until - now)) / WEEK));
+  const catchUp = now < until ? byTurn(defs).filter((d) => inWindow(d).length < windowShare(d)) : [];
+  if (!catchUp.length) {
+    if (pickedThisWeek(now) >= s.perWeek) return 'week';
+    // (Those filling holes in Netfish's guide aren't the week's.)
+    if (upcoming().filter((f) => f.hole === undefined).length >= s.perWeek) return 'enough';
+  }
   const behind = (d: ChannelDef) => share(d) - pickedThisWeek(now, d.id);
-  const order = byTurn(defs).sort((a, b) => behind(b) - behind(a));
+  const order = catchUp.length
+    ? catchUp.sort((a, b) => inWindow(a).length / windowShare(a) - inWindow(b).length / windowShare(b))
+    : byTurn(defs).sort((a, b) => behind(b) - behind(a));
   let full: FreshStatus['waiting'];
   for (const def of order) {
     // Not more than its share: one finding nothing doesn't hand the week to another.
-    if (pickedThisWeek(now, def.id) >= Math.ceil(share(def))) continue;
+    if (!catchUp.length && pickedThisWeek(now, def.id) >= Math.ceil(share(def))) continue;
     // Spread over the channel's week (its share of it), each far enough ahead to download in good
-    // time; catching up after Start, from a few hours on (it downloads straight away).
-    const last = Math.max(0, ...mine(def.id).map((f) => f.notBefore));
-    const soonest = now < (stored.rushUntil ?? 0) ? now + CATCH_UP_LEAD : now + s.aheadDays * DAY;
-    const spread = Math.max(soonest, last + WEEK / Math.max(1, share(def)));
+    // time; catching up, over the days caught up, from a few hours on.
+    const soonest = catchUp.length ? now + CATCH_UP_LEAD : now + s.aheadDays * DAY;
+    const last = Math.max(0, ...(catchUp.length ? inWindow(def) : mine(def.id)).map((f) => f.notBefore));
+    const gap = catchUp.length ? Math.max(0, until - soonest) / windowShare(def) : WEEK / Math.max(1, share(def));
+    const spread = Math.max(soonest, last + gap);
     const turn = turnOf(def.id);
     for (const want of wantsOf(def.source, turn, def.source.kind === 'mix' ? (link?.short() ?? []) : [])) {
       // Netfish's own films: Friday's and Saturday's nine o'clock first.
@@ -1282,7 +1295,8 @@ async function planOne(s: FreshSettings, defs: ChannelDef[], now: number, timeZo
         def.source.kind === 'mix' && want.mediaType === 'movie' && !want.genres.includes(DOCUMENTARY)
           ? weekendNight(spread, mine(def.id).filter((f) => f.mediaType === 'movie').map((f) => f.notBefore), timeZone)
           : undefined;
-      const notBefore = evening ?? spread;
+      // (Catching up: the weekend's only if it's one of the days caught up.)
+      const notBefore = evening !== undefined && (!catchUp.length || evening < until) ? evening : spread;
       if ((want.mediaType === 'movie' && !has.radarr()) || (want.mediaType === 'tv' && !has.sonarr())) continue;
       const need = guess(want.mediaType);
       if (used() + plannedSoon(s, now) + need > s.maxGb * GB) {

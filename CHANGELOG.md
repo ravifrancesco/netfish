@@ -11,9 +11,11 @@ Install files for every version are on [Releases](https://github.com/ravifrances
 
 ### New
 - **When it ends, in the player.** Next to the time: "0:42 / 1:58 · ends 9:43 PM" (when it'd be over watched from here, in your device's time). The channel player says it too: "12 min left · ends 9:30 PM".
+- **The guide has no holes.** Each programme's card now reaches the next one's start, the break after it included, so every channel's line is filled end to end. In the break, the card says when the next one starts ("Next at 9:00 PM") instead of "0 min left".
+- **New titles fill the guide straight away when channels start.** After **Start**, after **Rebuild the guide**, and for a channel just given ✨ (new, or turned on for it), New titles catch up: each channel's share of the next days (as many as *Download ahead* says) is picked at once, spread over those days, and downloaded straight away, whatever the download hours. A film waits for Friday or Saturday only if one of them is among those days. From then on, as usual: each title its days ahead, in the download hours.
 
 ### Fixed
-- **New titles: "Space full until some air" with almost nothing on the disk.** Every title planned for the week counted towards *Space for them* (about 5 GB a film, 9 GB a show) long before it downloaded, so a high weekly number filled it with plans and picking stopped. Now only what will be on the disk at the same time counts (the ones downloading in the next few days); each goes after it has aired, so the rest fits by then. A download still waits if the disk really is full.
+- **New titles: "Space full until some air" with almost nothing on the disk.** Every title planned for the week counted towards *Space for them* (about 5 GB a film, 9 GB a show) long before it downloaded, so a high weekly number filled it with plans and picking stopped. Now *Space for them* counts what's on the disk and the planned titles that are on within your *Download ahead* days (3 days: the next 3 days' worth): that's what's on the disk at any one time, since each is deleted once it has aired, unless someone keeps it. Titles further out don't count until then. A download still waits if the disk really is full.
 
 ### Update
 - **Server.**

@@ -1681,10 +1681,16 @@ export async function updateChannels(user: SessionUser, patch: Partial<Record<ke
   const ids = new Set(next.channels.map((c) => c.id));
   const movedZone = next.timeZone !== stored.settings.timeZone;
   for (const id of Object.keys(stored.schedules)) if (!ids.has(id) || movedZone) delete stored.schedules[id];
+  // A channel that's just been given ✨ (new, or turned on for it): it catches up like Start, its
+  // next days' New titles downloaded straight away, whatever the hours.
+  const freshIds = (x: ChannelSettings) => new Set(x.enabled && x.fresh?.enabled ? x.channels.filter((c) => c.fresh && !c.hidden).map((c) => c.id) : []);
+  const before = freshIds(stored.settings);
+  const added = [...freshIds(next)].filter((id) => !before.has(id));
   stored = { ...stored, settings: next };
   save();
   // New titles follow the settings straight away (starting, or deleting what's no longer wanted).
-  void runFresh();
+  if (added.length && freshStarted()) void startFresh(`New titles for ${next.channels.filter((c) => added.includes(c.id)).map((c) => c.name).join(', ')}`);
+  else void runFresh();
   return channelAdmin(user);
 }
 
@@ -1692,7 +1698,7 @@ export async function updateChannels(user: SessionUser, patch: Partial<Record<ke
  * Makes the guide again from now, channels and settings as they are: what's on now carries on,
  * everything after it is picked again (new titles placed again too).
  */
-export async function rebuildGuide(user: SessionUser): Promise<ChannelAdmin> {
+export async function rebuildGuide(user: SessionUser, why = 'Guide made again'): Promise<ChannelAdmin> {
   if (!stored.settings.enabled) throw new HttpError(404, t('Channels are off'));
   const now = Date.now();
   const real = await getLibrary(user, true);
@@ -1704,10 +1710,15 @@ export async function rebuildGuide(user: SessionUser): Promise<ChannelAdmin> {
   const visible = stored.settings.channels.filter((c) => !c.hidden);
   for (const def of visible) extend(def, real, now, timeZone());
   save();
-  // The new titles' times follow the new guide straight away.
-  void runFresh();
+  // New titles catch up with the new guide: the next days' downloaded straight away, whatever the
+  // hours; from then on, in them as usual. (Before Start: nothing yet.)
+  if (freshStarted()) void startFresh(why);
+  else void runFresh();
   return channelAdmin(user);
 }
+
+/** New titles on and started (Start pressed, or set up before there was one). */
+const freshStarted = () => Boolean(stored.settings.enabled && stored.settings.fresh?.enabled && stored.settings.fresh.running !== false);
 
 /**
  * Start (once the channels and New titles are set up): the guide made again from now, and New
@@ -1719,9 +1730,8 @@ export async function startChannels(user: SessionUser): Promise<ChannelAdmin> {
   const fresh = Boolean(stored.settings.fresh?.enabled);
   if (fresh) stored.settings = { ...stored.settings, fresh: { ...stored.settings.fresh!, running: true } };
   save();
-  const done = await rebuildGuide(user);
-  if (fresh) void startFresh('Started');
-  return done;
+  // (Making the guide again starts New titles catching up.)
+  return rebuildGuide(user, 'Started');
 }
 
 /** Starts over with the automatic line-up (the library has changed a lot, or to undo edits). */

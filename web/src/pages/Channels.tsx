@@ -63,6 +63,7 @@ function Block({
   channel,
   origin,
   until,
+  reachesTo,
   px,
   now,
   onAbout,
@@ -72,6 +73,8 @@ function Block({
   origin: number;
   /** Where the guide ends: what runs on past it stops there, with the rest. */
   until: number;
+  /** When the next one starts: the card goes up to it, the break after it included (no gaps in the guide). */
+  reachesTo?: number;
   px: number;
   now: number;
   onAbout: (program: ChannelProgram, channel: Channel) => void;
@@ -79,15 +82,19 @@ function Block({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLElement>(null);
   const end = programEnd(program);
-  const onNowBlock = program.start <= now && now < end;
+  // The card: the programme and the break after it, up to the next one.
+  const edge = Math.max(end, reachesTo ?? end);
+  const onNowBlock = program.start <= now && now < edge;
   // Already over (between where the guide starts and now): there, greyed, nothing to do with it.
-  const past = end <= now;
+  const past = edge <= now;
   const from = Math.max(program.start, origin);
   const left = (from - origin) * px;
   // One reaching the guide's end goes right up to it (no gap after): every channel ends on one line.
-  const width = end >= until ? Math.max(1, (until - from) * px) : Math.max(2, (end - from) * px - GAP);
+  const width = edge >= until ? Math.max(1, (until - from) * px) : Math.max(2, (edge - from) * px - GAP);
   const sub = episodeLine(program);
   const minutesLeft = Math.max(0, Math.ceil((end - now) / MINUTE));
+  // (In the break after it: when the next one starts, rather than "0 min left".)
+  const inBreak = now >= end && now < edge;
   // Too thin for a word: blank until it opens. Short: a smaller title, no time.
   const short = width < 40 && !onNowBlock ? ' is-tiny' : width < 110 ? ' is-narrow' : '';
   // Only its title shows; hovered (or with the remote on it) it opens out over its neighbours, at
@@ -112,7 +119,7 @@ function Block({
           {programTitle(program)}
         </span>
         <span className="guide__prog-meta">
-          {onNowBlock ? tn(minutesLeft, '{n} min left', '{n} min left') : clockTime(program.start)}
+          {onNowBlock ? (inBreak ? t('Next at {time}', { time: clockTime(edge) }) : tn(minutesLeft, '{n} min left', '{n} min left')) : clockTime(program.start)}
           {sub ? ` · ${sub}` : ''}
         </span>
       </span>
@@ -397,7 +404,11 @@ export default function ChannelsPage() {
               </div>
               <ul className="guide__rows">
                 {channels.map((channel) => {
-                  const list = (programs.get(channel.id) ?? []).filter((p) => programEnd(p) > Math.max(origin, shownFrom) && p.start < Math.min(shownUntil, limit));
+                  // Each with the next one's start (its card goes up to it, the break included).
+                  const all = programs.get(channel.id) ?? [];
+                  const list = all
+                    .map((p, i) => ({ p, reachesTo: all[i + 1]?.start }))
+                    .filter(({ p, reachesTo }) => Math.max(programEnd(p), reachesTo ?? 0) > Math.max(origin, shownFrom) && p.start < Math.min(shownUntil, limit));
                   return (
                     <li key={channel.id} className="guide__row">
                       <Link to={`/channels/${channel.number}`} className="guide__chan" aria-label={`${channel.number} ${channel.name}`}>
@@ -410,7 +421,9 @@ export default function ChannelsPage() {
                       <span className="guide__line">
                         {px > 0 &&
                           (list.length ? (
-                            list.map((p) => <Block key={`${p.itemId}${p.start}`} program={p} channel={channel} origin={origin} until={limit} px={px} now={now} onAbout={openAbout} />)
+                            list.map(({ p, reachesTo }) => (
+                              <Block key={`${p.itemId}${p.start}`} program={p} channel={channel} origin={origin} until={limit} reachesTo={reachesTo} px={px} now={now} onAbout={openAbout} />
+                            ))
                           ) : (
                             <span className="guide__empty muted small" style={{ left: x(Math.max(now, viewStart)) }}>
                               {t('Nothing to play yet')}
