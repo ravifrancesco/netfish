@@ -114,6 +114,7 @@ export default {
   'Started over: {n} channel, guide made again.': 'Ricominciato: {n} canale, guida rifatta.',
   'Started over: {n} channels, guide made again.': 'Ricominciato: {n} canali, guida rifatta.',
   'Starting over…': 'Si ricomincia…',
+  'ends {time}': 'finisce alle {time}',
   'fills a gap in the guide': 'riempie un buco nella guida',
   'Nothing new found that fits right now: it looks again every 10 minutes.': 'Niente di nuovo adatto per ora: riprova ogni 10 minuti.',
   'Kids': 'Bambini',

@@ -280,8 +280,13 @@ const guess = (type: MediaType) => {
 };
 /** On disk or on the way. */
 const used = () => stored.titles.filter((f) => f.state === 'downloading' || f.state === 'ready' || f.state === 'aired').reduce((n, f) => n + f.size, 0);
-/** And what's planned will take. */
-const planned = () => stored.titles.filter((f) => f.state === 'planned').reduce((n, f) => n + guess(f.mediaType), 0);
+/**
+ * And what's planned will take: the ones on the disk with what's there now (they download in the
+ * next few days). A week's worth isn't all there at once (each goes once it has aired), so picking
+ * isn't held up by space that'll be free by then. (A download still waits if the disk is full.)
+ */
+const plannedSoon = (s: FreshSettings, now: number) =>
+  stored.titles.filter((f) => f.state === 'planned' && downloadAt(f, s) < now + (s.aheadDays + 2) * DAY).reduce((n, f) => n + guess(f.mediaType), 0);
 const upcoming = () => stored.titles.filter((f) => f.state === 'planned' || f.state === 'downloading' || f.state === 'ready');
 /**
  * Picked in the last week, still here or downloaded: one taken off before it was (by an admin, by
@@ -1213,7 +1218,7 @@ async function fillHole(s: FreshSettings, defs: ChannelDef[], now: number, timeZ
   const fitsHole = (length: number) => length <= minutes - 0.25 && length >= minutes - MAX_BREAK_MINUTES;
   for (const want of wants) {
     if ((want.mediaType === 'movie' && !has.radarr()) || (want.mediaType === 'tv' && !has.sonarr())) continue;
-    if (used() + planned() + guess(want.mediaType) > s.maxGb * GB) return false;
+    if (used() + plannedSoon(s, now) + guess(want.mediaType) > s.maxGb * GB) return false;
     for (const r of (await candidates(want, now)).slice(0, 12)) {
       // Its length: a film's running time; a show's episode (two of a short one, back to back).
       const length =
@@ -1280,11 +1285,11 @@ async function planOne(s: FreshSettings, defs: ChannelDef[], now: number, timeZo
       const notBefore = evening ?? spread;
       if ((want.mediaType === 'movie' && !has.radarr()) || (want.mediaType === 'tv' && !has.sonarr())) continue;
       const need = guess(want.mediaType);
-      if (used() + planned() + need > s.maxGb * GB) {
+      if (used() + plannedSoon(s, now) + need > s.maxGb * GB) {
         full = 'space';
         continue;
       }
-      if (lastFree !== undefined && lastFree - planned() - need < s.minFreeGb * GB) {
+      if (lastFree !== undefined && lastFree - plannedSoon(s, now) - need < s.minFreeGb * GB) {
         full = 'disk';
         continue;
       }

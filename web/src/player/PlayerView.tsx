@@ -9,7 +9,7 @@ import { setSystemMuted, setSystemVolume, systemVolume, useSystemVolume } from '
 import { isTV } from '../lib/tv';
 import { parseVtt, type Cue } from './vtt';
 import { menuSubtitles } from './tracks';
-import { t } from '../i18n';
+import { locale, t } from '../i18n';
 
 /**
  * Netfish's player screen: the controls, the Audio and Subtitles menu, the seek bar, the
@@ -650,6 +650,10 @@ export function PlayerView(props: PlayerViewProps) {
           </div>
           <span className="player__time">
             {clock(shownTime)} <span className="muted">/ {clock(duration)}</span>
+            {/* When it'll be over, watched from here on (the clock where you are). */}
+            {duration > 0 && duration - shownTime > 30 && (
+              <span className="muted player__ends"> · {t('ends {time}', { time: new Date(Date.now() + (duration - shownTime) * 1000).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) })}</span>
+            )}
           </span>
           <span className="spacer" />
           {next && (

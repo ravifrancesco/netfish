@@ -701,7 +701,7 @@ export default function ChannelPlayer() {
               {program.isNew && kept !== program.itemId && <> <NewBadge /></>}
             </strong>
             <span className="channel__meta">
-              {[episodeLine(program), program.year, program.rating, tn(left, '{n} min left', '{n} min left')].filter(Boolean).join(' · ')}
+              {[episodeLine(program), program.year, program.rating, tn(left, '{n} min left', '{n} min left'), t('ends {time}', { time: clockTime(programEnd(program)) })].filter(Boolean).join(' · ')}
             </span>
             <div className="channel__progress" aria-hidden="true">
               <div style={{ width: `${fraction * 100}%` }} />

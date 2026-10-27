@@ -7,6 +7,17 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.7.40 (2026-10-26)
+
+### New
+- **When it ends, in the player.** Next to the time: "0:42 / 1:58 · ends 9:43 PM" (when it'd be over watched from here, in your device's time). The channel player says it too: "12 min left · ends 9:30 PM".
+
+### Fixed
+- **New titles: "Space full until some air" with almost nothing on the disk.** Every title planned for the week counted towards *Space for them* (about 5 GB a film, 9 GB a show) long before it downloaded, so a high weekly number filled it with plans and picking stopped. Now only what will be on the disk at the same time counts (the ones downloading in the next few days); each goes after it has aired, so the rest fits by then. A download still waits if the disk really is full.
+
+### Update
+- **Server.**
+
 ## 0.7.39 (2026-10-25)
 
 ### Fixed
