@@ -7,6 +7,30 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.8.0 (2026-10-29)
+
+### New
+- **Shows look after themselves.** For the shows you're watching:
+  - **The next season comes by itself.** When you're 2 episodes from the end of a season (and have watched a few of it lately), Netfish asks for the next one, through Seerr as you, so approvals still apply. Without Seerr, Sonarr looks for it. It's usually there before you finish, and you get the usual "ready to watch" notification. In Activity it says *Asked for by itself*.
+  - **New episodes as they air**, for a show still running that you're up to date with: Sonarr watches it, and the seasons announced later.
+  - **Missing episodes are looked for again**: an aired one missing ahead of where you are in a season.
+  - **You're asked once**, the first time it would get something for you (on Home or the show's page). Your answer counts for all your shows until you change it in **Settings → Playback on this device**. Admins turn it on or off for everyone in **Settings → Shows**.
+  - Nothing is asked for while the shows' disk has less than 20 GB free; the log says so.
+  - It looks when someone starts an episode in Netfish, and every half hour for everyone, so people watching in Jellyfin's own apps count too (with Jellyfin's API key in Connections).
+- **Seasons everyone has finished leave the disk.** When everyone who started a season has finished it, the last of them 30 days ago, the season is listed in **Settings → Storage** for a day, saying when it goes, with **Keep** next to it. Then it's deleted from disk. It stays in the library as **Not on disk**, ready to download again. The log says what went and how much it freed.
+  - **Settings → Shows** sets how long to wait (7 to 180 days), makes it only a suggestion in **Settings → Storage**, or turns it off.
+  - Never touched: anything kept, anything someone is partway through, New titles, and the latest season of a show still running.
+  - Needs Jellyfin's API key (Connections), to see what everyone has watched.
+  - Storage's *Could go to free space* can list single seasons now, each with its own **Delete** and **Keep**.
+- **Android: the fish from the first moment.** On a slow TV box (a Raspberry Pi, say) the app showed a black screen for up to 10 seconds while it started. Now Netfish's fish is there straight away.
+
+### Changed
+- **The channel guide no longer explains New titles** in a programme's details or on its **New** badge. Settings → Channels does.
+
+### Update
+- **Server.** Nothing is deleted in the first day: what would go is listed in **Settings → Storage** first.
+- **Android app** (phones, tablets, Fire TV, Android TV), for the fish at start.
+
 ## 0.7.40 (2026-10-26)
 
 ### New

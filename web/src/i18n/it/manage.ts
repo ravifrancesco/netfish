@@ -125,4 +125,5 @@ export default {
   'New versions download in the background and install when you quit Netfish.':
     'Le nuove versioni si scaricano in background e si installano quando chiudi Netfish.',
   'Auto-update failed: {problem}': 'Aggiornamento automatico non riuscito: {problem}',
+  'Everyone finished it · deleted from disk {when}': 'Tutti l’hanno finita · eliminata dal disco {when}',
 } as Record<string, string>;

@@ -32,6 +32,7 @@ import type {
   SearchResponse,
   SeasonDetail,
   ServerSettings,
+  KeepUpState,
   StopMode,
   StorageInfo,
   Screen,
@@ -184,6 +185,9 @@ export const api = {
   /** Audio and subtitle settings: the person's Jellyfin ones. */
   playbackPrefs: () => call<PlaybackPrefs>('/me/playback'),
   setPlaybackPrefs: (patch: Partial<PlaybackPrefs>) => call<PlaybackPrefs>('/me/playback', { method: 'PUT', body: patch }),
+  /** The next season and new episodes by themselves: this person's answer, and the question for them. */
+  keepUp: () => call<KeepUpState>('/me/keep-up'),
+  setKeepUp: (answer: 'yes' | 'no') => call<KeepUpState>('/me/keep-up', { method: 'PUT', body: { answer } }),
   setWatched: (itemId: string, watched: boolean) => call<{ ok: true }>(`/items/${enc(itemId)}/watched`, { body: { watched } }),
   /** From a title's page, by its TMDB id (one Jellyfin has no item for too: deleted from disk). */
   setTitleWatched: (type: MediaType, tmdbId: number, watched: boolean) => call<{ ok: true }>(`/title/${type}/${tmdbId}/watched`, { body: { watched } }),

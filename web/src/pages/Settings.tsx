@@ -6,6 +6,7 @@ import type { DownloadDetail, PlaybackPrefs, ServerSettings, SubtitleMode } from
 import { api } from '../api';
 import { Connections } from '../components/Connections';
 import { Storage } from '../components/Storage';
+import { KeepUpSetting, ShowsUpkeep } from '../components/KeepUp';
 import { AppUpdate, InstallExpiry } from '../components/AppUpdate';
 import { Devices } from '../components/Devices';
 import { ChannelSettings } from '../components/ChannelSettings';
@@ -356,6 +357,7 @@ export default function Settings() {
           <input type="checkbox" checked={prefs.autoplayNext} onChange={(e) => setPrefs({ autoplayNext: e.target.checked })} />
           <span>{t('Play the next episode automatically')}</span>
         </label>
+        {config?.features.downloads && <KeepUpSetting />}
         {notifySupport() && (
           <label className="check">
             <input
@@ -444,6 +446,13 @@ export default function Settings() {
         <section className="panel" id="storage">
           <h2>{t('Storage')}</h2>
           <Storage />
+        </section>
+      )}
+
+      {me?.isAdmin && config?.features.downloads && (
+        <section className="panel" id="shows">
+          <h2>{t('Shows')}</h2>
+          <ShowsUpkeep />
         </section>
       )}
 

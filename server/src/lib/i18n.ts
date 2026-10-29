@@ -178,6 +178,7 @@ const IT: Record<string, string> = {
   'qBittorrent wants a username and password': 'qBittorrent richiede nome utente e password',
   'qBittorrent answered {status}': 'qBittorrent ha risposto {status}',
   '{field} must be a size in GB, or empty for no limit': '{field} deve essere una dimensione in GB, o vuoto per nessun limite',
+  'Between 7 and 365 days': 'Tra 7 e 365 giorni',
   'Recommendations and a watch history for the server (optional)': 'Consigli e cronologia di visione per il server (facoltativo)',
   'What it requested for each person, on their Home (optional)': 'Quello che ha richiesto per ciascuno, nella sua Home (facoltativo)',
   'SuggestArr 2.11 or newer. In SuggestArr, signed in as an admin: Profile → API keys → create a key, and paste it here.':

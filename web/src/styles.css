@@ -4827,9 +4827,6 @@ html.is-tv .guide__prog:focus {
   color: var(--text-2);
   line-height: 1.5;
 }
-.program-about__new {
-  color: var(--text-2);
-}
 /* TVs: the picture beside the details, so it all fits on the screen. */
 html.is-tv .program-about {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);

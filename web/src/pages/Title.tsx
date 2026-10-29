@@ -15,6 +15,7 @@ import { RatingsStrip, TrailerPlayer } from '../components/Extras';
 import { RequestButton } from '../components/RequestButton';
 import { SubtitlesSheet } from '../components/SubtitlesSheet';
 import { VersionsSheet } from '../components/VersionsSheet';
+import { KeepUpQuestion } from '../components/KeepUp';
 import { ErrorState, Img, PageLoader, Progress, Spinner, StatusChip, useToast } from '../components/ui';
 import { AVAILABILITY_LABEL, DOWNLOAD_LABEL, ago, bytes, decimal, duration, percent } from '../lib/format';
 import { t, tn, locale } from '../i18n';
@@ -448,6 +449,7 @@ export default function Title() {
           <TogetherOnTitle titleId={d.jellyfinId} />
 
           <StatusPanel d={d} />
+          {d.mediaType === 'tv' && <KeepUpQuestion />}
           <Languages d={d} onSheet={setSheet} />
 
           {(stars.length > 0 || d.crew.length > 0) && (

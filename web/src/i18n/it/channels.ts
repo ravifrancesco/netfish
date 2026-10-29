@@ -74,11 +74,9 @@ export default {
 
   // New titles (Settings → Channels, and on the channels)
   New: 'Nuovo',
-  'New on this channel. Leaves after it airs unless someone keeps it.': 'Nuovo su questo canale. Va via dopo la messa in onda, se nessuno lo tiene.',
   'Keep it in the library': 'Tienilo nella libreria',
   'Kept {title}: it joins the library once it’s here.': 'Hai tenuto {title}: entra nella libreria appena arriva.',
   Kept: 'Tenuto',
-  'Kept. It stays in the library.': 'Tenuto. Resta nella libreria.',
   'started {title}': 'è partito {title}',
   '{title} was still downloading': '{title} si stava ancora scaricando',
   'nothing was due yet': 'nulla era ancora da scaricare',
@@ -188,7 +186,6 @@ export default {
   'Watch channel {n} now': 'Guarda ora il canale {n}',
   'Requested: {title} is in the library now': 'Richiesto: {title} ora è nella libreria',
   'Requested. It stays in the library.': 'Richiesto. Resta nella libreria.',
-  'New on this channel. Leaves after it airs unless requested.': 'Nuovo su questo canale. Va via dopo la messa in onda, se nessuno lo richiede.',
   'Requested by {name}': 'Richiesto da {name}',
   When: 'Quando',
   'always channel 1': 'sempre il canale 1',

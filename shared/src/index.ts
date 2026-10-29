@@ -398,6 +398,10 @@ export interface CleanupSuggestion {
   size: number;
   /** finished: everyone who watched it finished long ago · unwatched: nobody started it since it arrived. */
   reason: 'finished' | 'unwatched';
+  /** One season of a show, finished by everyone who started it (the rest of the show stays). */
+  season?: number;
+  /** When Netfish deletes it by itself (Settings → Shows), unless an admin keeps it first. */
+  deleteAt?: string;
   /** Last watched, or when it arrived. */
   since: string;
 }
@@ -581,6 +585,8 @@ export interface RequestItem {
   suggested?: { because?: string; forName?: string };
   /** Deleted from disk since (not coming back by itself). */
   removed?: boolean;
+  /** Netfish asked for it by itself: the next season of a show this person is watching. */
+  automatic?: boolean;
 }
 
 export interface RequestsResponse {
@@ -697,6 +703,26 @@ export interface ServerSettings {
   downloadDetails: DownloadDetail[];
   /** A Discover tab after Home with what isn't in the library; Home then shows only what is. */
   discoverTab: boolean;
+  /**
+   * Shows look after themselves: the next season when someone is 2 episodes from the end of
+   * one, new episodes of shows they're up to date with, missing episodes looked for again.
+   * Each person says yes or no the first time (KeepUpState).
+   */
+  keepUp: boolean;
+  /** Seasons everyone who started them has finished: deleted from disk, only suggested in Storage, or left alone. */
+  seasonCleanup: 'delete' | 'suggest' | 'off';
+  /** How long after the last of them finished (days). */
+  seasonCleanupDays: number;
+}
+
+/** Settings → Playback: whether Netfish gets the next season and new episodes for this person (asked once). */
+export interface KeepUpState {
+  /** Not answered yet: asked the first time it would get something for them. */
+  answer?: 'yes' | 'no';
+  /** What it would get now, the first time: the question to ask. */
+  question?: { seriesTitle: string; tmdbId: number; season?: number; kind: 'season' | 'follow' };
+  /** An admin turned it off for everyone (Settings → Downloads). */
+  off?: boolean;
 }
 
 export interface GrabRequest {

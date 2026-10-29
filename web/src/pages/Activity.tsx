@@ -135,6 +135,7 @@ function Requests({ scope }: { scope: 'mine' | 'all' }) {
                 {r.mine ? t('You') : r.requestedBy} · {ago(r.createdAt)}
               </div>
               {r.suggested && <div className="item__suggested small">{suggestedText(r.suggested)}</div>}
+              {r.automatic && <div className="item__suggested small">{t('Asked for by itself: the season before was nearly over')}</div>}
               {r.notOut && !r.download && !r.removed && notOutShort(r.notOut) && (
                 <div className="item__notout small">
                   <CalendarClock size={14} /> {notOutShort(r.notOut)}

@@ -6,7 +6,7 @@ import type { CleanupSuggestion, StorageInfo } from '@netfish/shared';
 import { api } from '../api';
 import { bytes } from '../lib/format';
 import { Img, Modal, Progress, Spinner, useToast } from './ui';
-import { t, tn } from '../i18n';
+import { locale, t, tn } from '../i18n';
 
 type Big = StorageInfo['biggest'][number];
 
@@ -55,8 +55,14 @@ function DeleteBig({ item, onDone }: { item: Big; onDone: () => void }) {
 }
 
 const monthsSince = (iso: string) => Math.max(1, Math.round((Date.now() - Date.parse(iso)) / (30.4 * 86_400_000)));
+/** A whole title (tv-123), or one season of a show (tv-123-s2). */
+const idOf = (s: CleanupSuggestion) => (s.season ? `${s.key}-s${s.season}` : s.key);
+
+/** "Thu 14:00": when a season due to go is deleted. */
+const goes = (iso: string) => new Date(iso).toLocaleString(locale, { weekday: 'short', hour: '2-digit', minute: '2-digit' });
 
 function why(s: CleanupSuggestion) {
+  if (s.deleteAt) return t('Everyone finished it · deleted from disk {when}', { when: goes(s.deleteAt) });
   const n = monthsSince(s.since);
   return s.reason === 'finished'
     ? tn(n, 'Everyone finished it · last watched a month ago', 'Everyone finished it · last watched {n} months ago')
@@ -71,7 +77,7 @@ function Cleanup({ onDone }: { onDone: () => void }) {
   const [chosen, setChosen] = useState<string[]>([]);
   const [confirming, setConfirming] = useState(false);
   const items = q.data?.items ?? [];
-  const selected = items.filter((s) => chosen.includes(s.key));
+  const selected = items.filter((s) => chosen.includes(idOf(s)));
   const total = selected.reduce((n, s) => n + s.size, 0);
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ['cleanup'] });
@@ -81,7 +87,7 @@ function Cleanup({ onDone }: { onDone: () => void }) {
   const remove = useMutation({
     mutationFn: async () => {
       let freed = 0;
-      for (const s of selected) if (s.tmdbId) freed += (await api.deleteFromDisk(s.mediaType, s.tmdbId)).freed;
+      for (const s of selected) if (s.tmdbId) freed += (await api.deleteFromDisk(s.mediaType, s.tmdbId, s.season ? [s.season] : undefined)).freed;
       return freed;
     },
     onSuccess: (freed) => {
@@ -109,26 +115,26 @@ function Cleanup({ onDone }: { onDone: () => void }) {
       </div>
       <ul className="bigs">
         {items.map((s) => (
-          <li key={s.key} className="big">
+          <li key={idOf(s)} className="big">
             <input
               type="checkbox"
-              checked={chosen.includes(s.key)}
-              onChange={(e) => setChosen((list) => (e.target.checked ? [...list, s.key] : list.filter((k) => k !== s.key)))}
-              aria-label={s.title}
+              checked={chosen.includes(idOf(s))}
+              onChange={(e) => setChosen((list) => (e.target.checked ? [...list, idOf(s)] : list.filter((k) => k !== idOf(s))))}
+              aria-label={s.season ? `${s.title} · ${t('Season {n}', { n: s.season })}` : s.title}
             />
             <Img src={s.poster} className="big__poster" fallback={<span>{s.title[0]}</span>} />
             <span className="big__title">
               <Link to={`/title/${s.mediaType}/${s.tmdbId}`} className="name-link">
                 {s.title}
               </Link>{' '}
-              {s.year && <span className="muted">({s.year})</span>}
+              {s.season ? <span className="muted">· {t('Season {n}', { n: s.season })}</span> : s.year && <span className="muted">({s.year})</span>}
               <span className="big__why muted small">
                 {why(s)}
                 <span className="big__size-inline"> · {bytes(s.size)}</span>
               </span>
             </span>
             <span className="muted small big__size">{bytes(s.size)}</span>
-            <button className="link-btn small" disabled={keep.isPending} onClick={() => keep.mutate(s.key)} title={t("Don't suggest it again")}>
+            <button className="link-btn small" disabled={keep.isPending} onClick={() => keep.mutate(idOf(s))} title={t("Don't suggest it again")}>
               {t('Keep')}
             </button>
           </li>

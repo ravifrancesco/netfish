@@ -229,11 +229,6 @@ function About({ program, channel, now, onClose }: { program: ChannelProgram; ch
           </p>
           {sub && <p className="program-about__episode">{sub}</p>}
           <p className="muted small">{[program.year, program.rating, duration(program.seconds)].filter(Boolean).join(' · ')}</p>
-          {askable && (
-            <p className="program-about__new small">
-              {requested ? t('Kept. It stays in the library.') : t('New on this channel. Leaves after it airs unless someone keeps it.')}
-            </p>
-          )}
           {about.isLoading ? <Spinner size={18} /> : about.data?.overview ? <p className="program-about__overview">{about.data.overview}</p> : null}
         </div>
       </div>

@@ -21,7 +21,11 @@ const DEFAULTS: ServerSettings = {
   manualGrabs: config.manualGrabs,
   downloadDetails: ['quality', 'languages', 'release'],
   discoverTab: false,
+  keepUp: true,
+  seasonCleanup: 'delete',
+  seasonCleanupDays: 30,
 };
+const CLEANUP: ServerSettings['seasonCleanup'][] = ['delete', 'suggest', 'off'];
 
 function size(value: unknown, field: string): number | null {
   if (value === null || value === '' || value === 0) return null;
@@ -46,6 +50,19 @@ function validate(input: Partial<Record<keyof ServerSettings, unknown>>): Partia
   if ('discoverTab' in input) {
     if (typeof input.discoverTab !== 'boolean') throw new HttpError(400, 'discoverTab must be true or false');
     out.discoverTab = input.discoverTab;
+  }
+  if ('keepUp' in input) {
+    if (typeof input.keepUp !== 'boolean') throw new HttpError(400, 'keepUp must be true or false');
+    out.keepUp = input.keepUp;
+  }
+  if ('seasonCleanup' in input) {
+    if (!CLEANUP.includes(input.seasonCleanup as ServerSettings['seasonCleanup'])) throw new HttpError(400, `seasonCleanup must be one of: ${CLEANUP.join(', ')}`);
+    out.seasonCleanup = input.seasonCleanup as ServerSettings['seasonCleanup'];
+  }
+  if ('seasonCleanupDays' in input) {
+    const days = Number(input.seasonCleanupDays);
+    if (!Number.isInteger(days) || days < 7 || days > 365) throw new HttpError(400, t('Between 7 and 365 days'));
+    out.seasonCleanupDays = days;
   }
   return out;
 }

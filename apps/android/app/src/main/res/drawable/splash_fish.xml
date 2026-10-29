@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Netfish's fish, as on the loading page (apps/common/loading.html): what shows while the app starts. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+    <path
+        android:pathData="M15,32 L6,23 L6,41 Z"
+        android:strokeWidth="4"
+        android:strokeLineJoin="round">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="6" android:startY="23" android:endX="15" android:endY="41">
+                <item android:offset="0" android:color="#FF8CF8E6" />
+                <item android:offset="1" android:color="#FF13B89C" />
+            </gradient>
+        </aapt:attr>
+        <aapt:attr name="android:strokeColor">
+            <gradient android:type="linear" android:startX="6" android:startY="23" android:endX="15" android:endY="41">
+                <item android:offset="0" android:color="#FF8CF8E6" />
+                <item android:offset="1" android:color="#FF13B89C" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M23,15 L52,32 L23,49 Z"
+        android:strokeWidth="6"
+        android:strokeLineJoin="round">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="23" android:startY="15" android:endX="52" android:endY="49">
+                <item android:offset="0" android:color="#FF8CF8E6" />
+                <item android:offset="1" android:color="#FF13B89C" />
+            </gradient>
+        </aapt:attr>
+        <aapt:attr name="android:strokeColor">
+            <gradient android:type="linear" android:startX="23" android:startY="15" android:endX="52" android:endY="49">
+                <item android:offset="0" android:color="#FF8CF8E6" />
+                <item android:offset="1" android:color="#FF13B89C" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M35.5,27.5 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0"
+        android:fillColor="#FF03140F" />
+</vector>

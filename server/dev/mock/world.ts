@@ -217,6 +217,10 @@ export const downloads: MockDownload[] = [];
 export const arrKnown = new Set<string>();
 /** Not monitored in Radarr/Sonarr: `movie-<tmdb>`, `tv-<tmdb>` (the series) or `tv-<tmdb>-<season>`. */
 export const unmonitored = new Set<string>();
+/** Shows whose new seasons Sonarr watches (monitorNewItems: all). */
+export const followed = new Set<string>();
+/** MOCK_CONTINUING=<tmdbIds>: shows still running (new episodes to come). */
+export const continuing = new Set((process.env.MOCK_CONTINUING ?? '').split(',').map(Number).filter(Boolean));
 /** Seerr statuses set by hand (POST /media/:id/:status), until something downloads. */
 export const statusOverride = new Map<string, number>();
 

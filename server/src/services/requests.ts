@@ -13,6 +13,7 @@ import { catalog } from './catalog';
 import { allDownloads, downloadsFor } from './downloads';
 import { findInLibrary, libraryIndex } from './library';
 import { suggestedNotes } from './suggestarr';
+import { wasAutomatic } from './keepUp';
 import { maybeSeerrUserId, seerrUserId } from './seerrUsers';
 import { forgetRadarrMovie, forgetSonarrSeries, radarrMovie, sonarrSeries } from './arrLookup';
 import { movieNotOut, showNotOut } from './notOut';
@@ -96,6 +97,7 @@ export async function listRequests(user: SessionUser, scope: 'mine' | 'all'): Pr
       download,
       notOut: notOut?.kind === 'airing' && status === 'partial' ? undefined : notOut,
       suggested: notes.get(`${r.type}-${tmdbId}`),
+      automatic: r.type === 'tv' && wasAutomatic(tmdbId, r.seasons?.map((s) => s.seasonNumber), r.createdAt) ? true : undefined,
     };
   });
 }

@@ -4,6 +4,7 @@ import type {
   AppConfig,
   CreateRequest,
   GrabRequest,
+  KeepUpState,
   PlaybackPrefs,
   LoginRequest,
   MediaType,
@@ -62,6 +63,7 @@ import { cleanupSuggestions, keepForGood } from './services/cleanup';
 import { playbackPrefs, setPlaybackPrefs } from './services/playbackPrefs';
 import { cancelRequest, deleteFromDisk, downloadAgain, goneKeys, removedTitles, stopDownload, storage } from './services/manage';
 import { createRequest, listRequests, myRequestKeys } from './services/requests';
+import { afterEpisodeStart, answerKeepUp, keepUpState } from './services/keepUp';
 import { scrobble, setScrobble, startImport, startLink, traktStatus, unlink } from './services/trakt';
 import { runSuggestarr, suggestarrStatus } from './services/suggestarr';
 import { trailersFor } from './services/trailers';
@@ -246,6 +248,13 @@ export async function apiRoutes(app: FastifyInstance) {
     // Audio and subtitle settings: the person's Jellyfin ones.
     api.get('/me/playback', async (req) => playbackPrefs(userOf(req)));
     api.put<{ Body: Partial<PlaybackPrefs> }>('/me/playback', async (req) => setPlaybackPrefs(userOf(req), req.body ?? {}));
+    // The next season and new episodes by themselves: this person's answer (asked once).
+    api.get('/me/keep-up', async (req): Promise<KeepUpState> => keepUpState(userOf(req)));
+    api.put<{ Body: { answer?: string } }>('/me/keep-up', async (req): Promise<KeepUpState> => {
+      const answer = req.body?.answer;
+      if (answer !== 'yes' && answer !== 'no') throw new HttpError(400, 'answer must be "yes" or "no"');
+      return answerKeepUp(userOf(req), answer);
+    });
     // This person's PIN on this device, and whether the device asks who's watching.
     api.put<{ Body: { pin?: string | null; ask?: boolean } }>('/profiles/me', async (req) => {
       const device = deviceOf(req);
@@ -386,7 +395,8 @@ export async function apiRoutes(app: FastifyInstance) {
     api.get('/admin/cleanup', { preHandler: requireAdmin }, async (req) => ({ items: await cleanupSuggestions(userOf(req)) }));
     api.post<{ Body: { key?: string } }>('/admin/cleanup/keep', { preHandler: requireAdmin }, async (req) => {
       const key = clean(req.body?.key, 40);
-      if (!/^(movie|tv)-\d+$/.test(key)) throw new HttpError(400, 'Bad key');
+      // A whole title (tv-123), or one season of a show (tv-123-s2).
+      if (!/^(movie-\d+|tv-\d+(-s\d+)?)$/.test(key)) throw new HttpError(400, 'Bad key');
       return keepForGood(key);
     });
 
@@ -479,6 +489,8 @@ export async function apiRoutes(app: FastifyInstance) {
       // A new title for channels someone chose to watch: theirs now.
       if (req.body?.itemId && !req.body.channel) noteChosen(keyOfItem(req.body.itemId), userOf(req).name);
       await reportProgress(userOf(req), req.body);
+      // An episode started: the next season, or its new episodes, may be due.
+      if (req.body.event === 'start' && !req.body.channel) void afterEpisodeStart(userOf(req), clean(req.body.itemId, 64));
       reply.code(204);
     });
 

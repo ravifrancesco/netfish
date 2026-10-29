@@ -13,14 +13,16 @@
       :root { color-scheme: dark; }
       html, body { margin: 0; height: 100%; background: #06080b; color: #eef3f6; font: 15px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; -webkit-user-select: none; user-select: none; }
       body { display: grid; place-items: center; -webkit-app-region: drag; }
-      .stage { display: grid; justify-items: center; gap: 18px; animation: in 0.5s ease-out both; }
+      /* The fish sits at the very centre of the screen, where the apps draw it while they start. */
+      .stage { position: relative; display: grid; }
+      .below { position: absolute; top: calc(100% + 18px); left: 50%; transform: translateX(-50%); display: grid; justify-items: center; gap: 18px; white-space: nowrap; }
       svg { width: 96px; height: 96px; overflow: visible; }
       .swim { animation: bob 2.4s ease-in-out infinite; }
       .tail { transform-box: fill-box; transform-origin: 100% 50%; animation: wag 0.7s ease-in-out infinite alternate; }
       .bubble { fill: none; stroke: #36e2c6; stroke-width: 1.4; opacity: 0; animation: rise 2.4s ease-out infinite; }
       .bubble:nth-of-type(2) { animation-delay: 0.8s; }
       .bubble:nth-of-type(3) { animation-delay: 1.6s; }
-      .word { font-size: 26px; letter-spacing: -0.035em; }
+      .word { font-size: 26px; letter-spacing: -0.035em; animation: in 0.5s ease-out both; }
       .word .net { font-weight: 300; color: #b5c0ca; }
       .word .fish { font-weight: 800; margin-left: 0.04em; }
       .status { min-height: 1.5em; color: #7c8996; font-size: 14px; opacity: 0; animation: in 0.6s ease-out 1.4s forwards; }
@@ -29,7 +31,7 @@
       @keyframes wag { from { transform: rotate(-9deg); } to { transform: rotate(9deg); } }
       @keyframes rise { 0% { opacity: 0; transform: translate(0, 0) scale(0.6); } 20% { opacity: 0.9; } 100% { opacity: 0; transform: translate(6px, -22px) scale(1.1); } }
       @media (prefers-reduced-motion: reduce) {
-        .swim, .tail, .bubble, .stage, .status { animation: none; }
+        .swim, .tail, .bubble, .word, .status { animation: none; }
         .status { opacity: 1; }
       }
     </style>
@@ -49,8 +51,10 @@
         <circle class="bubble" cx="58" cy="24" r="1.4" />
         <circle class="bubble" cx="55" cy="27" r="1.7" />
       </svg>
-      <span class="word" aria-label="Netfish"><span class="net">net</span><span class="fish">fish</span></span>
-      <span class="status" id="status">Looking for your server…</span>
+      <div class="below">
+        <span class="word" aria-label="Netfish"><span class="net">net</span><span class="fish">fish</span></span>
+        <span class="status" id="status">Looking for your server…</span>
+      </div>
     </div>
     <script>
       const lang = (navigator.languages && navigator.languages[0]) || navigator.language || 'en';

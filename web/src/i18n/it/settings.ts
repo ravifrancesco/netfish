@@ -150,4 +150,28 @@ export default {
   Browser: 'Browser',
   Devices: 'Dispositivi',
   'Where Netfish is open right now, and whether its app should be updated.': "Dove Netfish è aperto in questo momento, e se la sua app va aggiornata.",
+
+  // Shows look after themselves (components/KeepUp.tsx)
+  'Get season {n} of {title} by itself?': 'Scarico da solo la stagione {n} di {title}?',
+  'Get new episodes of {title} as they come out?': 'Scarico i nuovi episodi di {title} quando escono?',
+  'No thanks': 'No, grazie',
+  'Yes, get them': 'Sì, scaricali',
+  'When you’re 2 episodes from the end of a season, Netfish gets the next one, and shows you’re up to date with get their new episodes as they come out. This is for all your shows.':
+    'Quando ti mancano 2 episodi alla fine di una stagione, Netfish scarica la successiva, e le serie che hai visto fino in fondo ricevono i nuovi episodi appena escono. Vale per tutte le tue serie.',
+  'You can change it any time in Settings → Playback on this device.': 'Puoi cambiarlo quando vuoi in Impostazioni → Riproduzione su questo dispositivo.',
+  'Get the next season by itself': 'Scarica da solo la stagione successiva',
+  'When you’re 2 episodes from the end of a season, Netfish gets the next one, and shows you’re up to date with get their new episodes as they come out. For all your shows, on every device.':
+    'Quando ti mancano 2 episodi alla fine di una stagione, Netfish scarica la successiva, e le serie che hai visto fino in fondo ricevono i nuovi episodi appena escono. Per tutte le tue serie, su ogni dispositivo.',
+  'Next seasons and new episodes by themselves': 'Stagioni successive e nuovi episodi da soli',
+  'When someone is 2 episodes from the end of a season, Netfish gets the next one (through Seerr, as them). Shows they’re up to date with get new episodes as they air. Each person says yes or no the first time.':
+    'Quando a qualcuno mancano 2 episodi alla fine di una stagione, Netfish scarica la successiva (tramite Seerr, a suo nome). Le serie che ha visto fino in fondo ricevono i nuovi episodi appena vanno in onda. Ognuno dice sì o no la prima volta.',
+  'Seasons everyone has finished': 'Stagioni che tutti hanno finito',
+  'Only suggest them in Storage': 'Suggeriscile solo in Spazio su disco',
+  'Leave them': 'Lasciale',
+  After: 'Dopo',
+  '{n} days': '{n} giorni',
+  'A season everyone who started it has finished, the last of them that long ago. It’s listed in Storage for a day first, where you can keep it, and stays in the library as Not on disk, ready to download again. Never touched: anything kept, anything someone is partway through, New titles, and the latest season of a show still running.':
+    'Una stagione finita da tutti quelli che l’hanno iniziata, da almeno quel tempo. Prima resta un giorno in Spazio su disco, dove puoi tenerla, e poi rimane nella libreria come Non sul disco, pronta da scaricare di nuovo. Mai toccati: ciò che hai deciso di tenere, ciò che qualcuno sta ancora guardando, i Titoli nuovi e l’ultima stagione di una serie ancora in corso.',
+  'Needs Jellyfin’s API key (Connections), to see what everyone has watched.': 'Serve la chiave API di Jellyfin (Connessioni), per vedere cosa hanno guardato tutti.',
+  'Asked for by itself: the season before was nearly over': 'Richiesta da sola: la stagione prima era quasi finita',
 } as Record<string, string>;

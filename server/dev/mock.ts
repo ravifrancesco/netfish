@@ -39,6 +39,8 @@ import {
   progressOf,
   requests,
   seasonStatus,
+  followed,
+  continuing,
   seed,
   sessions,
   setUd,
@@ -1175,6 +1177,9 @@ void app.register(
       id: t.n, title: t.title, tvdbId: t.tvdbId, tmdbId: t.tmdbId, images: [{ coverType: 'poster', remoteUrl: posterUrl(t) }], ...releaseOf(t),
       year: t.year, monitored: !unmonitored.has(`tv-${t.tmdbId}`), seasons: seasonsDto(t), tags: titleTags.get(`tv-${t.tmdbId}`) ?? [],
       qualityProfileId: titleProfile.get(`tv-${t.tmdbId}`) ?? 4,
+      monitorNewItems: followed.has(`tv-${t.tmdbId}`) ? 'all' : 'none',
+      // MOCK_CONTINUING=<tmdbIds>: shows still running (new episodes to come).
+      ...(continuing.has(t.tmdbId) ? { status: 'continuing' } : {}),
       statistics: { sizeOnDisk: librarySeasons(t).reduce((n, s) => n + fileSize(t, s), 0), episodeFileCount: librarySeasons(t).length * EPISODES_PER_SEASON },
     });
     r.get<{ Querystring: Q }>('/series', async (req) =>
@@ -1210,11 +1215,19 @@ void app.register(
       const n = Number(req.query.seriesId);
       const t = TITLES.find((x) => x.type === 'tv' && x.n === n);
       const seasons = req.query.seasonNumber ? [Number(req.query.seasonNumber)] : Array.from({ length: t?.seasons ?? 1 }, (_, i) => i + 1);
+      // Aired weekly from mid-January of the season's year (an upcoming show: from its first airing).
+      // Monitored, as in Sonarr: a season someone wants (on disk, downloading or asked for).
+      const start = (season: number) => (t && releaseOf(t).status === 'upcoming' ? Date.parse(releaseOf(t).firstAired!) : Date.UTC((t?.year ?? 2020) + season - 1, 0, 15));
       return seasons.flatMap((season) =>
-        Array.from({ length: EPISODES_PER_SEASON }, (_, i) => ({
-          id: n * 10000 + season * 100 + i + 1, seasonNumber: season, episodeNumber: i + 1,
-          episodeFileId: t && library.has(`tv-${t.tmdbId}-${season}`) ? n * 100 + season : 0, monitored: !(t && unmonitored.has(`tv-${t.tmdbId}-${season}`)),
-        })),
+        Array.from({ length: EPISODES_PER_SEASON }, (_, i) => {
+          const hasFile = Boolean(t && library.has(`tv-${t.tmdbId}-${season}`));
+          return {
+            id: n * 10000 + season * 100 + i + 1, seasonNumber: season, episodeNumber: i + 1,
+            episodeFileId: hasFile ? n * 100 + season : 0, hasFile,
+            airDateUtc: new Date(start(season) + i * 7 * 86_400_000).toISOString(),
+            monitored: Boolean(t && !unmonitored.has(`tv-${t.tmdbId}-${season}`) && (seasonStatus(t, season) > 1 || followed.has(`tv-${t.tmdbId}`))),
+          };
+        }),
       );
     });
     r.delete<{ Body: { ids: number[] }; Querystring: Q }>('/queue/bulk', async (req) => {
@@ -1239,11 +1252,13 @@ void app.register(
       }
       return [];
     });
-    r.put<{ Body: { seriesIds: number[]; monitored?: boolean; qualityProfileId?: number } }>('/series/editor', async (req) => {
+    r.put<{ Body: { seriesIds: number[]; monitored?: boolean; qualityProfileId?: number; monitorNewItems?: 'all' | 'none' } }>('/series/editor', async (req) => {
       for (const n of req.body.seriesIds) {
         const t = TITLES.find((x) => x.type === 'tv' && x.n === n);
         if (!t) continue;
         if (req.body.qualityProfileId) titleProfile.set(`tv-${t.tmdbId}`, req.body.qualityProfileId);
+        if (req.body.monitorNewItems === 'all') followed.add(`tv-${t.tmdbId}`);
+        if (req.body.monitorNewItems === 'none') followed.delete(`tv-${t.tmdbId}`);
         if (req.body.monitored === undefined) continue;
         if (req.body.monitored) unmonitored.delete(`tv-${t.tmdbId}`);
         else unmonitored.add(`tv-${t.tmdbId}`);

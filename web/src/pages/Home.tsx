@@ -13,6 +13,7 @@ import { desktop } from '../lib/desktop';
 import { UpdateNudge } from '../components/AppUpdate';
 import { TogetherRow } from '../components/Together';
 import { ChannelsRow } from '../components/ChannelsRow';
+import { KeepUpQuestion } from '../components/KeepUp';
 
 /** Admins: a nudge to finish connecting services until they're all there. */
 function SetupNudge() {
@@ -141,6 +142,7 @@ export default function Home({ part = 'home' }: { part?: 'home' | 'discover' }) 
           <>
             <SetupNudge />
             <UpdateNudge />
+            <KeepUpQuestion />
             <TogetherRow />
             <ChannelsRow />
           </>

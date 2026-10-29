@@ -72,6 +72,7 @@ public class MainActivity extends Activity {
     private volatile String currentUrl = "";
     private String returnUrl;
     private boolean forgetHistory;
+    private View splash;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -100,6 +101,10 @@ public class MainActivity extends Activity {
         web.setFocusableInTouchMode(true);
         root.addView(playerView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         root.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        // The fish on top until the first page has drawn: on a slow TV box the web view takes seconds.
+        splash = new View(this);
+        splash.setBackgroundResource(R.drawable.splash);
+        root.addView(splash, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
         video = new VideoEngine(this, playerView, state ->
                 web.evaluateJavascript("window.__netfishVideo&&window.__netfishVideo(" + state + ")", null));
@@ -160,7 +165,13 @@ public class MainActivity extends Activity {
             }
 
             @Override
+            public void onPageCommitVisible(WebView view, String url) {
+                hideSplash(url.startsWith(LOADING));
+            }
+
+            @Override
             public void onPageFinished(WebView view, String url) {
+                hideSplash(url.startsWith(LOADING));
                 if (forgetHistory && !url.startsWith(SETUP)) {
                     // Back from the home screen shouldn't land on the setup page again.
                     forgetHistory = false;
@@ -204,6 +215,18 @@ public class MainActivity extends Activity {
                 else showSetup(getString(R.string.error_server_unreachable, server, getString(R.string.nothing_answered)));
             });
         }, "netfish-start").start();
+    }
+
+    /**
+     * The first page has drawn: the start-up fish goes. Over the loading page, whose fish is in the
+     * same place, it lingers a moment so the hand-over can't be seen.
+     */
+    private void hideSplash(boolean overLoadingFish) {
+        if (splash == null) return;
+        View gone = splash;
+        splash = null;
+        gone.animate().alpha(0f).setStartDelay(overLoadingFish ? 300 : 0).setDuration(200)
+                .withEndAction(() -> ((ViewGroup) gone.getParent()).removeView(gone));
     }
 
     private static JSONObject offlineMode() {

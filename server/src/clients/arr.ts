@@ -124,6 +124,9 @@ export interface SonarrEpisode {
   seasonNumber: number;
   episodeNumber: number;
   episodeFileId?: number;
+  hasFile?: boolean;
+  /** When it aired (or airs). Missing: not announced yet. */
+  airDateUtc?: string;
   monitored?: boolean;
 }
 
@@ -143,6 +146,8 @@ export interface SonarrSeries {
   seasons?: SonarrSeason[];
   statistics?: { sizeOnDisk?: number; episodeFileCount?: number };
   status?: 'continuing' | 'ended' | 'upcoming' | 'deleted';
+  /** Sonarr 4: whether seasons added later (a new one announced) are watched. */
+  monitorNewItems?: 'all' | 'none';
   firstAired?: string;
   previousAiring?: string;
   nextAiring?: string;
@@ -276,6 +281,9 @@ export const sonarr = {
     arrRequest<unknown>('sonarr', '/episode/monitor', { method: 'PUT', body: { episodeIds, monitored } }),
   setSeriesMonitored: (seriesIds: number[], monitored: boolean) =>
     arrRequest<unknown>('sonarr', '/series/editor', { method: 'PUT', body: { seriesIds, monitored } }),
+  /** Watch the show, and the seasons announced from now on (Sonarr 4's "monitor new seasons"). */
+  followSeries: (seriesIds: number[]) =>
+    arrRequest<unknown>('sonarr', '/series/editor', { method: 'PUT', body: { seriesIds, monitored: true, monitorNewItems: 'all' } }),
   /** Forget a show (files kept: only used when it has none). */
   deleteSeries: (seriesId: number) =>
     arrRequest<void>('sonarr', `/series/${seriesId}`, { method: 'DELETE', query: { deleteFiles: false, addImportListExclusion: false } }),
