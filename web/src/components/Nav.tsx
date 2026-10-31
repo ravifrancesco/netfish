@@ -66,7 +66,12 @@ function SearchBox() {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onBlur={() => !value && setOpen(false)}
-        onKeyDown={(e) => e.key === 'Escape' && (setValue(''), setOpen(false), input.current?.blur())}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') (setValue(''), setOpen(false), input.current?.blur());
+          // Go on an on-screen keyboard: done typing, so the keyboard goes away (the results come by themselves).
+          else if (e.key === 'Enter') input.current?.blur();
+        }}
+        enterKeyHint="search"
         aria-label={t('Search')}
       />
       {open && value && (

@@ -18,12 +18,14 @@ import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
@@ -106,6 +108,15 @@ public class MainActivity extends Activity {
         splash.setBackgroundResource(R.drawable.splash);
         root.addView(splash, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
+        // Whether the on-screen keyboard is open, for Back (see dispatchKeyEvent).
+        if (Build.VERSION.SDK_INT >= 30) {
+            getWindow().getDecorView().setOnApplyWindowInsetsListener((v, insets) -> {
+                boolean open = insets.isVisible(WindowInsets.Type.ime());
+                if (keyboardOpen && !open) keyboardClosedAt = SystemClock.uptimeMillis();
+                keyboardOpen = open;
+                return v.onApplyWindowInsets(insets);
+            });
+        }
         video = new VideoEngine(this, playerView, state ->
                 web.evaluateJavascript("window.__netfishVideo&&window.__netfishVideo(" + state + ")", null));
         video.setActiveListener(this::filmShowing);
@@ -338,11 +349,25 @@ public class MainActivity extends Activity {
 
     // ---------- Back (remote, gesture, Esc) ----------
 
+    /** Back went down here, not in the on-screen keyboard: only then does letting go of it go back. */
+    private boolean backDown;
+    /** The on-screen keyboard: open now, or when it last closed (uptime). */
+    private boolean keyboardOpen;
+    private long keyboardClosedAt;
+
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         // Esc too, for keyboards (and the emulator): the remote's Back button sends KEYCODE_BACK.
         if (event.getKeyCode() == KeyEvent.KEYCODE_BACK || event.getKeyCode() == KeyEvent.KEYCODE_ESCAPE) {
-            if (event.getAction() == KeyEvent.ACTION_UP) back();
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                // The Back that closes the keyboard can reach the app too (Android 16, while the
+                // keyboard slides away): it only closes the keyboard.
+                backDown = !keyboardOpen && SystemClock.uptimeMillis() - keyboardClosedAt > 700;
+                if (keyboardOpen) ((InputMethodManager) getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(web.getWindowToken(), 0);
+            } else if (event.getAction() == KeyEvent.ACTION_UP) {
+                if (backDown && !event.isCanceled()) back();
+                backDown = false;
+            }
             return true;
         }
         return super.dispatchKeyEvent(event);

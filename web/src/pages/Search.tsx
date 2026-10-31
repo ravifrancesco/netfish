@@ -33,7 +33,15 @@ export default function Search() {
       {/* The nav search lives in the header on wide screens; phones get this one. */}
       <label className="input-icon page-search">
         <SearchIcon size={18} />
-        <input className="input" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={t('Titles, people, anything')} autoFocus />
+        <input
+          className="input"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+          enterKeyHint="search"
+          placeholder={t('Titles, people, anything')}
+          autoFocus
+        />
       </label>
       {q.trim().length < 2 ? (
         <div className="empty">

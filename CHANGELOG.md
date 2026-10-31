@@ -7,6 +7,16 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.8.1 (2026-10-31)
+
+### Fixed
+- **Go on the on-screen keyboard puts it away** when you search, and you stay on the results (they come as you type). Phone keyboards show a search key there now.
+- **Android: Back closes the keyboard and stays on the page.** On Android 16 (some TV boxes) the Back that closed the keyboard also went back a page, so searching on a TV left the search.
+
+### Update
+- **Server**, for the keyboard's Go.
+- **Android app** (phones, tablets, Fire TV, Android TV), for Back.
+
 ## 0.8.0 (2026-10-29)
 
 ### New
