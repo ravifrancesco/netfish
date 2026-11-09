@@ -119,9 +119,9 @@ function tracks(itemId: string, source: JfMediaSource) {
 
 /**
  * When the default audio track is one this device can't play (DTS, TrueHD, AC3
- * in a browser), the Pi has to convert the sound. Many files also carry a
+ * in a browser), the server has to convert the sound. Many files also carry a
  * track in the same language that plays as-is (AAC, Opus, FLAC…): use that
- * one instead and the Pi has nothing to do. Commentary tracks don't count.
+ * one instead and the server has nothing to do. Commentary tracks don't count.
  */
 export function playableAudioAlternative(streams: JfMediaStream[], defaultIndex: number | undefined, playable: Set<string>) {
   const audio = streams.filter((s) => s.Type === 'Audio');
@@ -248,7 +248,7 @@ export async function startPlayback(user: SessionUser, itemId: string, body: Pla
     method = 'DirectPlay';
     url = proxied(`/Videos/${itemId}/stream?static=true&mediaSourceId=${source.Id}&playSessionId=${info.PlaySessionId}`);
   } else if (source.TranscodingUrl) {
-    // Container/audio-only reasons mean Jellyfin copies the video and just repackages (cheap on a Pi).
+    // Container/audio-only reasons mean Jellyfin copies the video and just repackages (cheap, even on a small server).
     method = reasons.length && reasons.every((r) => /^(ContainerNotSupported|Audio|SecondaryAudio|StreamCount)/i.test(r.trim()))
       ? 'DirectStream'
       : 'Transcode';
@@ -325,7 +325,7 @@ export async function offlineInfo(user: SessionUser, itemId: string, target: Off
   const streams = source.MediaStreams ?? item.MediaStreams ?? [];
   const playable = PLAYABLE[target];
   const defaultAudio = streams.find((s) => s.Type === 'Audio' && s.IsDefault) ?? streams.find((s) => s.Type === 'Audio');
-  // A same-language track that plays as-is beats converting the default one (no work for the Pi).
+  // A same-language track that plays as-is beats converting the default one (no work for the server).
   const keep = target === 'original';
   const alternative = keep ? undefined : playableAudioAlternative(streams, defaultAudio?.Index, playable.audio);
   const audio = alternative ?? defaultAudio;
@@ -354,7 +354,7 @@ export async function offlineInfo(user: SessionUser, itemId: string, target: Off
         mediaSourceId: source.Id,
         deviceId: 'netfish-offline',
         playSessionId: randomUUID().replace(/-/g, ''),
-        // Apple: keep H.264/HEVC as they are, anything else becomes H.264 (slow on a Pi).
+        // Apple: keep H.264/HEVC as they are, anything else becomes H.264 (slow on a small server).
         videoCodec: apple ? (playable.video!.has(videoCodec) ? videoCodec : 'h264') : video?.Codec ?? 'h264',
         allowVideoStreamCopy: true,
         // The chosen track as-is when it plays here, otherwise converted to AAC.

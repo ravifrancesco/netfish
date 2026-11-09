@@ -1,6 +1,6 @@
 # ---- Build -----------------------------------------------------------------
 # Plain Dockerfile on purpose: builds with BuildKit (GitHub Actions) and with the
-# classic builder Portainer uses when you build the image on the Pi itself.
+# classic builder Portainer uses when you build the image on the server itself.
 FROM node:22-bookworm-slim AS build
 WORKDIR /src
 

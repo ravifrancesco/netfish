@@ -4,7 +4,7 @@ Notes for anyone (person or AI assistant) working on Netfish's code.
 
 ## What it is
 
-- A Netflix-style front end for a home media stack: Jellyfin, Seerr, Radarr, Sonarr, Prowlarr, Bazarr and qBittorrent, typically in Portainer stacks on a Raspberry Pi.
+- A Netflix-style front end for a home media stack: Jellyfin, Seerr, Radarr, Sonarr, Prowlarr, Bazarr and qBittorrent, typically in Portainer stacks on a home server: a mini PC, a NAS or a Raspberry Pi, anything that runs Docker.
 - Netfish is its own container: port **7777**, image `ghcr.io/ravifrancesco/netfish`, MIT licence.
 - **Netfish never changes how the other services are set up.** It only talks to their APIs. Jellyfin is a hidden engine for streaming and sign-in; nobody opens it directly.
 - Every app is a thin shell around the server's web UI, with a native player underneath:
@@ -13,6 +13,7 @@ Notes for anyone (person or AI assistant) working on Netfish's code.
   - **iPhone/iPad:** Swift, AVPlayer under a WKWebView.
   - **Android, Fire TV, Android TV:** one Java app, ExoPlayer under a WebView.
   - **Samsung TV:** a Tizen starter page that loads the web UI.
+- Netfish isn't tied to one kind of machine: say "the server", not "the Pi". Name the Raspberry Pi only where something applies to it alone (arm64, slow transcoding).
 - English and Italian everywhere. Italian uses the informal "tu"; terms in [docs/i18n-glossary.md](docs/i18n-glossary.md).
 
 ## Layout

@@ -3,8 +3,10 @@ import type { SessionUser } from '../auth';
 import { has } from '../config';
 import { listConnections, testConnection } from '../connections';
 import { CARD_FIELDS, jellyfin, type JfItemsResult } from '../clients/jellyfin';
-import type { DiscoverKind, SeerrPage } from '../clients/seerr';
+import type { DiscoverKind, SeerrPage, SeerrResult } from '../clients/seerr';
 import { settle } from '../lib/async';
+import { MINUTE, TTLCache } from '../lib/cache';
+import { bestScore, searchWords } from '../lib/titleMatch';
 import { HttpError } from '../lib/upstream';
 import { jfToCard, seerrCards } from './cards';
 import { catalog } from './catalog';
@@ -25,7 +27,7 @@ export async function search(user: SessionUser, query: string): Promise<SearchRe
   const q = query.trim();
   if (!q) return { items: [], people: [] };
   const excludeItemIds = await leftOut(user);
-  const [index, local, remote, downloads] = await Promise.all([
+  const [index, local, close, remote, downloads] = await Promise.all([
     playableIndex(user),
     settle(
       jellyfin.items(user.token, {
@@ -39,17 +41,80 @@ export async function search(user: SessionUser, query: string): Promise<SearchRe
       }),
       EMPTY,
     ),
-    has.seerr() ? settle(catalog.search(q), EMPTY_PAGE) : Promise.resolve(EMPTY_PAGE),
+    settle(closeInLibrary(user, q, excludeItemIds), []),
+    has.seerr() ? settle(catalogSearch(q), EMPTY_PAGE) : Promise.resolve(EMPTY_PAGE),
     settle(allDownloads(), []),
   ]);
+  // What Jellyfin's search missed ("goodwill hunting", "spiderman", a typo), then all of it closest first.
+  const found = new Set(local.Items.map((i) => i.Id));
+  const missed = close.filter((id) => !found.has(id));
+  const more = missed.length ? await settle(jellyfin.items(user.token, { userId: user.id, ids: missed.join(','), fields: CARD_FIELDS }), EMPTY) : EMPTY;
+  const items = [...local.Items, ...more.Items]
+    .map((i) => ({ i, score: bestScore(q, [i.Name, i.OriginalTitle]) }))
+    .sort((a, b) => b.score - a.score)
+    .map(({ i }) => i);
   const progress = progressByTitle(downloads);
-  const cards = local.Items.map((i) => jfToCard(i, index));
+  const cards = items.map((i) => jfToCard(i, index));
   const seen = new Set(cards.map((c) => c.key));
   for (const card of seerrCards(remote.results, index, progress)) {
     if (!seen.has(card.key)) cards.push(card);
   }
   const people = await searchPeople(user, q, has.seerr() ? remote.results : undefined, index, progress);
   return { items: cards, ...people };
+}
+
+/** Every film's and show's names in the library, for searches Jellyfin's own would miss (kept a few minutes). */
+const libraryNames = new TTLCache<Array<{ id: string; names: string[] }>>(50);
+
+/** The library's titles close to what was typed, closest first. */
+async function closeInLibrary(user: SessionUser, q: string, excludeItemIds?: string): Promise<string[]> {
+  const all = await libraryNames.wrap(user.id, 5 * MINUTE, async () => {
+    const res = await jellyfin.items(user.token, {
+      userId: user.id,
+      includeItemTypes: 'Movie,Series',
+      recursive: true,
+      fields: 'OriginalTitle',
+      enableImages: false,
+      enableUserData: false,
+    });
+    return res.Items.map((i) => ({ id: i.Id, names: [i.Name, i.OriginalTitle].filter((n): n is string => Boolean(n)) }));
+  });
+  const hidden = new Set(excludeItemIds?.split(','));
+  return all
+    .flatMap(({ id, names }) => {
+      const score = hidden.has(id) ? 0 : bestScore(q, names);
+      return score ? [{ id, score }] : [];
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 30)
+    .map(({ id }) => id);
+}
+
+/** A film, show or person in TMDB's results that's what was typed, near enough. */
+const CLOSE = 0.7;
+const closeness = (q: string, r: SeerrResult) => (r.mediaType === 'collection' ? 0 : bestScore(q, [r.title, r.name, r.originalTitle, r.originalName]));
+
+/**
+ * TMDB (through Seerr), which matches words as typed. Nothing close: asked again a word at a time
+ * (and the start of the longest, for a typo further on), keeping what's close, closest first.
+ */
+async function catalogSearch(q: string): Promise<SeerrPage> {
+  const first = await catalog.search(q);
+  if (first.results.some((r) => closeness(q, r) >= CLOSE)) return first;
+  const words = [...new Set(searchWords(q).split(' '))].filter((w) => w.length >= 3).sort((a, b) => b.length - a.length);
+  const longest = words[0] ?? '';
+  const tries = [...(words.length > 1 ? words.slice(0, 2) : []), ...(longest.length >= 6 ? [longest.slice(0, Math.max(4, Math.ceil(longest.length * 0.6)))] : [])];
+  if (!tries.length) return first;
+  const pages = await Promise.all(tries.map((x) => settle(catalog.search(x), EMPTY_PAGE)));
+  const known = new Set(first.results.map((r) => `${r.mediaType}-${r.id}`));
+  const close = new Map<string, { r: SeerrResult; score: number }>();
+  for (const r of pages.flatMap((p) => p.results)) {
+    const key = `${r.mediaType}-${r.id}`;
+    const score = r.mediaType === 'movie' || r.mediaType === 'tv' ? closeness(q, r) : 0;
+    if (score >= CLOSE && !known.has(key) && !close.has(key)) close.set(key, { r, score });
+  }
+  const found = [...close.values()].sort((a, b) => b.score - a.score || (b.r.popularity ?? 0) - (a.r.popularity ?? 0)).map(({ r }) => r);
+  return { ...first, results: [...found, ...first.results] };
 }
 
 const SORTS: Record<string, string> = {

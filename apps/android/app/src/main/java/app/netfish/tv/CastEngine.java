@@ -13,6 +13,7 @@ import androidx.mediarouter.media.MediaRouter;
 
 import com.google.android.gms.cast.HlsSegmentFormat;
 import com.google.android.gms.cast.HlsVideoSegmentFormat;
+import com.google.android.gms.cast.MediaError;
 import com.google.android.gms.cast.MediaInfo;
 import com.google.android.gms.cast.MediaLoadRequestData;
 import com.google.android.gms.cast.MediaMetadata;
@@ -21,6 +22,8 @@ import com.google.android.gms.cast.MediaStatus;
 import com.google.android.gms.cast.MediaTrack;
 import com.google.android.gms.cast.framework.CastContext;
 import com.google.android.gms.cast.framework.CastSession;
+import com.google.android.gms.cast.framework.CastState;
+import com.google.android.gms.cast.framework.CastStateListener;
 import com.google.android.gms.cast.framework.SessionManagerListener;
 import com.google.android.gms.cast.framework.media.RemoteMediaClient;
 import com.google.android.gms.common.ConnectionResult;
@@ -33,7 +36,10 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Chromecast, on phones and tablets with Google Play services (not Fire TV): finds the
@@ -53,6 +59,8 @@ final class CastEngine {
     private MediaRouteSelector selector;
     private boolean watching;
     private RemoteMediaClient client;
+    /** The Chromecast's own reason for the last error with this film (its detailed code), 0 for none. */
+    private int lastError;
 
     CastEngine(Activity activity, Consumer<String> push) {
         this.activity = activity;
@@ -81,6 +89,8 @@ final class CastEngine {
         router = MediaRouter.getInstance(activity);
         selector = cast.getMergedSelector();
         cast.getSessionManager().addSessionManagerListener(sessions, CastSession.class);
+        cast.addCastStateListener(available);
+        available.onCastStateChanged(cast.getCastState());
         CastSession current = cast.getSessionManager().getCurrentCastSession();
         if (current != null && current.isConnected()) follow(current);
         return true;
@@ -89,8 +99,50 @@ final class CastEngine {
     void release() {
         if (cast == null) return;
         if (router != null) router.removeCallback(routes);
+        cast.removeCastStateListener(available);
         cast.getSessionManager().removeSessionManagerListener(sessions, CastSession.class);
         follow(null);
+    }
+
+    /** Everything again, for a page that has just loaded (it missed what was said before). */
+    void refresh() {
+        main.post(() -> {
+            if (cast == null) return;
+            pushAvailable(cast.getCastState());
+            CastSession current = session();
+            follow(current != null && current.isConnected() ? current : null);
+        });
+    }
+
+    /**
+     * Whether there are Chromecasts on the network, from Google's own watch while the app is open
+     * (it costs nothing extra): the top bar's cast button shows them before any film plays.
+     */
+    private final CastStateListener available = this::pushAvailable;
+
+    private void pushAvailable(int state) {
+        try {
+            push.accept(new JSONObject().put("available", state != CastState.NO_DEVICES_AVAILABLE).toString());
+        } catch (JSONException ignored) {
+        }
+    }
+
+    /** The title a Chromecast's link is for (/videos/<id>/…; Jellyfin 12 writes ids with dashes). */
+    static String itemOf(String url) {
+        Matcher m = Pattern.compile("/videos/([0-9a-f-]{32,36})/", Pattern.CASE_INSENSITIVE).matcher(url == null ? "" : url);
+        return m.find() ? m.group(1).replace("-", "").toLowerCase(Locale.ROOT) : null;
+    }
+
+    /** The title playing on the Chromecast now, if any (for its notification: back to that film's player). */
+    static String playingItem(Context context) {
+        try {
+            CastSession session = CastContext.getSharedInstance(context).getSessionManager().getCurrentCastSession();
+            RemoteMediaClient c = session == null ? null : session.getRemoteMediaClient();
+            MediaInfo info = c == null ? null : c.getMediaInfo();
+            return info == null ? null : itemOf(info.getContentId());
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     // ---------- Finding Chromecasts (only while the page's player is open: it costs battery) ----------
@@ -205,6 +257,14 @@ final class CastEngine {
         public void onStatusUpdated() {
             pushStatus();
         }
+
+        /** Why it gave up, in Google's numbers (for a bug report): said with the error that follows. */
+        @Override
+        public void onMediaError(MediaError error) {
+            Integer code = error.getDetailedErrorCode();
+            lastError = code == null ? 0 : code;
+            Log.w(TAG, "Chromecast error " + error.getType() + " " + code + (error.getReason() != null ? " (" + error.getReason() + ")" : ""));
+        }
     };
 
     private final RemoteMediaClient.ProgressListener progress = (position, duration) -> pushStatus();
@@ -237,8 +297,12 @@ final class CastEngine {
         CastSession session = session();
         if (client == null || session == null) return;
         MediaStatus s = client.getMediaStatus();
-        if (s == null) return;
         try {
+            // Nothing there (stopped, or not started yet): no film, for whoever keeps the last news.
+            if (s == null) {
+                push.accept(new JSONObject().put("playing", false).put("paused", false).put("buffering", false).toString());
+                return;
+            }
             int state = s.getPlayerState();
             JSONObject json = new JSONObject()
                     .put("time", client.getApproximateStreamPosition() / 1000.0)
@@ -253,7 +317,10 @@ final class CastEngine {
             if (state == MediaStatus.PLAYER_STATE_IDLE) {
                 int why = s.getIdleReason();
                 if (why == MediaStatus.IDLE_REASON_FINISHED) json.put("ended", true);
-                if (why == MediaStatus.IDLE_REASON_ERROR) json.put("error", "The Chromecast couldn't play this");
+                if (why == MediaStatus.IDLE_REASON_ERROR) {
+                    json.put("error", "The Chromecast couldn't play this");
+                    if (lastError != 0) json.put("errorCode", lastError);
+                }
             }
             push.accept(json.toString());
         } catch (JSONException ignored) {
@@ -282,6 +349,7 @@ final class CastEngine {
      */
     void load(String json) {
         main.post(() -> {
+            lastError = 0;
             CastSession session = session();
             if (session == null || session.getRemoteMediaClient() == null) {
                 pushError("Not connected to a Chromecast");

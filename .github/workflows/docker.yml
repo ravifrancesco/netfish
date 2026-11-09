@@ -1,4 +1,4 @@
-# Builds the Netfish image for x86 and Raspberry Pi (arm64) and publishes it to
+# Builds the Netfish image for x86 PCs (amd64) and ARM boards like the Raspberry Pi (arm64) and publishes it to
 # GitHub Container Registry as ghcr.io/<owner>/netfish. Portainer pulls it from there.
 name: Docker image
 

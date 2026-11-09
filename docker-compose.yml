@@ -1,12 +1,12 @@
 # Netfish — Portainer stack
 #
 # Portainer → Stacks → Add stack → paste this → Deploy.
-# Then open http://<your-pi>:7777: Netfish asks for your Jellyfin address, you
+# Then open http://<your-server>:7777: Netfish asks for your Jellyfin address, you
 # sign in with a Jellyfin admin account, and connect everything else in
 # Settings → Connections. No variables needed.
 #
-# Image: GitHub builds it (Raspberry Pi and PCs); "Pull and redeploy" updates it.
-# Built it on the Pi yourself instead? Set NETFISH_IMAGE=netfish:latest.
+# Image: GitHub builds it (PCs, mini PCs, Raspberry Pi); "Pull and redeploy" updates it.
+# Built it on your server yourself instead? Set NETFISH_IMAGE=netfish:latest.
 #
 # Netfish only talks to your existing services through their APIs; it never
 # changes their settings.
@@ -19,7 +19,7 @@ services:
     ports:
       - "7777:7777"
     extra_hosts:
-      # Lets Netfish reach services on the Pi itself as http://host.docker.internal:<port>
+      # Lets Netfish reach services on the same machine as http://host.docker.internal:<port>
       - "host.docker.internal:host-gateway"
     volumes:
       # Settings and connections made in the app live here and survive updates.

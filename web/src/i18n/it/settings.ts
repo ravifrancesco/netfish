@@ -58,8 +58,8 @@ export default {
     'Automatica segue la lingua di questo dispositivo. Se la cambi, la pagina si ricarica.',
   'Playback on this device': 'Riproduzione su questo dispositivo',
   'Streaming quality': 'Qualità dello streaming',
-  'Lower it when watching away from home. Anything the Pi has to shrink costs it CPU.':
-    'Abbassala quando guardi fuori casa. Ogni riduzione che il Pi deve fare gli costa CPU.',
+  'Lower it when watching away from home. Anything the server has to shrink costs it CPU.':
+    'Abbassala quando guardi fuori casa. Ogni riduzione che il server deve fare gli costa CPU.',
   'Preferred audio language': 'Lingua audio preferita',
   'Original / file default': 'Originale / predefinita del file',
   'Follows what you last chose while watching, films and channels alike.': 'Segue quello che hai scelto l’ultima volta guardando, film e canali.',

@@ -1,6 +1,6 @@
 {
   "name": "netfish",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "private": true,
   "description": "A Netflix-style front door for a Jellyfin + Seerr + *arr home media stack.",
   "license": "MIT",
@@ -19,7 +19,7 @@
     "build": "npm run build -w web && npm run build -w server",
     "start": "node server/dist/server.cjs",
     "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
-    "pack:pi": "node scripts/pack-pi.mjs",
+    "pack:server": "node scripts/pack-server.mjs",
     "build:mac": "apps/mac/build.sh --dmg",
     "build:android": "scripts/build-android.sh",
     "build:windows": "apps/windows/build.sh",

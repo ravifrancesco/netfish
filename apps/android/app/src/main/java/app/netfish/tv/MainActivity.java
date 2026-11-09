@@ -516,10 +516,16 @@ public class MainActivity extends Activity {
             return castReady && fromServer();
         }
 
-        /** Look for Chromecasts while the player is open (on), not otherwise (off). */
+        /** Look for Chromecasts while a list of them is on screen (on), not otherwise (off). */
         @JavascriptInterface
         public void castWatch(boolean on) {
             if (castReady && fromServer()) cast.watch(on);
+        }
+
+        /** A page that has just loaded: what the Chromecast is doing, told again (earlier news went to the page before). */
+        @JavascriptInterface
+        public void castRefresh() {
+            if (castReady && fromServer()) cast.refresh();
         }
 
         @JavascriptInterface

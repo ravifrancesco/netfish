@@ -21,7 +21,7 @@ import { useReadyNotifications, useTogetherNotifications } from './lib/notify';
 import { JoinRoom } from './components/Together';
 import { useLive } from './lib/together';
 import { useOfflineAware } from './lib/offline';
-import { RemoteBar } from './components/PlayOn';
+import { CastBar, RemoteBar } from './components/PlayOn';
 import { forgetPicked, ProfilePicker, useProfiles, wasPicked } from './components/ProfilePicker';
 
 // The player pulls in hls.js; only load it when someone presses play.
@@ -108,6 +108,8 @@ function Shell({ user }: { user: NonNullable<ReturnType<typeof useMe>['data']> }
       </main>
       {/* Playing on another device from here: a way back to its remote. */}
       {!watching && !pathname.startsWith('/remote/') && <RemoteBar />}
+      {/* A film on a Chromecast: a way back to its player. */}
+      {!watching && <CastBar />}
     </>
   );
 }

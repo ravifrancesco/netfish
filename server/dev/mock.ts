@@ -1,5 +1,5 @@
 /**
- * Local stand-in for the whole Pi stack (Jellyfin, Seerr, Radarr, Sonarr,
+ * Local stand-in for the whole home-server stack (Jellyfin, Seerr, Radarr, Sonarr,
  * Bazarr, qBittorrent, Trakt) so Netfish can be developed and demoed anywhere.
  *
  *   npm run dev:mock      → mock on :7700, Netfish API on :7777, web on :5173
@@ -394,7 +394,7 @@ void app.register(
         if (t.type === 'tv' && types.includes('Series')) items.push(itemsById.get(ids.series(t))!);
         if (t.type === 'tv' && types.includes('Episode')) items.push(...libraryEpisodes(t));
       }
-      if (q.searchTerm) items = items.filter((i) => i.title.title.toLowerCase().includes(q.searchTerm!.toLowerCase()));
+      if (q.searchTerm) items = items.filter((i) => cleanName(i.title.title).includes(cleanName(q.searchTerm!)));
       if (q.personIds) {
         const types = q.personTypes?.split(',');
         items = items.filter((i) => jfPeople(i.title).some((p) => q.personIds!.split(',').includes(p.Id) && (!types || types.includes(p.Type))));
@@ -478,7 +478,7 @@ void app.register(
     });
 
     const image = async (req: FastifyRequest<{ Params: { id: string; type: string } }>, reply: import('fastify').FastifyReply) => {
-      await new Promise((r) => setTimeout(r, 250)); // a Pi resizing artwork isn't instant
+      await new Promise((r) => setTimeout(r, 250)); // a small server resizing artwork isn't instant
       reply.header('content-type', 'image/svg+xml').header('cache-control', 'public, max-age=3600');
       const item = itemsById.get(req.params.id);
       if (!item) return svg.avatar(jfPersonName(req.params.id) ?? '?');
@@ -584,7 +584,7 @@ void app.register(
       return reply.type('image/jpeg').send(fs.readFileSync(file));
     });
     jf.get<{ Params: { id: string; idx: string } }>('/Videos/:id/:ms/Subtitles/:idx/0/Stream.vtt', async (req, reply) => {
-      // MOCK_SUBTITLE_DELAY_MS: like Jellyfin pulling subtitles out of a big file on a Pi the first time.
+      // MOCK_SUBTITLE_DELAY_MS: like Jellyfin pulling subtitles out of a big file on a small server the first time.
       const delay = Number(process.env.MOCK_SUBTITLE_DELAY_MS) || 0;
       if (delay) await sleep(delay);
       const item = itemsById.get(req.params.id);
@@ -660,6 +660,14 @@ function resultDto(t: Title) {
   };
 }
 
+// Searching as the real services do: Jellyfin looks for the cleaned-up words as typed (accents
+// and punctuation gone, spaces kept), TMDB for titles with a word starting with each word typed.
+const cleanName = (s: string) =>
+  s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+const tmdbMatches = (title: string, query: string) => {
+  const words = cleanName(title).split(' ');
+  return cleanName(query).split(' ').filter(Boolean).every((w) => words.some((x) => x.startsWith(w)));
+};
 const page = (items: Title[]) => ({ page: 1, totalPages: 1, totalResults: items.length, results: items.map(resultDto) });
 const shuffle = (items: Title[], salt: string) =>
   [...items].sort((a, b) => crypto.createHash('md5').update(salt + a.n).digest()[0] - crypto.createHash('md5').update(salt + b.n).digest()[0]);
@@ -725,7 +733,7 @@ void app.register(
     s.get('/auth/me', async () => ({ id: 1, displayName: 'admin' }));
     s.get<{ Querystring: Q }>('/search', async (req) => {
       const query = (req.query.query ?? '').trim();
-      const titles = page(TITLES.filter((t) => t.title.toLowerCase().includes(query.toLowerCase())));
+      const titles = page(TITLES.filter((t) => tmdbMatches(t.title, query)));
       const found = query.length >= 2 ? personSearch(query) : [];
       const persons = found.map(({ name, credits }) => ({
         id: personId(name), mediaType: 'person', name, profilePath: profileOf(name), popularity: credits.cast.length + credits.crew.length, adult: false,

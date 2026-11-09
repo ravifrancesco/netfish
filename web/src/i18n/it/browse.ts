@@ -231,7 +231,7 @@ export default {
   "Everyone signs in to Netfish with their Jellyfin account. You'll connect Seerr, Radarr, Sonarr and the rest after signing in, under Settings → Connections.":
     "Tutti accedono a Netfish con il proprio account Jellyfin. Seerr, Radarr, Sonarr e il resto li collegherai dopo l'accesso, in Impostazioni → Connessioni.",
   'Jellyfin address': 'Indirizzo di Jellyfin',
-  'Netfish running in Docker on the same Pi? Try {url}': 'Netfish gira in Docker sullo stesso Pi? Prova {url}',
+  'Netfish running in Docker on the same machine? Try {url}': 'Netfish gira in Docker sulla stessa macchina? Prova {url}',
   'Setup code': 'Codice di configurazione',
   "From Netfish's log in Portainer": 'Dal log di Netfish in Portainer',
   Connect: 'Collega',

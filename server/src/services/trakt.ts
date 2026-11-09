@@ -438,7 +438,7 @@ const recommendations = new TTLCache<SeerrResult[]>(10);
 /**
  * Trakt's picks for the account, as TMDB titles (so they open, request and show
  * availability like any other card). The same for everyone; kept for hours since
- * each one costs a Seerr lookup on the Pi.
+ * each one costs a Seerr lookup on the server.
  */
 export async function traktPicks(mediaType: MediaType): Promise<SeerrResult[]> {
   if (!link || !has.trakt() || !has.seerr()) return [];

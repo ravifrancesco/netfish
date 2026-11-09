@@ -7,7 +7,7 @@ import { t } from '../i18n';
 
 const REASONS: Record<string, string> = {
   ContainerNotSupported: t("This device can't open the file's container, so it's rewrapped (light work)."),
-  VideoCodecNotSupported: t("This device can't decode the video format, so the server re-encodes it (heavy on a Pi)."),
+  VideoCodecNotSupported: t("This device can't decode the video format, so the server re-encodes it, which is heavy work."),
   VideoProfileNotSupported: t("The video uses a profile this device can't decode, so the server re-encodes it (heavy)."),
   VideoLevelNotSupported: t("The video's level is too high for this device, so the server re-encodes it (heavy)."),
   VideoBitDepthNotSupported: t("This device can't show 10-bit video, so the server re-encodes it (heavy)."),
@@ -41,5 +41,5 @@ export function explainReasons(reasons: string[]): string[] {
     .filter((text) => !seen.has(text) && seen.add(text));
 }
 
-/** True when the server is re-encoding the picture, the part that loads a Raspberry Pi. */
+/** True when the server is re-encoding the picture, the part that loads a small server. */
 export const isHeavy = (reasons: string[]) => reasons.some((r) => /^(Video|Subtitle|ContainerBitrate|Interlaced|Anamorphic|RefFrames)/.test(r.trim()));

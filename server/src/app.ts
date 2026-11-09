@@ -15,7 +15,7 @@ export async function buildApp() {
   const app = Fastify({
     // Readable lines in the container log, like Netfish's own (lib/log).
     logger: { level: config.logLevel, stream: fastifyLogStream },
-    // One line per request is noise on a Pi; errors and warnings still get logged.
+    // One line per request is noise on a home server; errors and warnings still get logged.
     logController: new LogController({ disableRequestLogging: config.logLevel !== 'debug' }),
     trustProxy: config.trustProxy,
     bodyLimit: 1024 * 1024,

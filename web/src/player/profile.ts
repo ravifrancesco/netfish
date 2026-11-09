@@ -1,7 +1,7 @@
 /**
  * Tells Jellyfin what this browser can play natively, so it serves files
  * untouched when possible and only repackages (cheap) or transcodes (expensive
- * on a Pi) when it must. Built from real capability checks, not guesses.
+ * on a small server) when it must. Built from real capability checks, not guesses.
  */
 
 import { tizenVersion } from '../lib/tv';
@@ -31,7 +31,7 @@ export function buildDeviceProfile(maxBitrate: number) {
 
   // Chromium (Chrome, Edge, the desktop app) plays MKV natively even though it's not
   // "official" — tested: H.264/HEVC with AAC/FLAC/Opus work. Declaring it means most
-  // Radarr/Sonarr downloads play straight off the disk with zero work for the Pi.
+  // Radarr/Sonarr downloads play straight off the disk with zero work for the server.
   // AC3/DTS aren't in the audio list, so those files still get their audio converted.
   const mkv = document.createElement('video').canPlayType('video/x-matroska') !== '';
 

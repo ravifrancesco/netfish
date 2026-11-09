@@ -1,5 +1,5 @@
 // Bundles the source needed to build the Netfish server image into release/Netfish-<version>-server.tar.gz,
-// for Portainer → Images → Build a new image → Upload (builds right on the Pi).
+// for Portainer → Images → Build a new image → Upload (builds right on the server).
 // Portainer sends the archive as-is (no .dockerignore), so only the needed files go in.
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync } from 'node:fs';

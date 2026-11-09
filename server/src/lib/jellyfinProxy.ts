@@ -93,7 +93,7 @@ export function registerJellyfinProxy(app: FastifyInstance) {
           resolve();
         });
         // Subtitles inside the file: the first time, Jellyfin pulls them out with ffmpeg, which on a
-        // Pi can take minutes for a big file (then it keeps them). Waiting that out, not the usual
+        // small server can take minutes for a big file (then it keeps them). Waiting that out, not the usual
         // half minute (giving up made Jellyfin stop too, so they never came).
         upstream.setTimeout(/\/Subtitles\//i.test(rest) ? 5 * 60_000 : 30_000, () => upstream.destroy(new Error('timed out')));
         upstream.on('error', (err) => {
@@ -104,7 +104,7 @@ export function registerJellyfinProxy(app: FastifyInstance) {
           }
           resolve();
         });
-        // Viewer seeked or closed the player: stop pulling the old byte range from the Pi.
+        // Viewer seeked or closed the player: stop pulling the old byte range from the server.
         reply.raw.on('close', () => {
           if (!reply.raw.writableFinished) upstream.destroy();
         });

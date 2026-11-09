@@ -9,7 +9,7 @@ import { JF_PREFIX } from './images';
  * Jellyfin artwork, kept on Netfish's own disk. A tagged image URL never
  * changes content (Jellyfin gives a picture a new tag when it changes), so a
  * stored copy is good forever, and browsers and the apps may keep it forever
- * too. The first view of a poster costs the Pi one resize; every later one is
+ * too. The first view of a poster costs the server one resize; every later one is
  * a file read. Library posters are fetched ahead of time in the background.
  */
 

@@ -35,8 +35,8 @@ export default {
   // Why the server converts a video
   "This device can't open the file's container, so it's rewrapped (light work).":
     'Questo dispositivo non sa aprire il contenitore del file, quindi viene reimpacchettato (lavoro leggero).',
-  "This device can't decode the video format, so the server re-encodes it (heavy on a Pi).":
-    'Questo dispositivo non sa decodificare il formato video, quindi il server lo converte (pesante per un Pi).',
+  "This device can't decode the video format, so the server re-encodes it, which is heavy work.":
+    'Questo dispositivo non sa decodificare il formato video, quindi il server lo converte, un lavoro pesante.',
   "The video uses a profile this device can't decode, so the server re-encodes it (heavy).":
     'Il video usa un profilo che questo dispositivo non sa decodificare, quindi il server lo converte (pesante).',
   "The video's level is too high for this device, so the server re-encodes it (heavy).":

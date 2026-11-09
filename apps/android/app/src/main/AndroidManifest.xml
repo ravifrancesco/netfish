@@ -35,6 +35,15 @@
             </intent-filter>
         </activity>
 
+        <!-- Chromecast: its notification, tapped, goes through this (in a task of its own) to the film's player. -->
+        <activity
+            android:name=".CastNotificationActivity"
+            android:exported="false"
+            android:taskAffinity="${applicationId}.cast"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.NoDisplay" />
+
         <!-- Chromecast: the Cast library reads its settings from this class. -->
         <meta-data
             android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"

@@ -350,7 +350,7 @@ export default function Settings() {
               </option>
             ))}
           </select>
-          <small className="muted">{t('Lower it when watching away from home. Anything the Pi has to shrink costs it CPU.')}</small>
+          <small className="muted">{t('Lower it when watching away from home. Anything the server has to shrink costs it CPU.')}</small>
         </label>
         <PlaybackLanguages />
         <label className="check">

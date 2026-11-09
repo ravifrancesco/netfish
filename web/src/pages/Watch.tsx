@@ -11,6 +11,7 @@ import { getPrefs, usePrefs } from '../lib/prefs';
 import { rememberSubtitle } from '../lib/playbackPrefs';
 import { desktop, type CastDevice } from '../lib/desktop';
 import { CastVideo, CHROMECAST_PROFILE } from '../player/cast';
+import { castAudioOf, castBusy, castItemOf } from '../lib/chromecast';
 import { startVolume } from '../lib/systemVolume';
 import { buildDeviceProfile } from '../player/profile';
 import { OverlayVideo, trackPositions } from '../player/overlay';
@@ -34,6 +35,8 @@ interface LoadOptions {
   audio?: number;
   subtitle?: number;
   allowDirectPlay?: boolean;
+  /** The Chromecast is already playing this film, from this link: follow it, don't start it again. */
+  rejoin?: string;
 }
 
 /**
@@ -224,7 +227,7 @@ function Player() {
   };
 
   /** Sends the film to the Chromecast, with links it can open by itself (they carry a token for this film). */
-  const attachCast = (s: PlaybackSession, start: number) => {
+  const attachCast = (s: PlaybackSession, start: number, rejoin?: string) => {
     let cv = castVideo.current;
     if (!cv) {
       cv = new CastVideo(cast!);
@@ -234,6 +237,11 @@ function Player() {
     if (video.current instanceof HTMLVideoElement) pageVideo.current = video.current;
     video.current = cv as unknown as HTMLVideoElement;
     setPictureShown(false);
+    if (rejoin) {
+      // Back to a film already playing there (from the bar or the notification): it carries on.
+      cv.loadingNext(rejoin, start);
+      return;
+    }
     // The token goes in the path (/jellyfin/cast/<token>/…), so the links inside Jellyfin's
     // playlists, relative to it, carry it too.
     const linked = (url: string) => {
@@ -245,7 +253,6 @@ function Player() {
     cv.loadingNext(url);
     const d = infoRef.current;
     const episode = d?.type === 'Episode';
-    const sub = pickSubtitle(s, subtitleRef.current, false);
     cast!.load({
       url,
       contentType: s.isHls ? 'application/x-mpegURL' : 'video/mp4',
@@ -256,13 +263,34 @@ function Player() {
       image: d?.backdrop ? absolute(d.backdrop) : undefined,
       episode,
       subtitles: s.subtitleTracks.filter((tr) => tr.vttUrl).map((tr) => ({ id: tr.index, url: linked(tr.vttUrl!), label: tr.label, language: tr.code })),
-      subtitleId: sub?.vttUrl ? sub.index : null,
+      // Shown once they're ready (showOnCast): a Chromecast kept waiting for them gives up on the film.
+      subtitleId: null,
     });
   };
 
-  const attach = useCallback((s: PlaybackSession, start: number) => {
+  /**
+   * Subtitles on the Chromecast, by Jellyfin's numbers. Ones inside the file Jellyfin pulls out the
+   * first time they're asked for, which on a small server can take minutes, longer than a Chromecast waits:
+   * they're fetched here first (Jellyfin keeps them), then shown there, the film playing meanwhile.
+   */
+  const castSubtitleAsk = useRef(0);
+  const showOnCast = (track: StreamTrack | undefined) => {
+    const ask = ++castSubtitleAsk.current;
+    // None: also once it has the film, not over it while it loads.
+    const ready = track?.vttUrl
+      ? fetch(track.vttUrl).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`subtitles: ${r.status}`))))
+      : Promise.resolve();
+    ready
+      .then(() => castVideo.current?.whenLoaded())
+      .then(() => {
+        if (ask === castSubtitleAsk.current && castingRef.current) cast?.command('subtitle', track?.vttUrl ? track.index : null);
+      })
+      .catch(() => {});
+  };
+
+  const attach = useCallback((s: PlaybackSession, start: number, rejoin?: string) => {
     // Casting: a stream asked for before it connected has no links the Chromecast can open.
-    if (castingRef.current && cast) return s.castToken ? attachCast(s, start) : void latestLoad.current?.({ start, audio: s.audioStreamIndex });
+    if (castingRef.current && cast) return s.castToken ? attachCast(s, start, rejoin) : void latestLoad.current?.({ start, audio: s.audioStreamIndex });
     if (overlayActive.current && overlay) {
       let ov = overlayVideo.current;
       if (!ov) {
@@ -352,7 +380,7 @@ function Player() {
         started.current = false;
         setSession(s);
         setAudioIndex(s.audioStreamIndex);
-        attach(s, opts.start);
+        attach(s, opts.start, opts.rejoin);
       } catch (e) {
         setError((e as Error).message);
       }
@@ -441,6 +469,12 @@ function Player() {
     const fromUrl = params.get('t');
     const resume = d.resumeSeconds && d.durationSeconds && d.resumeSeconds < d.durationSeconds - 60 ? d.resumeSeconds : 0;
     startPaused.current = Boolean(room && !room.playback.playing);
+    // Already on the Chromecast (back from the bar or the notification): from where it is, as it is.
+    const there = cast?.last();
+    if (!room && castingRef.current && there && castBusy(there) && castItemOf(there.url) === itemId) {
+      void load({ start: there.time ?? 0, audio: castAudioOf(there.url), rejoin: there.url });
+      return;
+    }
     void load({ start: room ? (togetherRef.current.expected() ?? 0) : fromUrl !== null ? Number(fromUrl) : resume });
   }, [info.data, roomKnown]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -453,8 +487,7 @@ function Player() {
   // Make the chosen text track visible (mpv: switch to it; it draws every kind, pictures too).
   useEffect(() => {
     if (castingRef.current) {
-      // On the Chromecast: its WebVTT tracks, by Jellyfin's numbers.
-      if (session) cast?.command('subtitle', subtitle?.vttUrl ? subtitle.index : null);
+      if (session) showOnCast(subtitle);
       return;
     }
     if (overlayActive.current) {
@@ -491,7 +524,9 @@ function Player() {
 
   const onVideoError = () => {
     if (castingRef.current) {
-      setError(video.current?.error?.message ?? t("The Chromecast couldn't play this"));
+      // In Italian too, with the Chromecast's own number when it gave one.
+      const e = castVideo.current?.error;
+      setError(`${t(e?.message ?? "The Chromecast couldn't play this")}${e?.code ? ` (${e.code})` : ''}`);
       return;
     }
     if (overlayActive.current) {

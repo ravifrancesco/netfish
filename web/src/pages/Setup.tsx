@@ -45,7 +45,7 @@ export default function Setup({ change, onDone }: { change?: boolean; onDone?: (
           <span>{t('Jellyfin address')}</span>
           <input className="input" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="192.168.1.50:8096" autoFocus spellCheck={false} autoComplete="url" />
         </label>
-        <small className="muted">{t('Netfish running in Docker on the same Pi? Try {url}', { url: 'http://host.docker.internal:8096' })}</small>
+        <small className="muted">{t('Netfish running in Docker on the same machine? Try {url}', { url: 'http://host.docker.internal:8096' })}</small>
         {change && (
           <label className="field">
             <span>{t('Setup code')}</span>

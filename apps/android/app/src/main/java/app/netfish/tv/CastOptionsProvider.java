@@ -14,13 +14,13 @@ import java.util.List;
 /**
  * Google's Cast library asks the app for this (named in the manifest): Google's own player on
  * the Chromecast (the Default Media Receiver, nothing to register), and the usual notification
- * with play/pause while a film plays there, which opens Netfish when tapped.
+ * with play/pause while a film plays there, which opens that film's player when tapped.
  */
 public class CastOptionsProvider implements OptionsProvider {
     @Override
     public CastOptions getCastOptions(Context context) {
         NotificationOptions notification = new NotificationOptions.Builder()
-                .setTargetActivityClassName(MainActivity.class.getName())
+                .setTargetActivityClassName(CastNotificationActivity.class.getName())
                 .build();
         CastMediaOptions media = new CastMediaOptions.Builder()
                 .setNotificationOptions(notification)

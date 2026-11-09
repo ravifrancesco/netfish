@@ -10,7 +10,7 @@ A Netflix-style front door for a home media server. One app to browse, discover,
 
 - [Features](#features) · [Download](#download) · [Screenshots](#screenshots) · [Install guides](docs/install/README.md) ([italiano](docs/install/it/README.md))
 - [How it fits together](#how-it-fits-together) · [What's where](#whats-where)
-- [Install on the Pi (Portainer)](#install-on-the-pi-portainer) · [Admin settings](#admin-settings-in-the-app) · [Stack variables](#optional-stack-variables)
+- [Install the server (Portainer)](#install-the-server-portainer) · [Admin settings](#admin-settings-in-the-app) · [Stack variables](#optional-stack-variables)
 - [Playback: who does the work?](#playback-who-does-the-work)
 - Apps: [Mac](#mac-app) · [Windows](#windows-app) · [Android, Fire TV, Android TV](#android-app-phones-tablets-fire-tv-android-tv) · [Samsung TV](#samsung-tv-app) · [iPhone & iPad](#iphone--ipad-app)
 - [Developing](#developing) · [Building and releasing](#building-the-apps-and-releasing)
@@ -21,7 +21,7 @@ A Netflix-style front door for a home media server. One app to browse, discover,
 ### Watching
 - **Home like a streaming service:** Continue Watching, *Ready to watch*, *Top picks for you*, *Because you watched…*, new arrivals, trending and coming soon.
 - **Discover tab (optional):** an admin can split Home in two. Home then shows only what's in the library, ready to play, and a **Discover** tab after it has everything to request: trending, picks, coming soon and your requests.
-- **A real player:** plays the file as it is when it can; otherwise Jellyfin repackages it (cheap on a Pi) and only transcodes as a last resort. Audio and subtitle switching, resume, skip intro, next episode, keyboard shortcuts, and a preview picture as you scrub the timeline (from Jellyfin's trickplay images, see *Good to know*).
+- **A real player:** plays the file as it is when it can; otherwise Jellyfin repackages it (cheap, even on a small server) and only transcodes as a last resort. Audio and subtitle switching, resume, skip intro, next episode, keyboard shortcuts, and a preview picture as you scrub the timeline (from Jellyfin's trickplay images, see *Good to know*).
 - **Your languages, as in Jellyfin:** films start with the audio and subtitles your Jellyfin settings and Jellyfin's memory of each title ask for, the same tracks Jellyfin's own apps pick. Change those settings in **Settings → Playback on this device**; subtitles you pick while watching become your default. A browser or TV can only play a file's main audio track, so when your language is another track, Jellyfin repackages the film with yours (light work: the picture is copied as it is).
 - **Play on TV:** connect to the TV (or any device with Netfish open) with the cast button next to your profile picture, like YouTube; then Play plays there and your phone becomes the remote: pause, skip, audio and subtitles. A film you're already watching can be handed over mid-way.
 - **Chromecast:** in the Android app on phones and tablets, the player's cast button also lists the Chromecasts on your network. The film carries on there from the same spot, the phone is the remote, and **Stop casting** brings it back.
@@ -34,7 +34,7 @@ A Netflix-style front door for a home media server. One app to browse, discover,
 ### Finding something
 - **One search for everything:** your library and all of TMDB. Titles already on the server say **In library**, the rest *Requested*, *On its way* or how far a download has got; the same goes for a director's or actor's films.
 - **Directors and actors:** search a name for their films and shows; every name on a title page opens its own page.
-- **Suggestions that learn, for free:** TMDB's "people who liked this also liked", blended with each person's favourite genres, directors and actors, plus *Popular on this server*. Runs on the Pi, no subscription.
+- **Suggestions that learn, for free:** TMDB's "people who liked this also liked", blended with each person's favourite genres, directors and actors, plus *Popular on this server*. Runs on your server, no subscription.
 - **Scores and trailers:** TMDB, IMDb, Rotten Tomatoes, Metacritic and Letterboxd, and trailers in the app.
 
 ### Getting it
@@ -59,7 +59,7 @@ A Netflix-style front door for a home media server. One app to browse, discover,
 - **Download details:** Activity shows each download's custom formats and score, indexer and client from Radarr/Sonarr; admins choose which details everyone else sees.
 
 ### Apps
-- **Everywhere:** the web app at `http://<pi>:7777` (phones too), plus apps for Mac, Windows, iPhone/iPad, Android (phones, tablets, Fire TV, Android TV) and Samsung TVs.
+- **Everywhere:** the web app at `http://<server>:7777` (phones too), plus apps for Mac, Windows, iPhone/iPad, Android (phones, tablets, Fire TV, Android TV) and Samsung TVs.
 - **TV mode** (Fire TV, Android TV, Samsung TVs): a big, remote-friendly interface. The arrows move between rows and buttons, the timeline scrubs with left and right (with previews), and Back goes back, asking before it closes Netfish.
 - **Up to date by themselves:** the TV and phone apps get new features from the server. When an app itself has something new worth having, Netfish says so on that device, and the Mac, Windows and Android apps (Fire TV too) update in one click; the Mac and Windows apps can also do it on their own with **Auto-update**. Admins see every open device and its version in **Settings → Devices**, and an iPhone installed from a Mac warns before its 7 days run out.
 
@@ -69,7 +69,7 @@ Sign-in uses your Jellyfin accounts. Jellyfin keeps doing the heavy lifting (lib
 
 | For | Get it | Step-by-step |
 |---|---|---|
-| **Server** (Raspberry Pi or any Docker host) | `ghcr.io/ravifrancesco/netfish:latest`, pulled by Portainer | [Server guide](docs/install/server.md) |
+| **Server** (any Docker host: a mini PC, a NAS, a Raspberry Pi) | `ghcr.io/ravifrancesco/netfish:latest`, pulled by Portainer | [Server guide](docs/install/server.md) |
 | **Mac** (Apple silicon) | [Netfish-mac.dmg](https://github.com/ravifrancesco/netfish/releases/latest/download/Netfish-mac.dmg) | [Mac](docs/install/mac.md) |
 | **Windows 10/11** (64-bit) | [Netfish-windows.exe](https://github.com/ravifrancesco/netfish/releases/latest/download/Netfish-windows.exe) | [Windows](docs/install/windows.md) |
 | **Android** phones and tablets | [Netfish-android.apk](https://github.com/ravifrancesco/netfish/releases/latest/download/Netfish-android.apk) | [Android](docs/install/android.md) |
@@ -117,7 +117,7 @@ Guide in italiano: [docs/install/it](docs/install/it/README.md).
 
 | Folder | What it is |
 |---|---|
-| `server/` | The Netfish server (Node + Fastify), which runs on the Pi. It aggregates the services, holds their API keys, proxies Jellyfin media read-only behind your session, and serves the web app. |
+| `server/` | The Netfish server (Node + Fastify), which runs on your home server. It aggregates the services, holds their API keys, proxies Jellyfin media read-only behind your session, and serves the web app. |
 | `web/` | The interface (React + Vite) every app shows. It only talks to the Netfish server, so the engine behind it can change without touching the apps. |
 | `shared/` | The API contract (TypeScript types) used by the server and the interface. |
 | `apps/mac/` | The Mac app (Swift): the interface on top, mpv playing films underneath. |
@@ -127,26 +127,26 @@ Guide in italiano: [docs/install/it](docs/install/it/README.md).
 | `apps/tizen/` | The Samsung TV app (a small starter that opens your server in TV mode). |
 | `apps/common/` | The setup page, the downloads page and the icon shared by the apps. |
 | `docs/install/` | Step-by-step install guides for every device. |
-| `Dockerfile`, `docker/`, `docker-compose.yml` | Running the server on the Pi. |
+| `Dockerfile`, `docker/`, `docker-compose.yml` | Running the server in Docker. |
 | `scripts/` | Build helpers. |
-| `release/` | **The only place local builds go**: `Netfish-<version>-server.tar.gz` (the Pi image), `-mac.dmg`, `-windows.exe`, `-android.apk`. Not in git; published versions are on GitHub Releases. |
+| `release/` | **The only place local builds go**: `Netfish-<version>-server.tar.gz` (the server image's source), `-mac.dmg`, `-windows.exe`, `-android.apk`. Not in git; published versions are on GitHub Releases. |
 
-The apps show the interface from your server, so most new features arrive by updating the Pi; the apps themselves rarely change.
+The apps show the interface from your server, so most new features arrive by updating the server; the apps themselves rarely change.
 
-## Install on the Pi (Portainer)
+## Install the server (Portainer)
 
-**1. Portainer → Stacks → Add stack**, name it `netfish`, paste [`docker-compose.yml`](docker-compose.yml), and **Deploy**. No variables are needed: Portainer pulls the ready-made image `ghcr.io/ravifrancesco/netfish:latest` (built by GitHub for Raspberry Pi and PCs).
+**1. Portainer → Stacks → Add stack**, name it `netfish`, paste [`docker-compose.yml`](docker-compose.yml), and **Deploy**. No variables are needed: Portainer pulls the ready-made image `ghcr.io/ravifrancesco/netfish:latest` (built by GitHub for PCs and mini PCs, amd64, and for the Raspberry Pi and other ARM boards, arm64).
 
-**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.8.1`.
+**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.8.2`.
 
 <details>
-<summary>Or build the image on the Pi yourself</summary>
+<summary>Or build the image on your server yourself</summary>
 
-Download **Netfish-server.tar.gz** from [Releases](https://github.com/ravifrancesco/netfish/releases) (or make it with `npm run pack:pi`). In Portainer → **Images** → **Build a new image**: name it `netfish:latest`, choose **Upload**, select the file, and click **Build** (a few minutes on a Pi). Then set `NETFISH_IMAGE=netfish:latest` in the stack's environment variables. Repeat for updates.
+Download **Netfish-server.tar.gz** from [Releases](https://github.com/ravifrancesco/netfish/releases) (or make it with `npm run pack:server`). In Portainer → **Images** → **Build a new image**: name it `netfish:latest`, choose **Upload**, select the file, and click **Build** (a few minutes). Then set `NETFISH_IMAGE=netfish:latest` in the stack's environment variables. Repeat for updates.
 
 </details>
 
-**3. Open `http://<pi-ip>:7777`.** Netfish asks for your Jellyfin address: `http://host.docker.internal:8096` if Jellyfin runs on the same Pi. Sign in with a Jellyfin **admin** account, then open **Settings → Connections** and fill in Seerr, Radarr, Sonarr, Bazarr, qBittorrent and (optionally) MDBList, Trakt and SuggestArr. Each has a **Test** button, and changes apply immediately.
+**3. Open `http://<server-ip>:7777`.** Netfish asks for your Jellyfin address: `http://host.docker.internal:8096` if Jellyfin runs on the same machine. Sign in with a Jellyfin **admin** account, then open **Settings → Connections** and fill in Seerr, Radarr, Sonarr, Bazarr, qBittorrent and (optionally) MDBList, Trakt and SuggestArr. Each has a **Test** button, and changes apply immediately.
 
 If Netfish ever points at the wrong Jellyfin and nobody can sign in, use **Change the Jellyfin address** on the sign-in screen with the *setup code* printed in Netfish's log (Portainer → Containers → netfish → Logs).
 
@@ -157,7 +157,7 @@ If Netfish ever points at the wrong Jellyfin and nobody can sign in, use **Chang
 - **Shows:** the next seasons and new episodes for everyone (each person still says yes or no), and what happens to seasons everyone who started them has finished: deleted from disk after 30 days (or 7 to 180; listed in Storage for a day first, to keep), only suggested in Storage, or left alone. They stay listed as *Not on disk*, ready to download again; nothing kept, partway through or still running is touched. Needs Jellyfin's API key.
 - **Downloads:** who can pick specific versions (everyone or admins), and max release size for movies and per episode. Releases over the limit are hidden in Versions and refused by the server, and season packs count per episode. Admins can still show and pick them. Automatic downloads from requests follow Radarr/Sonarr's own size settings.
 
-Everything is kept in `/docker-data-volumes/netfish-data` on the Pi (change the path in the stack if you keep container data elsewhere), so updates don't lose it. Netfish creates that folder and gives it to `PUID`/`PGID` (1000 by default) on startup.
+Everything is kept in `/docker-data-volumes/netfish-data` on the server (change the path in the stack if you keep container data elsewhere), so updates don't lose it. Netfish creates that folder and gives it to `PUID`/`PGID` (1000 by default) on startup.
 
 ### Optional stack variables
 
@@ -165,7 +165,7 @@ You can also pre-fill connections from the stack (see [`.env.example`](.env.exam
 
 | Variable | Notes |
 | --- | --- |
-| `NETFISH_IMAGE` | Defaults to `ghcr.io/ravifrancesco/netfish:latest`; `netfish:latest` if you built the image on the Pi. |
+| `NETFISH_IMAGE` | Defaults to `ghcr.io/ravifrancesco/netfish:latest`; `netfish:latest` if you built the image yourself. |
 | `JELLYFIN_URL`, `JELLYFIN_API_KEY` | API key optional: refreshes items when new subtitles arrive, and lets *Popular on this server* include people who watch in other Jellyfin apps. |
 | `SEERR_*`, `RADARR_*`, `SONARR_*`, `BAZARR_*`, `QBITTORRENT_*`, `MDBLIST_API_KEY`, `TRAKT_CLIENT_ID`, `TRAKT_CLIENT_SECRET`, `SUGGESTARR_URL`, `SUGGESTARR_API_KEY` | Same as in Settings → Connections. The Trakt account itself is linked in the app. |
 | `MANUAL_GRABS` | Starting value for who may pick versions (`all` / `admin`). |
@@ -174,11 +174,11 @@ You can also pre-fill connections from the stack (see [`.env.example`](.env.exam
 
 ## Playback: who does the work?
 
-Your **device** decodes the video (the computer's or phone's GPU), never the Pi. Jellyfin on the Pi does one of three things, and the player shows which:
+Your **device** decodes the video (the computer's or phone's GPU), never the server. Jellyfin on the server does one of three things, and the player shows which:
 
 1. **Direct play:** sends the file untouched. Netfish declares what your device can decode (H.264, HEVC, AV1, VP9; AAC, Opus, FLAC; MP4 and, in Chrome/Edge, MKV; the Mac, Windows and Android apps play nearly everything), so most Radarr/Sonarr downloads play this way.
 2. **Repackaged:** rewraps the video untouched. It's used for AC3/DTS audio, which browsers can't play, so only the audio gets converted, which is light work.
-3. **Transcoding:** only when your device can't decode the video at all, image-based subtitles must be burned in, or you cap the quality for remote viewing. This is the only case that's heavy on a Pi.
+3. **Transcoding:** only when your device can't decode the video at all, image-based subtitles must be burned in, or you cap the quality for remote viewing. This is the only case that's heavy for the server, especially a Raspberry Pi or a mini PC without hardware transcoding.
 
 ## Mac app
 
@@ -198,7 +198,7 @@ Build it yourself: `npm run build:mac` (Xcode command-line tools, and `brew inst
 
 **Install:** run [Netfish-windows.exe](https://github.com/ravifrancesco/netfish/releases/latest/download/Netfish-windows.exe) on the PC (Windows 10 or 11, 64-bit). It installs for your account only, without admin rights, and adds Netfish to the Start menu and desktop. The installer isn't signed yet, so Windows SmartScreen may say *Windows protected your PC*: click **More info → Run anyway**. On first launch, enter your server address (e.g. `192.168.1.50`). Remove it from **Settings → Apps** like any app.
 
-**Downloads:** the **Download** button, the Offline tabs and the downloads page (Ctrl+Shift+D) work like on the Mac. Files are saved **exactly as they are on the server** (mpv plays them all, with every audio and subtitle track), so downloading costs the Pi nothing. They live in `%LOCALAPPDATA%\Netfish\Offline`. Interrupted downloads continue where they stopped.
+**Downloads:** the **Download** button, the Offline tabs and the downloads page (Ctrl+Shift+D) work like on the Mac. Files are saved **exactly as they are on the server** (mpv plays them all, with every audio and subtitle track), so downloading costs the server nothing. They live in `%LOCALAPPDATA%\Netfish\Offline`. Interrupted downloads continue where they stopped.
 
 **Keys:** F11 full screen, Ctrl+Shift+H home, Ctrl+Shift+D downloads, plus the player's own keys. The player's volume is the PC's own, so the volume keys and the slider move together.
 
@@ -210,7 +210,7 @@ One app (`apps/android/`) for every Android device (step by step: [Android phone
 
 Films play like on the Mac: **ExoPlayer draws the picture underneath Netfish's own player**, with Jellyfin's FFmpeg audio decoders (the same engine as Jellyfin's Android TV app). The device's hardware decodes the picture and the app decodes any sound format (DTS, TrueHD, Dolby), so the server sends files untouched; ExoPlayer draws every kind of subtitle, picture ones too, and lifts them above the controls when they show. The app tells the server exactly which video formats this device's decoders handle, so only what it truly can't play gets converted. On a phone a film turns to landscape full screen.
 
-**Chromecast** (phones and tablets with Google Play services, app 0.7.13 or newer): while a film plays, the cast button at the top of the player lists the Chromecasts nearby, under any Netfish screens. Pick one and the film continues there from the same spot. The phone is the remote (pause, skip, the timeline, volume, subtitles and audio), and Android's notification has play and pause too. **Stop casting** brings it back to the phone, from where the Chromecast got to. The Chromecast fetches the film from your server itself, with a link that only opens that film and expires after 12 hours, so the server address the app uses must be reachable from the Chromecast (the Pi's LAN address works; `localhost` doesn't). What a Chromecast can't play as it is, Jellyfin converts to H.264 and AAC.
+**Chromecast** (phones and tablets with Google Play services, app 0.7.13 or newer): while a film plays, the cast button at the top of the player lists the Chromecasts nearby, under any Netfish screens. Pick one and the film continues there from the same spot. The phone is the remote (pause, skip, the timeline, volume, subtitles and audio), and Android's notification has play and pause too. **Stop casting** brings it back to the phone, from where the Chromecast got to. The Chromecast fetches the film from your server itself, with a link that only opens that film and expires after 12 hours, so the server address the app uses must be reachable from the Chromecast (the server's LAN address works; `localhost` doesn't). What a Chromecast can't play as it is, Jellyfin converts to H.264 and AAC.
 
 The app is [Netfish-android.apk](https://github.com/ravifrancesco/netfish/releases/latest/download/Netfish-android.apk) (the same file for every device).
 
@@ -236,7 +236,7 @@ Build it yourself: `npm run build:android` (JDK 17+ and the Android SDK; set `sd
 
 ## Samsung TV app
 
-`apps/tizen/` is a small Samsung TV (Tizen) app: it asks for your server's address once, then opens Netfish in **TV mode**, like the Fire TV app: arrows, OK and Back on the remote, with the timeline scrubbing on left and right. Back on Netfish's first page asks before closing it, and on a Full HD or 4K TV everything is drawn about 1.5× bigger. Subtitles are drawn by Netfish itself, since the TV's browser doesn't draw them. The first time a film's subtitles are asked for, Jellyfin has to pull them out of the file, which can take a little while on a Pi. Films play with the **TV's own player**, as in Jellyfin's Samsung app: MKV, HEVC, AV1 (2020+ TVs) and Dolby sound play as-is, so the server just sends the file; DTS and TrueHD sound get converted. Netfish declares exactly this to the server when it detects a Samsung TV, and the web interface is built to run on the TVs' browsers from 2022 (Chromium 85) onwards.
+`apps/tizen/` is a small Samsung TV (Tizen) app: it asks for your server's address once, then opens Netfish in **TV mode**, like the Fire TV app: arrows, OK and Back on the remote, with the timeline scrubbing on left and right. Back on Netfish's first page asks before closing it, and on a Full HD or 4K TV everything is drawn about 1.5× bigger. Subtitles are drawn by Netfish itself, since the TV's browser doesn't draw them. The first time a film's subtitles are asked for, Jellyfin has to pull them out of the file, which can take a little while on a small server. Films play with the **TV's own player**, as in Jellyfin's Samsung app: MKV, HEVC, AV1 (2020+ TVs) and Dolby sound play as-is, so the server just sends the file; DTS and TrueHD sound get converted. Netfish declares exactly this to the server when it detects a Samsung TV, and the web interface is built to run on the TVs' browsers from 2022 (Chromium 85) onwards.
 
 Samsung only installs apps outside its store in Developer Mode, signed for your TV: use the community TizenBrew Installer or Samsung's Tizen Studio, step by step in the [Samsung TV guide](docs/install/samsung-tv.md). Build the package yourself with `npm run build:samsung` (it makes the unsigned `release/Netfish-<version>-samsung.wgt`).
 
@@ -264,7 +264,7 @@ npm run dev:mock     # fake Jellyfin/Seerr/Radarr/Sonarr/Bazarr/qBit + Netfish +
 
 Open http://localhost:5173 and sign in as `demo` / `demo` (or `admin` / `admin`). The mock (`server/dev/mock.ts`) has a small catalog, watch history, requests and downloads that progress in real time and land in the library, plus a generated test video with two audio tracks (needs `ffmpeg`).
 
-Against real services: copy `.env.example` to `server/.env`, swap `host.docker.internal` for your Pi's IP, then run `npm run dev`.
+Against real services: copy `.env.example` to `server/.env`, swap `host.docker.internal` for your server's IP, then run `npm run dev`.
 
 `npm run typecheck`, `npm run build`, and `npm start` (production bundle on :7777).
 
@@ -272,7 +272,7 @@ Against real services: copy `.env.example` to `server/.env`, swap `host.docker.i
 
 | Command | Makes (in `release/`) | Needs |
 |---|---|---|
-| `npm run pack:pi` | `-server.tar.gz`, the Pi build bundle | Node 22 |
+| `npm run pack:server` | `-server.tar.gz`, to build the server image on the server itself | Node 22 |
 | `npm run build:mac` | `-mac.dmg` | a Mac with Xcode's command-line tools, `brew install mpv dylibbundler` |
 | `npm run build:windows` | `-windows.exe` | .NET 8 SDK, `brew install makensis sevenzip` (works on a Mac) |
 | `npm run build:android` | `-android.apk` | JDK 17+, Android SDK (`sdk.dir` in `apps/android/local.properties`) |
@@ -286,12 +286,12 @@ The Android and Windows builds run from a copy in `~/Library/Caches/netfish-buil
 ## Good to know
 
 - **Picking a version replaces the file.** Radarr/Sonarr import it over your current copy only if it isn't lower quality. Netfish flags releases that would likely be refused; those can still be imported by hand in Radarr/Sonarr.
-- **Raspberry Pi and transcoding:** Netfish asks Jellyfin to direct-play or repackage whenever possible. Burned-in (image) subtitles or very high bitrates force real transcoding, which is slow on a Pi.
+- **Small servers and transcoding:** Netfish asks Jellyfin to direct-play or repackage whenever possible. Burned-in (image) subtitles or very high bitrates force real transcoding, which is slow on a Raspberry Pi and on a mini PC without hardware transcoding set up in Jellyfin.
 - **Popular on this server** shows what the other people on your server watched lately (titles only, never who). Each person counts once they open Netfish; with `JELLYFIN_API_KEY` set, people who watch in other Jellyfin apps count too.
 - **Trakt needs VIP.** Since August 2026 Trakt only lets VIP accounts create the API app whose Client ID and secret Netfish needs, and a free account can connect only one outside app. Netfish works the same without Trakt: its own suggestions (*Top picks*, *Because you watched…*) come from TMDB through Seerr.
 - **Play on TV** lists your own devices (signed in as you) and every TV on your server, since a TV is usually the household's. The film plays under the profile signed in on that TV. Name each device in **Settings → Playback on this device**. While you're connected, the cast button shows the device's name; pick **This device** to play here again.
 - **Watch together** keeps a live connection to the server open while you watch (server-sent events). Behind a reverse proxy that buffers responses, turn buffering off for `/api/together/`; Netfish already tells nginx not to.
-- **Scrubbing previews** come from Jellyfin's trickplay pictures (Jellyfin 10.9 or newer). Turn them on per library in Jellyfin's dashboard: **Libraries → ⋮ on the library → Manage library → Trickplay → Enable trickplay image extraction** (and *Extract trickplay images during the library scan* for new titles), then run **Scheduled Tasks → Generate Trickplay Images**. On a Raspberry Pi, tick *Only generate images from key frames* in **Dashboard → Playback → Trickplay**: it's much faster. The first run takes hours for a big library, and titles fill in as it goes. Downloads keep their previews when they were made before downloading.
+- **Scrubbing previews** come from Jellyfin's trickplay pictures (Jellyfin 10.9 or newer). Turn them on per library in Jellyfin's dashboard: **Libraries → ⋮ on the library → Manage library → Trickplay → Enable trickplay image extraction** (and *Extract trickplay images during the library scan* for new titles), then run **Scheduled Tasks → Generate Trickplay Images**. On a small server (a Raspberry Pi, say), tick *Only generate images from key frames* in **Dashboard → Playback → Trickplay**: it's much faster. The first run takes hours for a big library, and titles fill in as it goes. Downloads keep their previews when they were made before downloading.
 - **Audio and subtitle settings are Jellyfin's.** **Settings → Playback on this device** shows your Jellyfin audio language, subtitle mode and subtitle language, and changing them there changes them in Jellyfin and its apps too.
 - **Letterboxd** has no public API; its score comes from MDBList when a key is set, otherwise Netfish links to the film's page.
 - **Artwork cache:** Netfish keeps a copy of every poster it has shown (and fetches library posters ahead of time) in `/config/cache/images`, up to 1 GB by default (`IMAGE_CACHE_MB` to change). Covers load instantly after the first time, and apps keep them too.

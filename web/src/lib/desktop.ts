@@ -76,6 +76,8 @@ export interface CastDevice {
 /** What the Android app says about Chromecasts: any of these, as they change. */
 export interface CastState {
   devices?: CastDevice[];
+  /** There are Chromecasts on the network (Google's own watch, while the app is open: apps from 0.8.2 on). */
+  available?: boolean;
   connected?: boolean;
   /** The one in use. */
   device?: string;
@@ -110,13 +112,15 @@ export interface CastLoad {
 
 /** Chromecast, through the Android app. */
 export interface CastBridge {
-  /** Look for devices (only while the player is open). */
+  /** Look for devices, while a list of them is on screen (it costs battery). */
   watch: (on: boolean) => void;
   connect: (id: string) => void;
   disconnect: () => void;
   load: (request: CastLoad) => void;
   command: (name: 'play' | 'pause' | 'seek' | 'volume' | 'mute' | 'subtitle' | 'stop', value?: number | boolean | null) => void;
   onState: (cb: (state: CastState) => void) => () => void;
+  /** What it last said that lasts (connected, the device, the film and where it is). */
+  last: () => CastState;
 }
 
 export interface DesktopBridge {
@@ -234,6 +238,8 @@ interface AndroidNative {
   /** Chromecast (phones and tablets with Google Play services, apps from 0.7.13 on): state through window.__netfishCast. */
   castAvailable?(): boolean;
   castWatch?(on: boolean): void;
+  /** Says it all again, through window.__netfishCast (apps from 0.8.2 on). */
+  castRefresh?(): void;
   castConnect?(id: string): void;
   castDisconnect?(): void;
   castLoad?(request: string): void;
@@ -372,8 +378,16 @@ function castBridge(native: AndroidNative): CastBridge {
     castLast = { ...castLast, ...lasting };
     castListeners.forEach((cb) => cb(state));
   };
+  // A page loaded while connected (from the Chromecast's notification, say): it hears it all now.
+  native.castRefresh?.();
+  // The player and the top bar's menu can both want the list: looking stops when neither does.
+  let watchers = 0;
   return {
-    watch: (on) => native.castWatch?.(on),
+    watch: (on) => {
+      const before = watchers > 0;
+      watchers = Math.max(0, watchers + (on ? 1 : -1));
+      if (watchers > 0 !== before) native.castWatch?.(watchers > 0);
+    },
     connect: (id) => native.castConnect?.(id),
     disconnect: () => native.castDisconnect?.(),
     load: (request) => native.castLoad?.(JSON.stringify(request)),
@@ -383,6 +397,7 @@ function castBridge(native: AndroidNative): CastBridge {
       cb(castLast);
       return () => void castListeners.delete(cb);
     },
+    last: () => castLast,
   };
 }
 

@@ -48,6 +48,8 @@ export interface SeerrResult {
   mediaType: 'movie' | 'tv' | 'person' | 'collection';
   title?: string;
   name?: string;
+  originalTitle?: string;
+  originalName?: string;
   posterPath?: string | null;
   backdropPath?: string | null;
   overview?: string;

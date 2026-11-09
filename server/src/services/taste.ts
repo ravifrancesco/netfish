@@ -8,7 +8,7 @@ import { findInLibrary, type LibraryIndex } from './library';
 import { creditLists, watchableFirst } from './people';
 
 /**
- * Netfish's own recommendations, free and on the Pi: what someone watched says
+ * Netfish's own recommendations, free and on your server: what someone watched says
  * which genres, directors and actors they like; TMDB (through Seerr) says what
  * people who liked those titles also liked; the rest of the server says what's
  * popular here. Each pick gets a score from all of that together.

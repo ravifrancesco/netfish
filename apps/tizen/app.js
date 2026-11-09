@@ -29,8 +29,8 @@
     'Server address': 'Indirizzo del server',
     Connect: 'Connetti',
     'Connecting…': 'Connessione in corso…',
-    'The address you open Netfish at in a browser, e.g. 192.168.1.50 or http://raspberrypi.local:7777. Press OK on the field to type with the remote.':
-      "L'indirizzo con cui apri Netfish nel browser, ad es. 192.168.1.50 o http://raspberrypi.local:7777. Premi OK sul campo per scrivere con il telecomando.",
+    'The address you open Netfish at in a browser, e.g. 192.168.1.50 or http://myserver.local:7777. Press OK on the field to type with the remote.':
+      "L'indirizzo con cui apri Netfish nel browser, ad es. 192.168.1.50 o http://myserver.local:7777. Premi OK sul campo per scrivere con il telecomando.",
     'Enter the address of your Netfish server': "Inserisci l'indirizzo del tuo server Netfish",
     "That doesn't look like an address": 'Questo non sembra un indirizzo',
     "{origin} doesn't look like a Netfish server.": '{origin} non sembra un server Netfish.',

@@ -7,6 +7,7 @@ import { api } from '../api';
 import { screenId, screenKind, setCastTarget, useCastTarget, useOtherScreens, type CastTarget } from '../lib/screens';
 import { useTogether } from '../lib/together';
 import type { CastDevice } from '../lib/desktop';
+import { castBusy, castItemOf, chromecast, useChromecast } from '../lib/chromecast';
 import { Spinner, useToast } from './ui';
 import { t } from '../i18n';
 
@@ -68,7 +69,8 @@ function useCloseOutside(open: boolean, setOpen: (open: boolean) => void) {
 
 /**
  * The top bar's cast button, like YouTube's: connect to a TV (or any device with Netfish
- * open), and every Play then plays there, with this device as its remote. Not on TVs.
+ * open), or a Chromecast (the Android app), and every Play then plays there, with this device
+ * as its remote. Not on TVs.
  */
 export function CastButton() {
   const target = useCastTarget();
@@ -77,33 +79,47 @@ export function CastButton() {
   const screens = (q.data?.screens ?? []).filter((s) => s.id !== me);
   const [open, setOpen] = useState(false);
   const ref = useCloseOutside(open, setOpen);
+  const cast = chromecast();
+  // Looking for Chromecasts only while the menu is open.
+  const castState = useChromecast(open);
+  const castOn = Boolean(cast && castState.connected);
+  const castDevices = cast ? (castState.devices ?? []) : [];
+  const chromecasts = Boolean(cast && (castOn || castState.available || castDevices.length));
   // The device was turned off or closed Netfish: back to playing here.
   const gone = Boolean(target && q.data && !screens.some((s) => s.id === target.id));
   useEffect(() => {
     if (gone) setCastTarget(undefined);
   }, [gone]);
-  if (screenKind() === 'tv' || (!screens.length && !target)) return null;
+  if (screenKind() === 'tv' || (!screens.length && !target && !chromecasts)) return null;
 
   const pick = (next: CastTarget | undefined) => {
     setCastTarget(next);
+    if (castOn) cast?.disconnect();
     setOpen(false);
   };
-  const label = target ? t('Connected to {screen}', { screen: target.name }) : t('Play on another device');
+  const connectCast = (id: string) => {
+    setCastTarget(undefined);
+    cast?.connect(id);
+    setOpen(false);
+  };
+  const castName = castState.device || 'Chromecast';
+  const on = target?.name ?? (castOn ? castName : undefined);
+  const label = on ? t('Connected to {screen}', { screen: on }) : t('Play on another device');
   return (
     <div className="play-on" ref={ref}>
-      <button className={`cast-btn${target ? ' is-on' : ''}`} onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label={label} title={label}>
+      <button className={`cast-btn${on ? ' is-on' : ''}`} onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label={label} title={label}>
         <Cast size={20} />
-        {target && <span className="cast-btn__name">{target.name}</span>}
+        {on && <span className="cast-btn__name">{on}</span>}
       </button>
       {open && (
         <div className="menu play-on__menu" role="menu">
           <div className="menu__head">
             <strong>{t('Play on')}</strong>
           </div>
-          <button className="menu__item" role="menuitemradio" aria-checked={!target} onClick={() => pick(undefined)}>
+          <button className="menu__item" role="menuitemradio" aria-checked={!on} onClick={() => pick(undefined)}>
             <Smartphone size={18} />
             <span className="play-on__name">{t('This device')}</span>
-            {!target && <Check size={16} className="play-on__tick" />}
+            {!on && <Check size={16} className="play-on__tick" />}
           </button>
           {screens.map((screen) => {
             const Icon = ICONS[screen.kind];
@@ -119,6 +135,38 @@ export function CastButton() {
               </button>
             );
           })}
+          {chromecasts && (
+            <>
+              <div className="menu__head play-on__section">
+                <strong>Chromecast</strong>
+              </div>
+              {castOn ? (
+                <>
+                  <div className="menu__item play-on__current">
+                    <Tv size={18} />
+                    <span className="play-on__name">{castName}</span>
+                    <Check size={16} className="play-on__tick" />
+                  </div>
+                  <button className="menu__item" role="menuitem" onClick={() => (setOpen(false), cast?.disconnect())}>
+                    <X size={18} />
+                    <span className="play-on__name">{t('Stop casting')}</span>
+                  </button>
+                </>
+              ) : castDevices.length ? (
+                castDevices.map((device) => (
+                  <button key={device.id} className="menu__item" role="menuitemradio" aria-checked={false} onClick={() => connectCast(device.id)}>
+                    <Tv size={18} />
+                    <span className="play-on__name">{device.name}</span>
+                  </button>
+                ))
+              ) : (
+                <div className="menu__item play-on__current">
+                  <Spinner size={16} />
+                  <span className="play-on__name muted">{t('Looking for Chromecasts…')}</span>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>
@@ -313,6 +361,41 @@ export function RemoteBar() {
         }}
         aria-label={t('Stop playing on {screen}', { screen: room?.screenName ?? session.screenName })}
       >
+        <X size={20} />
+      </button>
+    </div>
+  );
+}
+
+/**
+ * While a film plays on a Chromecast from here, away from its player: a bar back to the player
+ * (which picks up where the Chromecast is, without starting the film again), pause, or stop
+ * casting.
+ */
+export function CastBar() {
+  const cast = chromecast();
+  const state = useChromecast();
+  const itemId = castBusy(state) ? castItemOf(state.url) : undefined;
+  // Its own key: the player's ['play', id] loads the film whenever it changes.
+  const info = useQuery({ queryKey: ['cast-title', itemId], queryFn: () => api.playInfo(itemId!), enabled: Boolean(itemId), staleTime: 5 * 60_000 });
+  if (!cast || !itemId) return null;
+  const d = info.data;
+  const title = d?.type === 'Episode' ? `${d.seriesTitle ?? ''} · S${d.seasonNumber}:E${d.episodeNumber}` : d?.title;
+  const device = state.device || 'Chromecast';
+  const playing = Boolean(state.playing || state.buffering);
+  return (
+    <div className="remote-bar">
+      <Link to={`/watch/${itemId}`} className="remote-bar__text">
+        <Cast size={18} />
+        <span>
+          <strong>{title || device}</strong>
+          <span className="muted small">{state.paused ? t('Paused on {screen}', { screen: device }) : t('Playing on {screen}', { screen: device })}</span>
+        </span>
+      </Link>
+      <button className="icon-btn" onClick={() => cast.command(playing ? 'pause' : 'play')} aria-label={playing ? t('Pause') : t('Play')}>
+        {playing ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" />}
+      </button>
+      <button className="icon-btn" onClick={() => cast.disconnect()} aria-label={t('Stop casting')}>
         <X size={20} />
       </button>
     </div>

@@ -12,7 +12,7 @@ import { freshHidden } from './fresh';
 /**
  * Live download state, straight from Radarr/Sonarr's queues (and qBittorrent
  * for speed). Shared by everyone and cached for a few seconds so polling
- * clients don't hammer the Pi.
+ * clients don't hammer the server.
  */
 
 const cache = new TTLCache<DownloadItem[]>(4);

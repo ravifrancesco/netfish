@@ -7,6 +7,25 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.8.2 (2026-11-08)
+
+### New
+- **Search forgives slips.** Spaces, punctuation, accents and a typo or two no longer get in the way: "goodwill hunting" finds *Good Will Hunting*, "spiderman" *Spider-Man*, "intersteller" *Interstellar*. In your library and for things you don't have yet. A film shown under its Italian title is found by its original one too.
+- **Chromecast from the top bar.** In the Android app, the cast button next to your profile picture lists the Chromecasts on your network too. Connect to one before choosing anything, and Play plays there.
+- **Back to the film on the Chromecast.** While a film plays on a Chromecast, a bar at the bottom of every page shows it, with play/pause and Stop casting. Tap it, or Android's Chromecast notification, to get its player back, from where the Chromecast is, without the film starting again.
+
+### Changed
+- **"The server", not "the Pi".** Netfish runs on any machine with Docker (a mini PC, a NAS, a Raspberry Pi), and the guides, the setup pages and the interface now say so. The apps' setup pages give `http://192.168.1.50:7777` as the example address.
+- For anyone building it themselves: `npm run pack:pi` is now `npm run pack:server`.
+
+### Fixed
+- **Chromecast: films with subtitles inside the file didn't start** the first time: the Chromecast waited for the subtitles, which Jellyfin takes a while (minutes on a small server) to pull out of the file, and gave up. The film now starts straight away and the subtitles appear as soon as they're ready.
+- **Chromecast errors say why**, with the Chromecast's own number, and in Italian too.
+
+### Update
+- **Server.**
+- **Android app** (phones and tablets), for the Chromecast notification and for the cast button showing Chromecasts on their own.
+
 ## 0.8.1 (2026-10-31)
 
 ### Fixed

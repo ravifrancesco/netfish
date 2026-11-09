@@ -1,4 +1,4 @@
-/** Map with bounded concurrency — the Pi and its services prefer a gentle pace. */
+/** Map with bounded concurrency — the server and its services prefer a gentle pace. */
 export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
   const results = new Array<R>(items.length);
   let next = 0;

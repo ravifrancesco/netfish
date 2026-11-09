@@ -32,4 +32,5 @@ export default {
   "The Chromecast couldn't play this": 'Il Chromecast non è riuscito a riprodurlo',
   "Couldn't connect to the Chromecast": 'Impossibile connettersi al Chromecast',
   "That device isn't there any more": 'Quel dispositivo non è più disponibile',
+  'Looking for Chromecasts…': 'Cerco i Chromecast…',
 } as Record<string, string>;

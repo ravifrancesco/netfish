@@ -16,11 +16,14 @@ export class CastVideo extends EventTarget {
   private level = 1;
   private isMuted = false;
   readonly textTracks: TextTrack[] = [];
-  error: { message: string } | null = null;
+  /** `code`: the Chromecast's own reason, a number (for a bug report). */
+  error: { message: string; code?: number } | null = null;
   /** Finished, or failed, already said (the Chromecast keeps repeating it while it sits idle). */
   private over = false;
   /** The film sent to it: news of any other is old news. */
   private url = '';
+  /** It has said where it is in that film, so it has it. */
+  private known = false;
   private readonly stopListening: () => void;
 
   constructor(private readonly cast: CastBridge) {
@@ -35,10 +38,11 @@ export class CastVideo extends EventTarget {
     this.dispatchEvent(new Event(type));
   }
 
-  /** Another film on its way to the Chromecast: nothing playing until it says so. */
-  loadingNext(url: string) {
+  /** Another film on its way to the Chromecast (or already there, `at` that point): nothing playing until it says so. */
+  loadingNext(url: string, at = 0) {
     this.url = url;
-    this.time = 0;
+    this.known = false;
+    this.time = at;
     this.buffering = true;
     this.over = false;
     this.error = null;
@@ -48,6 +52,10 @@ export class CastVideo extends EventTarget {
   private apply(state: CastState) {
     // Connecting, devices, and the like: not about the film.
     if (typeof state.time !== 'number' || state.url !== this.url) return;
+    if (!this.known) {
+      this.known = true;
+      this.emit('loadeddata');
+    }
     this.time = state.time;
     this.emit('timeupdate');
     if (typeof state.duration === 'number' && state.duration > 0 && state.duration !== this.length) {
@@ -83,7 +91,7 @@ export class CastVideo extends EventTarget {
     if ((state.ended || state.error) && !this.over) {
       this.over = true;
       if (state.error) {
-        this.error = { message: state.error };
+        this.error = { message: state.error, code: state.errorCode };
         this.emit('error');
       } else this.emit('ended');
     }
@@ -132,6 +140,10 @@ export class CastVideo extends EventTarget {
     this.playingSaid = false;
     this.cast.command('pause');
     this.emit('pause');
+  }
+  /** Once the Chromecast has the film: a change of subtitles sent before then gets lost. */
+  whenLoaded(): Promise<void> {
+    return this.known ? Promise.resolve() : new Promise((resolve) => this.addEventListener('loadeddata', () => resolve(), { once: true }));
   }
   destroy() {
     this.stopListening();

@@ -1,5 +1,5 @@
 /**
- * Tiny in-memory TTL cache with in-flight de-duplication. The Pi is small, so
+ * Tiny in-memory TTL cache with in-flight de-duplication. The server may be small, so
  * we lean on this heavily: ten people opening the home page should cost one
  * round of upstream calls, not ten.
  */

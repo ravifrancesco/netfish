@@ -461,7 +461,7 @@ export async function apiRoutes(app: FastifyInstance) {
     api.post<{ Params: { itemId: string }; Body: PlaybackRequest }>('/play/:itemId/session', async (req) => {
       const user = userOf(req);
       const session = await startPlayback(user, clean(req.params.itemId, 64), req.body);
-      // Who's watching what, where, and how: "why is ffmpeg busy on the Pi?" has an answer here.
+      // Who's watching what, where, and how: "why is ffmpeg busy on the server?" has an answer here.
       const audio = session.audioTracks.find((t) => t.index === session.audioStreamIndex);
       const subtitle = session.subtitleTracks.find((t) => t.index === session.subtitleStreamIndex);
       const reasons = session.transcodeReasons?.length ? `: ${session.transcodeReasons.join(', ')}` : '';

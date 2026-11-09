@@ -4,7 +4,7 @@
 
 Netfish è fatto di due parti:
 
-1. **Il server**, che gira accanto a Jellyfin (di solito su un Raspberry Pi con Portainer). Lo configuri una volta sola: **[Guida al server](server.md)**.
+1. **Il server**, che gira accanto a Jellyfin (su qualsiasi macchina con Docker, di solito con Portainer: un mini PC, un NAS, un Raspberry Pi). Lo configuri una volta sola: **[Guida al server](server.md)**.
 2. **Le app** con cui guardi. Ogni app ha bisogno solo dell'indirizzo del tuo server (per esempio `192.168.1.50`); l'interfaccia, il tuo account e le tue impostazioni arrivano tutti dal server.
 
 | Dispositivo | Guida | Difficoltà |
@@ -19,4 +19,4 @@ Netfish è fatto di due parti:
 
 Tutti i file da scaricare sono nella [pagina Releases](https://github.com/ravifrancesco/netfish/releases/latest). I link in queste guide portano sempre alla versione più recente.
 
-**Come trovare l'indirizzo del tuo server:** è l'indirizzo con cui apri Netfish nel browser. Sul Pi, il comando `hostname -I` lo mostra (è il primo numero, tipo `192.168.1.50`). La porta `:7777` la aggiunge Netfish da solo.
+**Come trovare l'indirizzo del tuo server:** è l'indirizzo con cui apri Netfish nel browser. Sul server (Linux), il comando `hostname -I` lo mostra (è il primo numero, tipo `192.168.1.50`). La porta `:7777` la aggiunge Netfish da solo.

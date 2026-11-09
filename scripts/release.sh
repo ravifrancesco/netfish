@@ -37,7 +37,7 @@ if (ahead.length) {
 ' web/src/lib/appVersions.ts "$VERSION"
 
 if [ "${SKIP_BUILD:-}" != 1 ]; then
-  npm run pack:pi
+  npm run pack:server
   npm run build:mac
   npm run build:android
   npm run build:windows
@@ -62,7 +62,7 @@ cat >> "$STAGE/notes.md" <<NOTES
 
 | For | Get |
 |---|---|
-| **Server** (Raspberry Pi or any Docker host) | Portainer pulls \`ghcr.io/$OWNER/netfish:latest\` (or \`:$VERSION\`), see the README. Or upload **Netfish-server.tar.gz** in Portainer to build the image on the Pi itself. |
+| **Server** (any Docker host: a mini PC, a NAS, a Raspberry Pi) | Portainer pulls \`ghcr.io/$OWNER/netfish:latest\` (or \`:$VERSION\`), see the README. Or upload **Netfish-server.tar.gz** in Portainer to build the image on the server itself. |
 | **Mac** (Apple silicon, macOS 15 or later) | **Netfish-mac.dmg** (everything included) |
 | **Windows 10/11** (64-bit) | **Netfish-windows.exe** (installs for your account, no admin rights) |
 | **Android**: phones, tablets, Fire TV, Android TV | **Netfish-android.apk**. On a Fire TV, the Downloader app takes this link: \`https://github.com/$OWNER/netfish/releases/latest/download/Netfish-android.apk\` |
