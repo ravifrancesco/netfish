@@ -29,6 +29,7 @@ const Watch = lazy(() => import('./pages/Watch'));
 const Remote = lazy(() => import('./pages/Remote'));
 const ChannelsPage = lazy(() => import('./pages/Channels'));
 const ChannelPlayer = lazy(() => import('./pages/ChannelPlayer'));
+const Photos = lazy(() => import('./pages/Photos'));
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -100,6 +101,8 @@ function Shell({ user }: { user: NonNullable<ReturnType<typeof useMe>['data']> }
             <Route path="/remote/:id" element={<Remote />} />
             <Route path="/channels" element={<ChannelsPage />} />
             <Route path="/channels/:number" element={<ChannelPlayer />} />
+            <Route path="/photos" element={<Photos key="top" />} />
+            <Route path="/photos/:id" element={<Photos />} />
             <Route path="/profiles" element={<SwitchProfile />} />
             <Route path="/profiles/add" element={<AddProfile />} />
             <Route path="*" element={<Navigate to="/" replace />} />

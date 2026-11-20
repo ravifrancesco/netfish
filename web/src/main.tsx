@@ -1,4 +1,4 @@
-import { StrictMode } from 'react';
+import { StrictMode, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -51,12 +51,22 @@ if (isTV() && window.innerWidth >= 1800) {
   });
 }
 
+// The screensaver (Android TV's, through the app): on its own, no menus or sign-in screens.
+const Screensaver = lazy(() => import('./pages/Screensaver'));
+const screensaver = location.pathname === '/screensaver';
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
+      {screensaver ? (
+        <Suspense fallback={null}>
+          <Screensaver />
+        </Suspense>
+      ) : (
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      )}
     </QueryClientProvider>
   </StrictMode>,
 );

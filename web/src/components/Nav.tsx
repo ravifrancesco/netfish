@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Activity, Clapperboard, Compass, Film, HardDriveDownload, House, LogOut, RadioTower, Search, Settings, Tv, Users, X } from 'lucide-react';
+import { Activity, Clapperboard, Compass, Film, HardDriveDownload, House, Images, LogOut, RadioTower, Search, Settings, Tv, Users, X } from 'lucide-react';
 import type { User } from '@netfish/shared';
 import { api } from '../api';
 import { appKind, desktop } from '../lib/desktop';
 import { useConfig } from '../lib/hooks';
+import { hasPhotos, usePhotosTop } from '../lib/photos';
 import { Logo } from './Logo';
 import { TogetherPill } from './Together';
 import { CastButton } from './PlayOn';
@@ -154,6 +155,7 @@ const LINKS = [
 ];
 const CHANNELS = { to: '/channels', label: t('Channels'), icon: RadioTower, end: false };
 const DISCOVER = { to: '/discover', label: t('Discover'), icon: Compass, end: false };
+const PHOTOS = { to: '/photos', label: t('Photos'), icon: Images, end: false };
 
 export function Nav({ user }: { user: User }) {
   const [scrolled, setScrolled] = useState(false);
@@ -161,7 +163,9 @@ export function Nav({ user }: { user: User }) {
   // Discover and Channels, when an admin has turned them on: right after Home (phones find Channels on Home).
   const features = useConfig().data?.features;
   const discover = Boolean(features?.discoverTab);
-  const links = [LINKS[0], ...(discover ? [DISCOVER] : []), ...(features?.channels ? [CHANNELS] : []), ...LINKS.slice(1)];
+  // Photos, when there's a photo library: after Shows (phones find it on Home).
+  const photos = hasPhotos(usePhotosTop().data);
+  const links = [LINKS[0], ...(discover ? [DISCOVER] : []), ...(features?.channels ? [CHANNELS] : []), ...LINKS.slice(1, 3), ...(photos ? [PHOTOS] : []), LINKS[3]];
   const tabs = [LINKS[0], ...(discover ? [DISCOVER] : []), ...LINKS.slice(1, 3)];
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);

@@ -103,7 +103,7 @@ async function catalogSearch(q: string): Promise<SeerrPage> {
   if (first.results.some((r) => closeness(q, r) >= CLOSE)) return first;
   const words = [...new Set(searchWords(q).split(' '))].filter((w) => w.length >= 3).sort((a, b) => b.length - a.length);
   const longest = words[0] ?? '';
-  const tries = [...(words.length > 1 ? words.slice(0, 2) : []), ...(longest.length >= 6 ? [longest.slice(0, Math.max(4, Math.ceil(longest.length * 0.6)))] : [])];
+  const tries = [...(words.length > 1 ? words.slice(0, 2) : []), ...(longest.length >= 5 ? [longest.slice(0, Math.max(4, Math.ceil(longest.length * 0.6)))] : [])];
   if (!tries.length) return first;
   const pages = await Promise.all(tries.map((x) => settle(catalog.search(x), EMPTY_PAGE)));
   const known = new Set(first.results.map((r) => `${r.mediaType}-${r.id}`));

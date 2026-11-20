@@ -47,6 +47,8 @@ enum Bridge {
         serverReachable: () => call('serverReachable'),
         installExpires: () => call('installExpires'),
         changeServer: () => { call('changeServer'); },
+        // On mobile data right now (the app says so as it changes).
+        mobileData: () => Boolean(window.__netfishCellular),
         connect: (input) => call('connect', input),
         currentServer: () => call('currentServer'),
         // Apple's player draws the film underneath the page; the page's player drives it.

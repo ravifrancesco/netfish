@@ -1,5 +1,7 @@
 import type {
   PlaybackPrefs,
+  ScreensaverResponse,
+  PhotosPage,
   AppConfig,
   Card,
   ChannelAdmin,
@@ -115,6 +117,9 @@ export const api = {
   home: (part: 'home' | 'discover' = 'home') => call<HomeResponse>(part === 'discover' ? '/home?part=discover' : '/home'),
   ready: () => call<{ items: Card[] }>('/ready'),
   search: (q: string) => call<SearchResponse>(`/search?q=${enc(q)}`),
+  screensaver: () => call<ScreensaverResponse>('/screensaver'),
+  /** Photos: the top (no folder), or a folder, a page at a time from `start`. */
+  photos: (folderId?: string, start = 0) => call<PhotosPage>(folderId ? `/photos/${enc(folderId)}?start=${start}` : `/photos?start=${start}`),
   person: (id: string) => call<PersonDetail>(`/person/${enc(id)}`),
   library: (type: MediaType, sort: string, start: number, limit = 60) =>
     call<{ items: Card[]; total: number }>(`/library?type=${type}&sort=${sort}&start=${start}&limit=${limit}`),

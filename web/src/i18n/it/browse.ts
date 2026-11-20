@@ -236,4 +236,14 @@ export default {
   "From Netfish's log in Portainer": 'Dal log di Netfish in Portainer',
   Connect: 'Collega',
   'Back to sign in': "Torna all'accesso",
+
+  // Photos (Jellyfin's Photos and Home videos libraries)
+  Photos: 'Foto',
+  Slideshow: 'Presentazione',
+  'Pause slideshow': 'Metti in pausa la presentazione',
+  'Previous photo': 'Foto precedente',
+  'Next photo': 'Foto successiva',
+  'No photos here yet.': 'Ancora nessuna foto qui.',
+  '{n} item': '{n} elemento',
+  '{n} items': '{n} elementi',
 } as Record<string, string>;

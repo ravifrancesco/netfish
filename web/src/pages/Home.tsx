@@ -13,6 +13,7 @@ import { desktop } from '../lib/desktop';
 import { UpdateNudge } from '../components/AppUpdate';
 import { TogetherRow } from '../components/Together';
 import { ChannelsRow } from '../components/ChannelsRow';
+import { PhotosRow } from '../components/PhotosRow';
 import { KeepUpQuestion } from '../components/KeepUp';
 
 /** Admins: a nudge to finish connecting services until they're all there. */
@@ -150,6 +151,7 @@ export default function Home({ part = 'home' }: { part?: 'home' | 'discover' }) 
         {rows.map((row) => (
           <Row key={row.id} row={row} />
         ))}
+        {!discover && <PhotosRow />}
         {rows.length === 0 && <Empty>{discover ? t('Nothing new to discover right now.') : t('Your library is empty.')}</Empty>}
       </div>
     </div>

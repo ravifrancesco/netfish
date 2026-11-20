@@ -7,6 +7,31 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.9.0 (2026-11-19)
+
+### New
+- **Photos.** Jellyfin's Photos and Home videos libraries are in Netfish: **Photos** in the menu and a row on Home, with albums and folders as they are in Jellyfin.
+  - A photo opens full screen: left and right (or a swipe, or the remote) for the others, and a **Slideshow**.
+  - Home videos play in the player.
+- **A Netfish screensaver** in the Android app: the library's backdrops slowly drifting by, with the title, the time and what's on Netfish's channel.
+  - Choose it where Android lets you pick a screen saver: on most Android TV boxes, Settings → System (or Device Preferences) → Screen saver → **Netfish**. Google TV and Fire TV only offer their own.
+- **The version that plays best, by itself.** When a film or episode has several versions (a 4K one and a 1080p one, say) and nobody picked one, Netfish plays the one this device takes as it is, the biggest that does. The server's log says which.
+- **On mobile data on iPhone and iPad too:** Settings → Playback on this device → On mobile data.
+
+### Changed
+- **Android: smoother on TV boxes.** The app tells the server what the device really decodes well, and the server converts the rest instead of the device stuttering through it.
+  - AV1 and VP9 only with a decoder in the chip on a TV or TV box. A phone or tablet's own processor takes them up to 1080p.
+  - No picture bigger than the device's decoder takes, such as 4K H.264 on a Raspberry Pi.
+- **A TV that can't play something tries once more** with a plain conversion (1080p H.264, stereo) before saying it can't. Heavier for the server, but it plays.
+
+### Fixed
+- **Search:** a single five-letter word with a slip ("walle") now also finds things you don't have yet.
+
+### Update
+- **Server.**
+- **Android app** (TVs, boxes, phones, tablets), for smoother playback and the screensaver.
+- **iPhone and iPad app**, for On mobile data.
+
 ## 0.8.3 (2026-11-19)
 
 ### New

@@ -694,7 +694,7 @@ public class MainActivity extends Activity {
         /** What ExoPlayer plays as-is (a Jellyfin device profile). */
         @JavascriptInterface
         public String videoProfile() {
-            return DeviceProfile.build();
+            return DeviceProfile.build(tv);
         }
 
         @JavascriptInterface

@@ -5,6 +5,8 @@ export default {
   'On now': 'In onda ora',
   'No channels yet.': 'Ancora nessun canale.',
   'Nothing to play yet': 'Ancora niente in programma',
+  // The screensaver (Android TV)
+  'Now on {channel}': 'Ora su {channel}',
   Now: 'Ora',
   'Starting soon': 'Tra poco',
   '{channel}: {title}, on now': '{channel}: {title}, in onda ora',

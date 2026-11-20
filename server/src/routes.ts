@@ -44,6 +44,8 @@ import { settle } from './lib/async';
 import { publicLanguages } from './lib/languages';
 import { HttpError, UpstreamError } from './lib/upstream';
 import { discoverPage, libraryPage, search, serviceStatus } from './services/browse';
+import { screensaver } from './services/screensaver';
+import { photos } from './services/photos';
 import { allDownloads, detailsFor } from './services/downloads';
 import { homeFor } from './services/home';
 import { titleRatings } from './services/ratings';
@@ -269,6 +271,12 @@ export async function apiRoutes(app: FastifyInstance) {
     api.get('/languages', async () => publicLanguages());
 
     api.get<{ Querystring: { q?: string } }>('/search', async (req) => search(userOf(req), clean(req.query.q, 200)));
+    api.get('/screensaver', async (req) => screensaver(userOf(req)));
+    // Photos (Jellyfin's Photos and Home videos libraries): the top, or a folder, a page at a time.
+    api.get<{ Querystring: { start?: string } }>('/photos', async (req) => photos(userOf(req), undefined, Math.max(0, Number(req.query.start) || 0)));
+    api.get<{ Params: { id: string }; Querystring: { start?: string } }>('/photos/:id', async (req) =>
+      photos(userOf(req), clean(req.params.id, 64), Math.max(0, Number(req.query.start) || 0)),
+    );
     api.get<{ Params: { id: string } }>('/person/:id', async (req) => personDetail(userOf(req), clean(req.params.id, 80)));
 
     api.get<{ Querystring: { type?: string; sort?: string; start?: string; limit?: string } }>('/library', async (req) => {
@@ -469,7 +477,8 @@ export async function apiRoutes(app: FastifyInstance) {
         session.method === 'DirectPlay' ? 'plays as it is' : session.method === 'Transcode' ? `converted by the server (heavy)${reasons}` : `repackaged by the server (light)${reasons}`;
       const tracks = [audio && `audio ${audio.label} [${audio.codec}]`, subtitle && `subtitles ${subtitle.label}`].filter(Boolean).join(', ');
       const where = req.body?.cast ? 'Chromecast' : appOf(req);
-      logItem(user, session.itemId, 'playback', (name) => `${user.name} started ${name} on ${where}: ${how}${tracks ? ` · ${tracks}` : ''}`);
+      const version = session.version ? ` · the ${session.version} version (plays best here)` : '';
+      logItem(user, session.itemId, 'playback', (name) => `${user.name} started ${name} on ${where}: ${how}${version}${tracks ? ` · ${tracks}` : ''}`);
       return session;
     });
     // Channels (when they don't count as watching): the programme is over, the transcode can stop.

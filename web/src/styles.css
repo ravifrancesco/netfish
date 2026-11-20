@@ -5869,3 +5869,273 @@ html.is-desktop.is-mac.is-fullscreen .channel__top {
     justify-content: flex-end;
   }
 }
+
+/* ---------- The screensaver (Android TV's, through the app) ---------- */
+.saver {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  cursor: none;
+}
+/* Each picture fades in over the last, drifting slowly one way, then the next the other way. */
+.saver__picture {
+  position: absolute;
+  inset: -4%;
+  background: center / cover no-repeat;
+  animation:
+    saver-in 2s ease both,
+    saver-drift-right 12s linear both;
+}
+.saver__picture--left {
+  animation:
+    saver-in 2s ease both,
+    saver-drift-left 12s linear both;
+}
+.saver__picture--right.is-before {
+  animation: none;
+  transform: translateX(1.5%);
+}
+.saver__picture--left.is-before {
+  animation: none;
+  transform: translateX(-1.5%);
+}
+@keyframes saver-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes saver-drift-right {
+  from {
+    transform: scale(1.08) translateX(-1.5%);
+  }
+  to {
+    transform: translateX(1.5%);
+  }
+}
+@keyframes saver-drift-left {
+  from {
+    transform: scale(1.08) translateX(1.5%);
+  }
+  to {
+    transform: translateX(-1.5%);
+  }
+}
+.saver__shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to top, rgba(0, 0, 0, 0.75), transparent 45%),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent 30%);
+}
+.saver__title {
+  position: absolute;
+  left: 5%;
+  bottom: 9%;
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  animation: saver-in 2s ease both;
+}
+.saver__title img {
+  max-width: 34vw;
+  max-height: 16vh;
+  object-fit: contain;
+  object-position: left bottom;
+}
+.saver__title strong {
+  font-size: clamp(28px, 4vw, 64px);
+  font-weight: 800;
+  line-height: 1.05;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.6);
+}
+.saver__title span {
+  font-size: clamp(16px, 1.6vw, 26px);
+  opacity: 0.75;
+}
+.saver__corner {
+  position: absolute;
+  top: 6%;
+  right: 5%;
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+}
+.saver__clock {
+  font-size: clamp(36px, 5vw, 88px);
+  font-weight: 300;
+  line-height: 1;
+}
+.saver__now {
+  font-size: clamp(14px, 1.4vw, 22px);
+  opacity: 0.85;
+}
+
+/* ---------- Photos (Jellyfin's Photos and Home videos libraries) ---------- */
+.photos__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.photos__head .page__title {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+.photos__folders {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 18px;
+  margin-bottom: 28px;
+}
+.album {
+  display: grid;
+  gap: 4px;
+  color: inherit;
+  text-decoration: none;
+}
+.album__img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius);
+  background: var(--surface-2, #1a1f27);
+}
+.album__empty {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-3);
+}
+.album__name {
+  font-weight: 650;
+}
+.album__count {
+  color: var(--text-3);
+  font-size: 0.85rem;
+}
+.album:focus-visible .album__img,
+.album:hover .album__img {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.photos__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 4px;
+}
+.photo {
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: var(--surface-2, #1a1f27);
+  aspect-ratio: 1;
+  overflow: hidden;
+  cursor: pointer;
+}
+.photo__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.photo:focus-visible,
+.photo:hover {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+}
+.photo__video {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 0.8rem;
+}
+@media (max-width: 720px) {
+  .photos__folders {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .photos__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2px;
+  }
+}
+/* A photo full screen. */
+.photo-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: #000;
+  touch-action: pan-y;
+  user-select: none;
+}
+.photo-viewer__img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  animation: saver-in 0.4s ease both;
+}
+.photo-viewer__bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 24px clamp(16px, 3vw, 40px) calc(16px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+  color: #fff;
+}
+.photo-viewer__text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.photo-viewer__text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.photo-viewer__step {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-top: -28px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  cursor: pointer;
+}
+.photo-viewer__step--back {
+  left: 16px;
+}
+.photo-viewer__step--next {
+  right: 16px;
+}
+/* Phones swipe; TVs press left and right. */
+@media (hover: none) {
+  .photo-viewer__step {
+    display: none;
+  }
+}
+.is-tv .photo-viewer__step,
+.is-tv .photo-viewer__bar .icon-btn {
+  display: none;
+}

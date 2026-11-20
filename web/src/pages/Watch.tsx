@@ -13,7 +13,7 @@ import { desktop, type CastDevice } from '../lib/desktop';
 import { CastVideo, CHROMECAST_PROFILE } from '../player/cast';
 import { castAudioOf, castBusy, castItemOf } from '../lib/chromecast';
 import { startVolume } from '../lib/systemVolume';
-import { buildDeviceProfile } from '../player/profile';
+import { buildDeviceProfile, plainestProfile } from '../player/profile';
 import { OverlayVideo, trackPositions } from '../player/overlay';
 import { PlayerView, useVolume } from '../player/PlayerView';
 import { forcedFor, menuSubtitles, pickSubtitle } from '../player/tracks';
@@ -37,6 +37,8 @@ interface LoadOptions {
   allowDirectPlay?: boolean;
   /** The Chromecast is already playing this film, from this link: follow it, don't start it again. */
   rejoin?: string;
+  /** The device couldn't play what it said it could: everything converted to the plainest there is. */
+  plainest?: boolean;
 }
 
 /**
@@ -116,6 +118,7 @@ function Player() {
   const started = useRef(false);
   const lastReport = useRef(0);
   const fallbackTried = useRef(false);
+  const plainestTried = useRef(false);
 
   // The Mac app draws the film with mpv underneath this page; these controls drive it.
   const overlay = useMemo(() => desktop()?.videoOverlay, []);
@@ -372,7 +375,13 @@ function Player() {
           cast: casting || undefined,
           // Only mpv and ExoPlayer switch audio tracks inside a file; anything else plays its default one.
           defaultAudioOnly: casting || !(overlayActive.current && appSwitchesTracks),
-          deviceProfile: casting ? CHROMECAST_PROFILE : overlayActive.current ? overlayProfile.current : buildDeviceProfile(qualityRef.current ?? streamingBitrate()),
+          deviceProfile: casting
+            ? CHROMECAST_PROFILE
+            : overlayActive.current
+              ? overlayProfile.current
+              : opts.plainest
+                ? plainestProfile(qualityRef.current ?? streamingBitrate())
+                : buildDeviceProfile(qualityRef.current ?? streamingBitrate()),
           maxBitrate: (qualityRef.current ?? streamingBitrate()) || undefined,
           startSeconds: opts.start,
           audioStreamIndex: opts.audio,
@@ -466,6 +475,7 @@ function Player() {
       return;
     }
     fallbackTried.current = false;
+    plainestTried.current = false;
     const d = info.data;
     const room = inRoom() ? togetherRef.current.room : undefined;
     if (room && room.playback.itemId !== itemId) return; // moving to the room's episode first
@@ -546,6 +556,10 @@ function Player() {
       // The browser couldn't decode the file after all: let Jellyfin repackage it.
       fallbackTried.current = true;
       void load({ start: video.current?.currentTime ?? 0, audio: audioIndex, allowDirectPlay: false });
+    } else if (!hls.current && !plainestTried.current) {
+      // Still not (a TV that says it plays something it doesn't): once more, converted to the plainest there is.
+      plainestTried.current = true;
+      void load({ start: video.current?.currentTime ?? 0, audio: audioIndex, allowDirectPlay: false, plainest: true });
     } else if (!hls.current) {
       // With the player's own number (3: it couldn't decode it, 4: the format), for a bug report.
       const code = video.current?.error?.code;

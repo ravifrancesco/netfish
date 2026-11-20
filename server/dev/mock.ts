@@ -15,6 +15,7 @@ import Fastify, { type FastifyRequest } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { DURATION_SECONDS, MEDIA_DIR, ensureMedia, subtitleVtt } from './mock/media';
 import * as svg from './mock/svg';
+import { childrenOf, isPhotoFolder, photoById, photoDto, photoLibraries, photoSvg } from './mock/photos';
 import {
   EPISODES_PER_SEASON,
   RUNTIME_TICKS,
@@ -40,6 +41,7 @@ import {
   requests,
   seasonStatus,
   followed,
+  hex,
   continuing,
   seed,
   sessions,
@@ -111,6 +113,15 @@ const emptyShows = new Set<number>();
 const fileHistory: { radarr: Array<{ movieId?: number } & Record<string, unknown>>; sonarr: Array<{ seriesId?: number } & Record<string, unknown>> } = { radarr: [], sonarr: [] };
 
 const containerOf = (item: Item) => (item.kind === 'movie' && item.title.n === 4 ? 'mkv' : 'mp4');
+
+/** A title's versions, as Jellyfin lists them: "The Deep Current" also has a 4K HEVC file next to its 1080p one. */
+const versionsOf = (item: Item) => [
+  { id: item.id, codec: 'h264', container: containerOf(item), width: 1920, height: 1080 },
+  ...(item.kind === 'movie' && item.title.n === 1 ? [{ id: hex(`${item.id}-4k`), codec: 'hevc', container: 'mkv', width: 3840, height: 2160 }] : []),
+];
+/** A version's tracks: the title's, with its own picture. */
+const streamsOfVersion = (item: Item, v: ReturnType<typeof versionsOf>[number]) =>
+  (streamsFor(item) as Array<{ Type: string; Codec?: string; DeliveryUrl?: string }>).map((x) => (x.Type === 'Video' ? { ...x, Codec: v.codec, Width: v.width, Height: v.height } : x));
 
 function streamsFor(item: Item) {
   const t = item.title;
@@ -253,7 +264,7 @@ function dto(item: Item, userId?: string, full = false): Record<string, unknown>
         ProviderIds: { Tmdb: String(t.tmdbId) }, ImageTags: { Primary: 'p1', Thumb: 't1' }, BackdropImageTags: ['b1'],
         DateCreated: date(titleAdded(t)), UserData: userDataDto(userId, item), Taglines: [],
         People: jfPeople(t),
-        ...(full ? { MediaStreams: streamsFor(item), MediaSources: [{ Id: item.id, Container: containerOf(item), Size: SAMPLE_SIZE, Bitrate: 400_000, MediaStreams: streamsFor(item), DefaultSubtitleStreamIndex: subtitleChoice(userId, item) }], Trickplay: TRICKPLAY(item.id) } : {}),
+        ...(full ? { MediaStreams: streamsFor(item), MediaSources: versionsOf(item).map((v) => ({ Id: v.id, Container: v.container, Size: SAMPLE_SIZE, Bitrate: 400_000, MediaStreams: streamsOfVersion(item, v), DefaultSubtitleStreamIndex: subtitleChoice(userId, item) })), Trickplay: TRICKPLAY(item.id) } : {}),
       };
     case 'series':
       return {
@@ -273,7 +284,7 @@ function dto(item: Item, userId?: string, full = false): Record<string, unknown>
         Overview: `${t.title}, season ${item.s} episode ${item.e}. Things get choppy.`, PremiereDate: `${t.year + item.s - 1}-0${Math.min(9, item.e)}-10T00:00:00.0000000Z`,
         ImageTags: { Primary: 'p1' }, SeriesPrimaryImageTag: 'p1', ParentBackdropItemId: seriesId, ParentBackdropImageTags: ['b1'],
         UserData: userDataDto(userId, item),
-        ...(full ? { MediaStreams: streamsFor(item), MediaSources: [{ Id: item.id, Container: containerOf(item), Size: SAMPLE_SIZE, Bitrate: 400_000, MediaStreams: streamsFor(item), DefaultSubtitleStreamIndex: subtitleChoice(userId, item) }], Trickplay: TRICKPLAY(item.id) } : {}),
+        ...(full ? { MediaStreams: streamsFor(item), MediaSources: versionsOf(item).map((v) => ({ Id: v.id, Container: v.container, Size: SAMPLE_SIZE, Bitrate: 400_000, MediaStreams: streamsOfVersion(item, v), DefaultSubtitleStreamIndex: subtitleChoice(userId, item) })), Trickplay: TRICKPLAY(item.id) } : {}),
       };
   }
 }
@@ -385,6 +396,15 @@ void app.register(
     const listed = (t: Title) => inLibrary(t) || (t.type === 'tv' && emptyShows.has(t.tmdbId));
     jf.get<{ Querystring: Q }>('/Items', async (req) => {
       const q = req.query;
+      // In a photo library: its albums, photos and videos (folders by name; the rest by date, as asked).
+      const folder = q.parentId ? photoById.get(q.parentId) : undefined;
+      if (folder) {
+        let kids = childrenOf(folder.id).filter((p) => (q.isFolder === 'true' ? isPhotoFolder(p) : q.isFolder === 'false' ? !isPhotoFolder(p) : true));
+        kids = q.sortBy?.startsWith('PremiereDate') ? kids.sort((a, b) => (a.date ?? '').localeCompare(b.date ?? '')) : kids.sort((a, b) => a.name.localeCompare(b.name));
+        if (q.sortOrder === 'Descending') kids.reverse();
+        const start = Number(q.startIndex ?? 0);
+        return { Items: kids.slice(start, q.limit ? start + Number(q.limit) : undefined).map(photoDto), TotalRecordCount: kids.length };
+      }
       const userId = q.userId;
       const types = (q.includeItemTypes ?? 'Movie,Series').split(',');
       let items: Item[] = [];
@@ -438,10 +458,22 @@ void app.register(
     jf.get<{ Params: { id: string }; Querystring: Q }>('/Items/:id', async (req, reply) => {
       const person = jfPersonName(req.params.id);
       if (person) return jfPerson(person);
+      const photo = photoById.get(req.params.id);
+      if (photo) return photoDto(photo);
       const item = itemsById.get(req.params.id);
       if (!item) return reply.code(404).send();
       return dto(item, req.query.userId, true);
     });
+
+    // The person's libraries: films, shows, and the photo libraries.
+    jf.get('/UserViews', async () => ({
+      Items: [
+        { Id: hex('view-movies'), Name: 'Movies', CollectionType: 'movies', ImageTags: {} },
+        { Id: hex('view-shows'), Name: 'Shows', CollectionType: 'tvshows', ImageTags: {} },
+        ...photoLibraries.map(photoDto),
+      ],
+      TotalRecordCount: 2 + photoLibraries.length,
+    }));
 
     jf.get<{ Querystring: Q }>('/UserItems/Resume', async (req) => {
       const userId = req.query.userId!;
@@ -480,6 +512,8 @@ void app.register(
     const image = async (req: FastifyRequest<{ Params: { id: string; type: string } }>, reply: import('fastify').FastifyReply) => {
       await new Promise((r) => setTimeout(r, 250)); // a small server resizing artwork isn't instant
       reply.header('content-type', 'image/svg+xml').header('cache-control', 'public, max-age=3600');
+      const photo = photoById.get(req.params.id);
+      if (photo) return photoSvg(photo);
       const item = itemsById.get(req.params.id);
       if (!item) return svg.avatar(jfPersonName(req.params.id) ?? '?');
       const t = item.title;
@@ -495,16 +529,15 @@ void app.register(
     );
 
     jf.post<{ Params: { id: string }; Body: Record<string, unknown> }>('/Items/:id/PlaybackInfo', async (req, reply) => {
-      const item = itemsById.get(req.params.id);
+      // (A home video plays the sample, as the first film does.)
+      const item = itemsById.get(req.params.id) ?? (photoById.get(req.params.id)?.type === 'Video' ? itemsById.get(ids.movie(TITLES[0])) : undefined);
       if (!item) return reply.code(404).send();
       const body = req.body ?? {};
       const profile = body.DeviceProfile as
         | { DirectPlayProfiles?: Array<{ Container?: string; VideoCodec?: string; AudioCodec?: string }>; SubtitleProfiles?: Array<{ Format: string; Method: string }> }
         | undefined;
       // Like Jellyfin: an empty Container/VideoCodec/AudioCodec in a profile means "any".
-      const container = containerOf(item);
       const anyOf = (list: string | undefined, value: string) => !list || list.split(',').includes(value);
-      const mp4 = profile?.DirectPlayProfiles?.find((p) => (p as { Type?: string }).Type !== 'Audio' && anyOf(p.Container, container) && anyOf(p.VideoCodec, 'h264'));
       // Like Jellyfin: no track asked for means the person's language when they don't always want the
       // default-flagged track ("Play default audio track regardless of language" off), else that one.
       const streams = streamsFor(item) as Array<{ Type: string; Index: number; Codec?: string; IsDefault?: boolean; Language?: string }>;
@@ -513,34 +546,38 @@ void app.register(
       const theirs = prefs && !prefs.PlayDefaultAudioTrack && prefs.AudioLanguagePreference
         ? streams.find((x) => x.Type === 'Audio' && x.Language === prefs.AudioLanguagePreference)?.Index
         : undefined;
-      // Like Jellyfin: the tracks asked for only count when the request names this version too.
-      const named = typeof body.MediaSourceId === 'string' && body.MediaSourceId.toLowerCase() === item.id.toLowerCase();
+      // Like Jellyfin: one version when the request names it (and only then the tracks asked for count), else all of them.
+      const asked = typeof body.MediaSourceId === 'string' ? body.MediaSourceId.toLowerCase() : undefined;
+      const named = Boolean(asked && versionsOf(item).some((v) => v.id.toLowerCase() === asked));
+      const versions = versionsOf(item).filter((v) => !named || v.id.toLowerCase() === asked);
       const audioIndex = Number((named ? body.AudioStreamIndex : undefined) ?? theirs ?? streams.find((x) => x.Type === 'Audio' && x.IsDefault)?.Index ?? 1);
       const subIndex = Number((named ? body.SubtitleStreamIndex : undefined) ?? streams.find((x) => x.Type === 'Subtitle' && x.IsDefault)?.Index ?? -1);
       const audioCodec = streams.find((x) => x.Index === audioIndex)?.Codec?.toLowerCase() ?? 'aac';
       const subCodec = streams.find((x) => x.Index === subIndex)?.Codec?.toLowerCase();
-      const reasons = [
-        ...(mp4 ? [] : ['ContainerNotSupported']),
-        ...(mp4 && !anyOf(mp4.AudioCodec, audioCodec) ? ['AudioCodecNotSupported'] : []),
-        ...(subCodec && profile?.SubtitleProfiles?.find((p) => p.Format === subCodec)?.Method === 'Encode' ? ['SubtitleCodecNotSupported'] : []),
-      ];
-      const direct = body.EnableDirectPlay !== false && !reasons.length;
       const playSessionId = crypto.randomBytes(8).toString('hex');
       return {
         PlaySessionId: playSessionId,
-        MediaSources: [
-          {
-            Id: item.id, Container: containerOf(item), RunTimeTicks: RUNTIME_TICKS, SupportsDirectPlay: direct, SupportsDirectStream: direct,
-            SupportsTranscoding: true, MediaStreams: deliveredAs(streams, profile?.SubtitleProfiles), DefaultAudioStreamIndex: audioIndex, DefaultSubtitleStreamIndex: subIndex,
+        MediaSources: versions.map((v) => {
+          const videoOk = profile?.DirectPlayProfiles?.some((p) => (p as { Type?: string }).Type !== 'Audio' && anyOf(p.VideoCodec, v.codec));
+          const mp4 = profile?.DirectPlayProfiles?.find((p) => (p as { Type?: string }).Type !== 'Audio' && anyOf(p.Container, v.container) && anyOf(p.VideoCodec, v.codec));
+          const reasons = [
+            ...(mp4 ? [] : [videoOk ? 'ContainerNotSupported' : 'VideoCodecNotSupported']),
+            ...(mp4 && !anyOf(mp4.AudioCodec, audioCodec) ? ['AudioCodecNotSupported'] : []),
+            ...(subCodec && profile?.SubtitleProfiles?.find((p) => p.Format === subCodec)?.Method === 'Encode' ? ['SubtitleCodecNotSupported'] : []),
+          ];
+          const direct = body.EnableDirectPlay !== false && !reasons.length;
+          return {
+            Id: v.id, Container: v.container, RunTimeTicks: RUNTIME_TICKS, SupportsDirectPlay: direct, SupportsDirectStream: direct,
+            SupportsTranscoding: true, MediaStreams: deliveredAs(streamsOfVersion(item, v), profile?.SubtitleProfiles), DefaultAudioStreamIndex: audioIndex, DefaultSubtitleStreamIndex: subIndex,
             ...(direct
               ? {}
               : {
                   // Like Jellyfin 12: the id with dashes in the path.
-                  TranscodingUrl: `/videos/${dashed(item.id)}/master.m3u8?MediaSourceId=${item.id}&AudioStreamIndex=${audioIndex}&PlaySessionId=${playSessionId}&ApiKey=${jfToken(req)}&TranscodeReasons=${(reasons.length ? reasons : ['ContainerNotSupported']).join(',')}`,
+                  TranscodingUrl: `/videos/${dashed(item.id)}/master.m3u8?MediaSourceId=${v.id}&AudioStreamIndex=${audioIndex}&PlaySessionId=${playSessionId}&ApiKey=${jfToken(req)}&TranscodeReasons=${(reasons.length ? reasons : ['ContainerNotSupported']).join(',')}`,
                   TranscodingSubProtocol: 'hls',
                 }),
-          },
-        ],
+          };
+        }),
       };
     });
 

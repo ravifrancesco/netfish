@@ -6,7 +6,7 @@
 import { t } from '../i18n';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea, [tabindex]:not([tabindex="-1"])';
-const OVERLAYS = '.modal, .trailer, .menu, .player__menu';
+const OVERLAYS = '.modal, .trailer, .menu, .player__menu, .photo-viewer';
 
 type Direction = 'up' | 'down' | 'left' | 'right';
 const KEYS: Record<string, Direction> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
@@ -208,8 +208,8 @@ function onKey(e: KeyboardEvent) {
   if (!dir || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
   const active = document.activeElement as HTMLElement | null;
 
-  // The player handles its own arrows (seek) unless its controls are showing and one has focus.
-  const player = document.querySelector('.player');
+  // The player handles its own arrows (seek) unless its controls are showing and one has focus; the photo viewer, always.
+  const player = document.querySelector('.player, .photo-viewer');
   if (player && !(player.classList.contains('show-ui') && active && player.contains(active) && active.matches(FOCUSABLE))) return;
 
   // A slider (the player's timeline): left/right move along it.

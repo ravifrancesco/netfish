@@ -181,12 +181,31 @@ async function subtitleFor(asTheySee: Promise<JfItem | undefined>, source: JfMed
   return { subtitleStreamIndex: mine.DefaultSubtitleStreamIndex ?? -1, subtitleChosen: true };
 }
 
+/** Repackaged, not converted: what's in the way is the container or the sound, never the picture. */
+const repackaged = (reasons: string[]) => reasons.length > 0 && reasons.every((r) => /^(ContainerNotSupported|Audio|SecondaryAudio|StreamCount)/i.test(r.trim()));
+
+const pictureOf = (source: JfMediaSource) => source.MediaStreams?.find((m) => m.Type === 'Video');
+const versionName = (source: JfMediaSource) => {
+  const width = pictureOf(source)?.Width ?? 0;
+  return width >= 3200 ? '4K' : width >= 1800 ? '1080p' : width >= 1200 ? '720p' : width ? `${width}px` : (source.Container ?? 'other');
+};
+
+/**
+ * Of a title's versions, the one this device plays best: as it is, then repackaged, then
+ * converted; then the biggest picture (converted, the smallest: less work for the server).
+ */
+function bestVersion(sources: JfMediaSource[], allowDirectPlay: boolean): JfMediaSource | undefined {
+  const tier = (s: JfMediaSource) => (allowDirectPlay && s.SupportsDirectPlay ? 0 : repackaged(reasonsOf(s)) || (!s.TranscodingUrl && s.SupportsDirectStream) ? 1 : 2);
+  const width = (s: JfMediaSource) => pictureOf(s)?.Width ?? 0;
+  return [...sources].sort((a, b) => tier(a) - tier(b) || (tier(a) === 2 ? width(a) - width(b) : width(b) - width(a)))[0];
+}
+
 export async function startPlayback(user: SessionUser, itemId: string, body: PlaybackRequest): Promise<PlaybackSession> {
   if (!body?.deviceProfile) throw new HttpError(400, 'deviceProfile is required');
   let allowDirectPlay = body.allowDirectPlay !== false;
   // Jellyfin only applies the audio and subtitle tracks asked for when the request names the
   // version too (otherwise it quietly picks its own). The item's own version, unless one was chosen.
-  const sourceId = body.mediaSourceId ?? itemId;
+  let sourceId: string | undefined = body.mediaSourceId ?? itemId;
   const ask = (audioStreamIndex: number | undefined) =>
     jellyfin.playbackInfo(user.token, itemId, {
       UserId: user.id,
@@ -212,6 +231,28 @@ export async function startPlayback(user: SessionUser, itemId: string, body: Pla
   if (info.ErrorCode) throw new HttpError(415, t("Jellyfin can't play this here ({code})", { code: info.ErrorCode }));
   let source = info.MediaSources.find((s) => s.Id === sourceId) ?? info.MediaSources[0];
   if (!source) throw new HttpError(404, t('No playable file found'));
+
+  // Several versions (a 4K one and a 1080p one, say), none chosen: the one that plays best here.
+  let version: string | undefined;
+  if (!body.mediaSourceId && ((await asTheySee)?.MediaSources?.length ?? 0) > 1) {
+    const ids = sourceId;
+    sourceId = undefined; // (Jellyfin says how each version would play only when none is named.)
+    const all = await settle(ask(undefined), undefined);
+    sourceId = ids;
+    const best = all && !all.ErrorCode ? bestVersion(all.MediaSources, allowDirectPlay) : undefined;
+    if (best && best.Id !== source.Id) {
+      sourceId = best.Id;
+      const again = await ask(body.audioStreamIndex);
+      const picked = again.MediaSources.find((s) => s.Id === best.Id);
+      if (!again.ErrorCode && picked) {
+        info = again;
+        source = picked;
+        version = versionName(picked);
+      } else {
+        sourceId = ids;
+      }
+    }
+  }
 
   // Nobody chose an audio track and the default one needs converting: try a same-language track that plays as-is.
   if (body.audioStreamIndex === undefined && !(allowDirectPlay && source.SupportsDirectPlay) && reasonsOf(source).some((r) => /^Audio/i.test(r))) {
@@ -249,9 +290,7 @@ export async function startPlayback(user: SessionUser, itemId: string, body: Pla
     url = proxied(`/Videos/${itemId}/stream?static=true&mediaSourceId=${source.Id}&playSessionId=${info.PlaySessionId}`);
   } else if (source.TranscodingUrl) {
     // Container/audio-only reasons mean Jellyfin copies the video and just repackages (cheap, even on a small server).
-    method = reasons.length && reasons.every((r) => /^(ContainerNotSupported|Audio|SecondaryAudio|StreamCount)/i.test(r.trim()))
-      ? 'DirectStream'
-      : 'Transcode';
+    method = repackaged(reasons) ? 'DirectStream' : 'Transcode';
     url = proxied(source.TranscodingUrl);
   } else if (source.SupportsDirectStream) {
     method = 'DirectStream';
@@ -263,6 +302,7 @@ export async function startPlayback(user: SessionUser, itemId: string, body: Pla
   return {
     itemId,
     mediaSourceId: source.Id,
+    ...(version ? { version } : {}),
     playSessionId: info.PlaySessionId,
     method,
     url,

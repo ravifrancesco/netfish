@@ -36,6 +36,18 @@
             </intent-filter>
         </activity>
 
+        <!-- The screensaver: Netfish's, picked in Android's settings (TVs: Settings → System → Screen saver). -->
+        <service
+            android:name=".NetfishDream"
+            android:exported="true"
+            android:label="Netfish"
+            android:permission="android.permission.BIND_DREAM_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.dreams.DreamService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+
         <!-- Chromecast: its notification, tapped, goes through this (in a task of its own) to the film's player. -->
         <activity
             android:name=".CastNotificationActivity"

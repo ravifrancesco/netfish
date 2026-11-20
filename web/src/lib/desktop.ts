@@ -140,7 +140,7 @@ export interface DesktopBridge {
   };
   /** TV: keep the screen from dimming while a film plays. */
   keepAwake?: (on: boolean) => void;
-  /** On mobile data right now (the Android app from 0.8.3 on). */
+  /** On mobile data right now (the Android app from 0.8.3 on, the iPhone app from 0.9.0). */
   mobileData?: () => boolean;
   videoOverlay?: VideoOverlay;
   /** Chromecast (the Android app on phones and tablets with Google Play services). */

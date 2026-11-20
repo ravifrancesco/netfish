@@ -129,3 +129,34 @@ function samsungProfile(version: number, maxBitrate: number) {
     SubtitleProfiles: SUBTITLES,
   };
 }
+
+/**
+ * For a device that couldn't play what it said it could (a TV that lists a format it stumbles on,
+ * like Dolby Vision or some HDR): no file as it is, everything converted to plain 1080p H.264 and
+ * stereo AAC, which every device plays. Heavy for the server, but it plays.
+ */
+export function plainestProfile(maxBitrate: number) {
+  return {
+    Name: 'Netfish (plainest)',
+    MaxStreamingBitrate: maxBitrate || 400_000_000,
+    MaxStaticBitrate: 400_000_000,
+    MusicStreamingTranscodingBitrate: 384_000,
+    DirectPlayProfiles: [],
+    TranscodingProfiles: [
+      { Container: 'ts', Type: 'Video', Protocol: 'hls', Context: 'Streaming', VideoCodec: 'h264', AudioCodec: 'aac', MaxAudioChannels: '2', MinSegments: 1, BreakOnNonKeyFrames: true },
+    ],
+    ContainerProfiles: [],
+    CodecProfiles: [
+      {
+        Type: 'Video',
+        Codec: 'h264',
+        Conditions: [
+          { Condition: 'LessThanEqual', Property: 'Width', Value: '1920', IsRequired: false },
+          { Condition: 'LessThanEqual', Property: 'VideoBitDepth', Value: '8', IsRequired: false },
+          { Condition: 'NotEquals', Property: 'IsAnamorphic', Value: 'true', IsRequired: false },
+        ],
+      },
+    ],
+    SubtitleProfiles: SUBTITLES,
+  };
+}

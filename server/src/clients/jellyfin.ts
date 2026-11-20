@@ -62,6 +62,9 @@ export interface JfMediaStream {
   Type: 'Video' | 'Audio' | 'Subtitle' | 'EmbeddedImage' | 'Data' | 'Lyric';
   Index: number;
   Codec?: string;
+  /** Video: the picture's size. */
+  Width?: number;
+  Height?: number;
   Language?: string;
   DisplayTitle?: string;
   Title?: string;
@@ -137,6 +140,16 @@ export interface JfItem {
   DateCreated?: string;
   LocationType?: string;
   IndexNumberEnd?: number;
+  /** Photo libraries: albums and folders, and photos (MediaType Photo) or home videos. */
+  IsFolder?: boolean;
+  MediaType?: string;
+  ParentId?: string;
+  /** A photo's size (with fields=Width,Height). */
+  Width?: number;
+  Height?: number;
+  CollectionType?: string;
+  /** A folder's items (with fields=ChildCount). */
+  ChildCount?: number;
   People?: Array<{ Id: string; Name: string; Role?: string; Type?: string; PrimaryImageTag?: string }>;
 }
 
@@ -175,6 +188,8 @@ export const jellyfin = {
     jfRequest<JfItemsResult>(token, '/Persons', { query }),
   item: (token: string, userId: string, itemId: string) =>
     jfRequest<JfItem>(token, `/Items/${itemId}`, { query: { userId } }),
+  /** The person's libraries (films, shows, photos…), each with its kind (CollectionType). */
+  views: (token: string, userId: string) => jfRequest<JfItemsResult>(token, '/UserViews', { query: { userId } }),
   resume: (token: string, userId: string, limit = 16) =>
     jfRequest<JfItemsResult>(token, '/UserItems/Resume', {
       query: { userId, limit, mediaTypes: 'Video', fields: CARD_FIELDS, enableImageTypes: 'Primary,Backdrop,Thumb' },

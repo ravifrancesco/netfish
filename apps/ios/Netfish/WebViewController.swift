@@ -1,3 +1,4 @@
+import Network
 import UIKit
 @preconcurrency import WebKit
 
@@ -11,6 +12,9 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     /// Where to go back to after the downloads page (e.g. the Movies → Offline tab).
     private var returnURL: URL?
     private static let background = UIColor(red: 6 / 255, green: 8 / 255, blue: 11 / 255, alpha: 1)
+    /// Whether the phone is on mobile data, for the page (it streams at its own quality then).
+    private let network = NWPathMonitor()
+    private var cellular = false
 
     override func loadView() {
         let config = WKWebViewConfiguration()
@@ -53,6 +57,14 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     override func viewDidLoad() {
         super.viewDidLoad()
         store.onChange = { [weak self] list in self?.push(list) }
+        network.pathUpdateHandler = { [weak self] path in
+            let cellular = path.usesInterfaceType(.cellular)
+            DispatchQueue.main.async {
+                self?.cellular = cellular
+                self?.pushCellular()
+            }
+        }
+        network.start(queue: .global(qos: .utility))
         if let server = Server.url { start(server) } else { showSetup(error: nil) }
     }
 
@@ -149,6 +161,15 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         if failed?.scheme == LocalScheme.scheme { return }
         // The server stopped answering (offline, or away from home): offline mode, like Netflix.
         showOffline(["offline": true])
+    }
+
+    /// Each page that loads hears whether the phone is on mobile data.
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        pushCellular()
+    }
+
+    private func pushCellular() {
+        web.evaluateJavaScript("window.__netfishCellular = \(cellular)")
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {

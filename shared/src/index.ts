@@ -809,6 +809,8 @@ export interface PlaybackRequest {
 export interface PlaybackSession {
   itemId: string;
   mediaSourceId: string;
+  /** Of a title's several versions, the one chosen by itself for this device ("1080p"). */
+  version?: string;
   playSessionId: string;
   method: 'DirectPlay' | 'DirectStream' | 'Transcode';
   /** Same-origin URL. `.m3u8` → use HLS, otherwise a plain progressive stream. */
@@ -1136,6 +1138,49 @@ export interface ProgramAbout {
   href?: string;
   /** A new title on a channel that someone has kept, or asked for: it stays, in the library. */
   requested?: boolean;
+}
+
+/** An album or folder in a photo library (or a photo library itself). */
+export interface PhotoFolder {
+  id: string;
+  name: string;
+  cover?: string;
+  /** What's in it, when Jellyfin says. */
+  count?: number;
+}
+
+/** A photo, or a home video, in a photo library. */
+export interface Photo {
+  id: string;
+  name: string;
+  thumb?: string;
+  /** Big enough for the whole screen. */
+  full?: string;
+  /** A video: it opens in the player. */
+  video?: boolean;
+  /** A video's length. */
+  seconds?: number;
+  /** When it was taken (else added), ISO. */
+  date?: string;
+  width?: number;
+  height?: number;
+}
+
+/** Photos (Jellyfin's Photos and Home videos libraries): a folder's albums, then its photos, a page at a time. */
+export interface PhotosPage {
+  /** The folder shown; none at the top, where the libraries are. */
+  folder?: { id: string; name: string; parentId?: string };
+  folders: PhotoFolder[];
+  photos: Photo[];
+  /** All the photos in this folder (the page is part of them). */
+  total: number;
+}
+
+/** The screensaver (Android TV's, through the app): the library's films and shows, and what's on. */
+export interface ScreensaverResponse {
+  items: Array<{ title: string; year?: number; backdrop: string; logo?: string }>;
+  /** On Netfish's own channel (the first one) now, when channels are on. */
+  onNow?: { channel: string; title: string; until: number };
 }
 
 export interface Channel {
