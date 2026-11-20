@@ -18,10 +18,14 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$BUILD/iconset.iconset
 swiftc -O -swift-version 5 -target arm64-apple-macos15.0 \
   -import-objc-header Netfish/Netfish-Bridging-Header.h \
   -I "$BREW/include" -L "$BREW/lib" -lmpv \
-  -framework AppKit -framework WebKit -framework OpenGL -framework CoreAudio -framework AudioToolbox \
+  -framework AppKit -framework WebKit -framework OpenGL -framework CoreAudio -framework AudioToolbox -framework Network \
   Netfish/*.swift ../ios/Netfish/Server.swift ../ios/Netfish/OfflineStore.swift ../ios/Netfish/LocalScheme.swift \
   ../ios/Netfish/Strings.swift \
   -o "$APP/Contents/MacOS/Netfish" 2> >(grep -v "deprecated\|^\s*|\|^\s*$\|note:\|^\s*[0-9]* |" >&2)
+
+# The tunnel for away from home (apps/common/tunnel, Go), next to the app.
+GO=$(command -v go || echo /opt/homebrew/bin/go)
+(cd ../common/tunnel && CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 "$GO" build -trimpath -ldflags "-s -w" -o "$APP/Contents/MacOS/netfish-tunnel" .)
 
 sed "s/__VERSION__/$VERSION/g" Netfish/Info.plist > "$APP/Contents/Info.plist"
 # The setup and downloads pages are shared with the other apps.
@@ -66,7 +70,7 @@ done
 
 # iCloud and Finder tag files with metadata that code signing refuses.
 xattr -cr "$APP"
-for lib in "$APP"/Contents/Frameworks/*.dylib; do codesign --force --sign - "$lib"; done
+for lib in "$APP"/Contents/Frameworks/*.dylib "$APP/Contents/MacOS/netfish-tunnel"; do codesign --force --sign - "$lib"; done
 codesign --force --sign - "$APP" >/dev/null
 echo "Built $APP"
 

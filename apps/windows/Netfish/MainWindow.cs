@@ -105,8 +105,13 @@ sealed class MainWindow : Form
 
     async Task CreateWebView()
     {
+        // Away from home: with a tunnel set up, the page and mpv go through it (it goes straight to the
+        // server when that answers directly). Edge's engine takes its proxy only as it starts.
+        await Tunnel.Start();
+        Player.Set("http-proxy", Tunnel.ProxyUrl ?? "");
+        var arguments = "--autoplay-policy=no-user-gesture-required" + (Tunnel.ProxyUrl is { } proxy ? $" --proxy-server={proxy}" : "");
         // The interface follows navigator.language: the same language as Windows (and these messages).
-        var options = new CoreWebView2EnvironmentOptions("--autoplay-policy=no-user-gesture-required") { Language = Strings.Language };
+        var options = new CoreWebView2EnvironmentOptions(arguments) { Language = Strings.Language };
         environment = await CoreWebView2Environment.CreateAsync(null, Path.Combine(AppData.Root, "WebView2"), options);
         controller = await environment.CreateCoreWebView2CompositionControllerAsync(Handle);
         // See-through where the page is transparent (during playback), so mpv's picture shows.
@@ -169,12 +174,12 @@ sealed class MainWindow : Form
     async Task Start(Uri server)
     {
         Navigate(LocalPages.Page("loading.html"));
-        if (await Server.Reachable(server)) Navigate(server);
+        if (await Server.Reachable(server) || await Tunnel.Reachable(server)) Navigate(server);
         else ShowOffline(new JsonObject { ["offline"] = true });
     }
 
-    /// <summary>Edge's engine went away (crashed or updated): start it again where the page was.</summary>
-    async void RestartWebView()
+    /// <summary>Edge's engine went away (crashed or updated), or the tunnel changed: start it again.</summary>
+    internal async void RestartWebView()
     {
         var old = controller;
         controller = null;
@@ -443,6 +448,7 @@ sealed class MainWindow : Form
         KeepAwake(false);
         Hide(); // gone at once, while mpv winds down
         Player?.Dispose();
+        Tunnel.Stop();
         Volume.Dispose();
         try { controller?.Close(); } catch { }
         controller = null;

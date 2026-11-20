@@ -3,7 +3,7 @@ plugins {
 }
 
 // Version shown in Settings; keep in step with the root package.json.
-def netfishVersion = '0.9.0'
+def netfishVersion = '0.9.1'
 
 android {
     namespace 'app.netfish.tv'
@@ -42,13 +42,43 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
-    // The downloads page is shared with the other apps (apps/common).
+    // The downloads page is shared with the other apps (apps/common); so is the tunnel (below).
     sourceSets {
         main {
             assets.srcDirs += [layout.buildDirectory.dir('generated/commonAssets').get().asFile]
+            jniLibs.srcDirs += [layout.buildDirectory.dir('generated/tunnel').get().asFile]
+        }
+    }
+
+    // The tunnel is a program the app runs: Android only lets apps run files it installed itself
+    // (unpacked from the APK), so native libraries are unpacked on install.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
 }
+
+// netfish-tunnel (apps/common/tunnel, Go: WireGuard away from home), built for each kind of
+// processor as libnetfishtunnel.so. 32-bit ARM and x86 as Linux programs (Android's own Go
+// targets need the NDK there), which run on Android just the same.
+def go = ['/opt/homebrew/bin/go', '/usr/local/go/bin/go', '/usr/local/bin/go'].find { new File(it).exists() } ?: 'go'
+def tunnelTargets = ['arm64-v8a': ['android', 'arm64'], 'armeabi-v7a': ['linux', 'arm'], 'x86_64': ['linux', 'amd64']]
+tunnelTargets.each { abi, target ->
+    tasks.register("buildTunnel-${abi}", Exec) {
+        def source = file('../../common/tunnel')
+        def output = layout.buildDirectory.file("generated/tunnel/${abi}/libnetfishtunnel.so").get().asFile
+        inputs.dir(source)
+        outputs.file(output)
+        workingDir source
+        environment 'CGO_ENABLED', '0'
+        environment 'GOOS', target[0]
+        environment 'GOARCH', target[1]
+        environment 'GOARM', '7'
+        commandLine go, 'build', '-trimpath', '-ldflags', '-s -w', '-o', output.path, '.'
+    }
+}
+tasks.named('preBuild') { dependsOn tunnelTargets.keySet().collect { "buildTunnel-${it}" } }
 
 tasks.register('copyCommonPages', Copy) {
     from('../../common') { include 'offline.html', 'loading.html', 'player.js' }
@@ -69,5 +99,7 @@ dependencies {
     // MediaRouter to find the devices.
     implementation 'com.google.android.gms:play-services-cast-framework:21.5.0'
     implementation 'androidx.mediarouter:mediarouter:1.7.0'
+    // The page's own connections through the tunnel (WebView's proxy setting).
+    implementation 'androidx.webkit:webkit:1.12.1'
     compileOnly 'androidx.annotation:annotation:1.6.0'
 }

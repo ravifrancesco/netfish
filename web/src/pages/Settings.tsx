@@ -17,7 +17,7 @@ import { usePlaybackPrefs, useSetPlaybackPrefs } from '../lib/playbackPrefs';
 import { Mark } from '../components/Logo';
 import { Spinner, StorageWarning, Switch, useToast } from '../components/ui';
 import { useConfig, useMe } from '../lib/hooks';
-import { appKind, desktop, useOffline } from '../lib/desktop';
+import { appKind, desktop, useOffline, type TunnelStatus } from '../lib/desktop';
 import { bytes } from '../lib/format';
 import { defaultScreenName, savedScreenName, setScreenName } from '../lib/screens';
 import { onMobileData, setPrefs, usePrefs } from '../lib/prefs';
@@ -32,6 +32,95 @@ const BITRATES = [
   { value: 3_000_000, label: t('3 Mbps (mobile data)') },
 ];
 
+
+/**
+ * Away from home (the Android, Mac and Windows apps): WireGuard inside Netfish, so the server can
+ * be reached from anywhere without a VPN on the whole device. The configuration is never shown again.
+ */
+function AwayFromHome() {
+  const tunnel = desktop()?.tunnel;
+  const toast = useToast();
+  const [status, setStatus] = useState<TunnelStatus>();
+  const [editing, setEditing] = useState(false);
+  const [config, setConfig] = useState('');
+  const [problem, setProblem] = useState<string>();
+  const [busy, setBusy] = useState(false);
+  const refresh = () => void tunnel?.status().then(setStatus).catch(() => {});
+  useEffect(refresh, []); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!tunnel || !status) return null;
+  const save = async () => {
+    setBusy(true);
+    const wrong = await tunnel.save(config).catch((e: Error) => e.message);
+    setBusy(false);
+    if (wrong) return setProblem(wrong);
+    setConfig('');
+    setProblem(undefined);
+    setEditing(false);
+    toast('ok', t('Saved. Netfish uses it whenever the server doesn’t answer directly.'));
+    setTimeout(refresh, 1500);
+  };
+  const remove = async () => {
+    await tunnel.remove().catch(() => {});
+    refresh();
+  };
+  return (
+    <section className="panel">
+      <h2>{t('Away from home')}</h2>
+      <p className="muted">
+        {t('Netfish can reach your server through WireGuard when you’re out, just for itself: no VPN to switch on, and nothing else on this device goes through it. At home it goes straight to the server.')}
+      </p>
+      {status.configured && !editing ? (
+        <div className="account">
+          <span>
+            {status.active
+              ? t('Connected through WireGuard now.')
+              : status.problem
+                ? t('Couldn’t connect: {reason}', { reason: status.problem })
+                : t('Set up. Used when the server doesn’t answer directly.')}
+          </span>
+          <div className="row-gap">
+            <button className="btn btn--ghost btn--sm" onClick={() => setEditing(true)}>
+              {t('Replace')}
+            </button>
+            <button className="btn btn--ghost btn--sm" onClick={() => void remove()}>
+              {t('Remove')}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <label className="field">
+            <span>{t('WireGuard configuration')}</span>
+            <textarea
+              className="input tunnel-config"
+              rows={9}
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              value={config}
+              onChange={(e) => setConfig(e.target.value)}
+              placeholder={'[Interface]\nPrivateKey = …\nAddress = …\n\n[Peer]\nPublicKey = …\nEndpoint = …\nAllowedIPs = …'}
+            />
+            <small className="muted">
+              {t('Your router or WireGuard server gives you this, one for each device. Its AllowedIPs must include your home network. It stays on this device.')}
+            </small>
+          </label>
+          {problem && <p className="error-text small">{t('That configuration doesn’t work: {reason}', { reason: problem })}</p>}
+          <div className="row-gap">
+            <button className="btn btn--primary btn--sm" disabled={!config.trim() || busy} onClick={() => void save()}>
+              {busy ? <Spinner size={16} /> : null} {t('Save')}
+            </button>
+            {status.configured && (
+              <button className="btn btn--ghost btn--sm" onClick={() => (setEditing(false), setProblem(undefined))}>
+                {t('Cancel')}
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
 
 /** What this device is called when someone picks where to play something (Play on TV). */
 function ScreenNameField() {
@@ -405,6 +494,8 @@ export default function Settings() {
           </label>
         )}
       </section>
+
+      <AwayFromHome />
 
       {desktop() && (
         <section className="panel" id="app">

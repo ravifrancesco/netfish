@@ -6139,3 +6139,16 @@ html.is-desktop.is-mac.is-fullscreen .channel__top {
 .is-tv .photo-viewer__bar .icon-btn {
   display: none;
 }
+
+/* Settings → Away from home: a WireGuard configuration, pasted. */
+.tunnel-config {
+  height: auto;
+  padding: 10px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  resize: vertical;
+}
+.error-text {
+  color: var(--danger);
+}

@@ -7,6 +7,27 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.9.1 (2026-11-20)
+
+### New
+- **Away from home, without a VPN.** The Android (phones, tablets, TV boxes), Mac and Windows apps can reach your server through WireGuard, built in and used only by Netfish: nothing to switch on, no VPN on the whole device, and nothing else goes through it.
+  - Set it up at home: Settings → **Away from home**, and paste the WireGuard configuration your router or WireGuard server gives that device. Its AllowedIPs must include your home network.
+  - Netfish goes straight to the server when it answers (at home), and through WireGuard when it doesn't. Android and Mac switch by themselves when you change network.
+  - The configuration stays on the device and is never shown again.
+  - On Mac and Windows, downloading for offline still needs you at home.
+
+### Changed
+- **New titles flow better.** A show on its way through its first season no longer counts as waiting, so new titles keep coming while it airs.
+- **New titles: never AV1** (the smallest release often is): TV boxes stutter through it, and converting it is heavy for a small server.
+- **New titles: children's cartoons stay off the grown-up channels** even before they have an age rating, by the channel they're made for (Nickelodeon, Disney Junior, CBeebies, Rai Yoyo…).
+
+### Fixed
+- **Netfish's own channel can't go blank.** If its timetable ever has nothing for a stretch, the library fills it, and the log says so.
+
+### Update
+- **Server.**
+- **Android, Mac and Windows apps**, for Away from home.
+
 ## 0.9.0 (2026-11-19)
 
 ### New

@@ -10,7 +10,7 @@ import { writeJson } from '../lib/storage';
 import { HttpError } from '../lib/upstream';
 import { inLanguage, t } from '../lib/i18n';
 import { FRESH_DEFAULTS, freshHidden, freshPlans, freshRetired, linkChannels, onFreshChange, resetFresh, runFresh, startFresh, validFresh, type FreshPlan } from './fresh';
-import { log, setLogTimeZone } from '../lib/log';
+import { log, logTime, setLogTimeZone } from '../lib/log';
 
 /**
  * Channels: the library as old-school TV, made only of what's already on the server. Each
@@ -1348,9 +1348,21 @@ function extend(def: ChannelDef, real: Library, now: number, timeZone: string): 
   const last = sched.entries.at(-1);
   let at = last ? last.start + (last.seconds + BREAK_SECONDS) * 1000 : now;
   if (!last || at < now - KEEP_BEHIND) at = now; // switched off for a while: on again from now
+  let stopGap = false;
   for (let guard = 0; at < now + AHEAD && guard < 5000; guard++) {
     view.slot = at;
-    const next = pick(def, sched, view, at, timeZone);
+    let next = pick(def, sched, view, at, timeZone);
+    // Netfish's own timetable with nothing for this time (it shouldn't happen): a film from the
+    // library, so the channel never goes blank, and the timetable from after it. Said in the log.
+    if (!next && def.source.kind === 'mix') {
+      const p = film(sched, view, 'films', view.kinds.films, at) ?? episodeFrom(sched, view, 'shows', view.kinds.shows);
+      if (p) {
+        if (!stopGap) log.warn('channels', `${def.name}'s timetable had nothing from ${logTime(at)}: "${p.title}" and the library instead`);
+        stopGap = true;
+        sched.block = undefined;
+        next = { program: p };
+      }
+    }
     if (!next) break;
     if ('waitUntil' in next) {
       at = Math.max(next.waitUntil, at + 1000);

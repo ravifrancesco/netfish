@@ -76,6 +76,9 @@ final class MainWindow: NSWindowController, NSWindowDelegate, WKNavigationDelega
             if let error { state["error"] = error }
             self?.push("__netfishVideo", state)
         }
+        // Away from home: mpv through the tunnel too, while it's on.
+        Tunnel.shared.onChange = { [weak self] in self?.player.set("http-proxy", Tunnel.shared.proxyURL ?? "") }
+        Tunnel.shared.watchNetwork()
 
         if let server = Server.url { start(server) } else { showSetup(error: nil) }
     }
@@ -116,7 +119,8 @@ final class MainWindow: NSWindowController, NSWindowDelegate, WKNavigationDelega
     private func start(_ server: URL) {
         web.load(URLRequest(url: LocalScheme.url("loading.html", query: [:])))
         Task { @MainActor in
-            if await Server.reachable(server) { return open(server) }
+            // (Away from home: through the tunnel, when there is one.)
+            if await Tunnel.shared.route(server) { return open(server) }
             showOffline(["offline": true])
         }
     }

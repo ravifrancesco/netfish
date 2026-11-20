@@ -43,6 +43,12 @@ final class MacBridge: NSObject, WKScriptMessageHandlerWithReply {
         saveSnapshot: (json) => { call('saveSnapshot', json); },
         snapshot: () => call('snapshot'),
         serverReachable: () => call('serverReachable'),
+        // Away from home: WireGuard inside the app (Settings).
+        tunnel: {
+          status: () => call('tunnelStatus'),
+          save: (config) => call('tunnelSave', config),
+          remove: () => call('tunnelRemove'),
+        },
         toggleFullscreen: () => { call('fullscreen'); },
         // The Mac's own volume: the player's slider follows it and sets it.
         systemVolume: {
@@ -147,7 +153,17 @@ final class MacBridge: NSObject, WKScriptMessageHandlerWithReply {
         case "snapshot": return store.snapshot() ?? NSNull()
         case "serverReachable":
             guard let server = Server.url else { return false }
-            return await Server.reachable(server)
+            return await Tunnel.shared.route(server)
+
+        // Away from home (Settings, the server's pages only): never the configuration itself back
+        case "tunnelStatus": return Tunnel.shared.status
+        case "tunnelSave":
+            guard !local else { throw Problem(L("Not allowed here")) }
+            return await Tunnel.shared.save(args as? String ?? "") ?? ""
+        case "tunnelRemove":
+            guard !local else { throw Problem(L("Not allowed here")) }
+            Tunnel.shared.remove()
+            return nil
         case "openServer":
             window.showServer()
             return nil

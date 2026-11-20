@@ -110,6 +110,20 @@ export interface CastLoad {
   subtitleId: number | null;
 }
 
+/** A WireGuard tunnel inside the app: set up or not, in use now or not, and why not if it failed. */
+export interface TunnelStatus {
+  configured?: boolean;
+  active?: boolean;
+  problem?: string;
+}
+
+export interface TunnelBridge {
+  status: () => Promise<TunnelStatus>;
+  /** "" once kept, else what's wrong with the configuration. Never given back once kept. */
+  save: (config: string) => Promise<string>;
+  remove: () => Promise<void>;
+}
+
 /** Chromecast, through the Android app. */
 export interface CastBridge {
   /** Look for devices, while a list of them is on screen (it costs battery). */
@@ -142,6 +156,8 @@ export interface DesktopBridge {
   keepAwake?: (on: boolean) => void;
   /** On mobile data right now (the Android app from 0.8.3 on, the iPhone app from 0.9.0). */
   mobileData?: () => boolean;
+  /** Away from home: WireGuard inside the app (Android, Mac and Windows apps from 0.9.1 on). */
+  tunnel?: TunnelBridge;
   videoOverlay?: VideoOverlay;
   /** Chromecast (the Android app on phones and tablets with Google Play services). */
   cast?: CastBridge;
@@ -219,6 +235,10 @@ interface AndroidNative {
   changeServer(): void;
   keepAwake(on: boolean): void;
   onMobileData?(): boolean;
+  /** Away from home (apps from 0.9.1 on). */
+  tunnelStatus?(): string;
+  tunnelSave?(config: string): string;
+  tunnelRemove?(): void;
   videoProfile?(): string;
   videoLoad?(request: string): void;
   videoCommand?(name: string, value: string): void;
@@ -337,6 +357,13 @@ function androidBridge(): DesktopBridge | undefined {
     changeServer: () => native.changeServer(),
     keepAwake: (on) => native.keepAwake(on),
     mobileData: native.onMobileData ? () => Boolean(native.onMobileData!()) : undefined,
+    tunnel: native.tunnelStatus
+      ? {
+          status: async () => JSON.parse(native.tunnelStatus!() || '{}') as TunnelStatus,
+          save: async (config) => native.tunnelSave!(config),
+          remove: async () => native.tunnelRemove!(),
+        }
+      : undefined,
     // Phones and tablets: downloads, saved as MP4 for Android's player.
     ...(phone
       ? {

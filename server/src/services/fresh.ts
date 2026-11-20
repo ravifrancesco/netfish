@@ -80,6 +80,8 @@ interface Fresh {
   notBefore: number;
   /** Where the guide has it (its first airing). */
   airAt?: number;
+  /** When it first went on: from then (a show's season going out over days) it's on, not waiting. */
+  onAirFrom?: number;
   /** When its download started, and finished. */
   startedAt?: number;
   readyAt?: number;
@@ -470,6 +472,9 @@ async function candidates(want: Want, now: number): Promise<SeerrResult[]> {
 }
 
 /** Its details for the guide (TMDB's), if nobody has it in Radarr/Sonarr already. */
+/** Channels made for children, by name (Nickelodeon, Disney Junior, CBeebies…). */
+const KIDS_NETWORKS = /nick(elodeon| jr)|disney (channel|junior|xd)|cartoonito|cbeebies|cbbc|pbs kids|baby ?tv|boomerang|treehouse|tiny pop|rai yoyo|rai gulp|k2|frisbee|super!|discovery kids|universal kids/i;
+
 async function planFor(r: SeerrResult, want: Want, channelId: string, notBefore: number, now: number): Promise<Fresh | undefined> {
   const key = `${want.mediaType}-${r.id}`;
   stored.tried.push(key);
@@ -497,7 +502,9 @@ async function planFor(r: SeerrResult, want: Want, channelId: string, notBefore:
   // only (and nothing rated for grown-ups there).
   const rating = (d.contentRatings?.results?.find((x) => x.iso_3166_1 === 'US')?.rating ?? '').toUpperCase();
   const genreIds = (d.genres ?? []).map((g) => g.id);
-  const children = genreIds.includes(KIDS) || /^TV-(Y|Y7|Y7-FV)$/.test(rating) || (rating === 'TV-G' && genreIds.includes(ANIMATION));
+  // (A new show often has no rating yet: a cartoon from a children's channel counts as for children.)
+  const kidsNetwork = !rating && genreIds.includes(ANIMATION) && (d.networks ?? []).some((n) => KIDS_NETWORKS.test(n.name));
+  const children = genreIds.includes(KIDS) || /^TV-(Y|Y7|Y7-FV)$/.test(rating) || (rating === 'TV-G' && genreIds.includes(ANIMATION)) || kidsNetwork;
   if (want.forKids ? !children || ['TV-14', 'TV-MA'].includes(rating) : children) return undefined;
   const runtime = Math.min(...(d.episodeRunTime?.length ? d.episodeRunTime : [45]));
   // Sitcoms: half-hour episodes.
@@ -695,6 +702,8 @@ const RESOLUTIONS: Record<Exclude<FreshSettings['pick'], 'profile' | undefined>,
   'smallest-2160': [2160, 1080, 720],
 };
 
+const AV1 = /\bav1\b/i;
+
 /** The smallest at the resolution asked for (then the nearest), the well-shared ones first: a tiny release nobody seeds never finishes. */
 function smallestOf(list: ArrRelease[], resolutions: number[]): ArrRelease | undefined {
   for (const resolution of resolutions) {
@@ -713,8 +722,9 @@ function smallestOf(list: ArrRelease[], resolutions: number[]): ArrRelease | und
  */
 async function grabSmallest(f: Fresh, arrId: number, resolutions: number[]): Promise<'grabbed' | 'episodes' | 'none'> {
   const found = f.mediaType === 'movie' ? await radarr.releases(arrId) : await sonarr.releases(arrId, 1);
-  // Ones they'd take, not a sample or a fake (a gigabyte at least), with someone to download from.
-  const takes = found.filter((r) => !r.rejected && r.size >= GB && (r.protocol !== 'torrent' || (r.seeders ?? 0) > 0));
+  // Ones they'd take, not a sample or a fake (a gigabyte at least), with someone to download from;
+  // never AV1 (the smallest often is): TV boxes stutter through it, and converting it is heavy for a small server.
+  const takes = found.filter((r) => !r.rejected && r.size >= GB && (r.protocol !== 'torrent' || (r.seeders ?? 0) > 0) && !AV1.test(r.title));
   const pick = smallestOf(f.mediaType === 'movie' ? takes : takes.filter((r) => r.fullSeason), resolutions);
   if (pick) {
     await (f.mediaType === 'movie' ? radarr : sonarr).grab(pick.guid, pick.indexerId);
@@ -818,6 +828,7 @@ async function step(now: number) {
 
   for (const f of stored.titles) {
     f.airAt = link.airAt(f.key);
+    if (f.airAt !== undefined && f.airAt <= now) f.onAirFrom ??= f.airAt;
     if (f.state === 'planned') {
       // Its slot went by (or went to something else) before it was even downloading: forgotten,
       // unless someone asked for it (it downloads anyway, and goes on once it's here).
@@ -1271,8 +1282,9 @@ async function planOne(s: FreshSettings, defs: ChannelDef[], now: number, timeZo
   const catchUp = now < until ? byTurn(defs).filter((d) => inWindow(d).length < windowShare(d)) : [];
   if (!catchUp.length) {
     if (pickedThisWeek(now) >= s.perWeek) return 'week';
-    // (Those filling holes in Netfish's guide aren't the week's.)
-    if (upcoming().filter((f) => f.hole === undefined).length >= s.perWeek) return 'enough';
+    // (Those filling holes in Netfish's guide aren't the week's; nor those on already, a show's
+    // first season going out over days or weeks: only what's waiting to go on counts.)
+    if (upcoming().filter((f) => f.hole === undefined && f.onAirFrom === undefined).length >= s.perWeek) return 'enough';
   }
   const behind = (d: ChannelDef) => share(d) - pickedThisWeek(now, d.id);
   const order = catchUp.length

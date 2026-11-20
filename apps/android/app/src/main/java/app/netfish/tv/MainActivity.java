@@ -21,6 +21,7 @@ import android.graphics.Color;
 import android.graphics.drawable.Icon;
 import android.media.AudioManager;
 import android.net.ConnectivityManager;
+import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.Uri;
 import android.os.Build;
@@ -56,6 +57,7 @@ import org.json.JSONTokener;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.Proxy;
 import java.net.URL;
 
 /**
@@ -86,12 +88,15 @@ public class MainActivity extends Activity {
     private View splash;
     /** Phones and tablets: a film carries on in a small window when you leave the app (picture in picture). */
     private boolean pip;
+    /** Away from home: WireGuard inside the app, when the server doesn't answer directly. */
+    private Tunnel tunnel;
     private BroadcastReceiver pipButtons;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences("netfish", MODE_PRIVATE);
+        tunnel = new Tunnel(this, prefs);
         UiModeManager modes = (UiModeManager) getSystemService(UI_MODE_SERVICE);
         tv = modes.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION
                 || getPackageManager().hasSystemFeature(PackageManager.FEATURE_LEANBACK);
@@ -142,6 +147,16 @@ public class MainActivity extends Activity {
         cast = new CastEngine(this, state -> runOnUiThread(() ->
                 web.evaluateJavascript("window.__netfishCast&&window.__netfishCast(" + state + ")", null)));
         castReady = !tv && cast.start();
+        // Home or away as the network changes (Wi-Fi to mobile data): the tunnel on or off, no reload.
+        ConnectivityManager networks = getSystemService(ConnectivityManager.class);
+        if (networks != null) {
+            networks.registerDefaultNetworkCallback(new ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onAvailable(Network network) {
+                    reroute();
+                }
+            });
+        }
 
         WebSettings settings = web.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -231,15 +246,41 @@ public class MainActivity extends Activity {
         String page = path != null && path.startsWith("/") ? server.replaceAll("/+$", "") + path : server;
         web.loadUrl(LOADING);
         new Thread(() -> {
-            boolean up = reachable(server);
-            runOnUiThread(() -> {
+            boolean up = route(server);
+            runOnUiThread(() -> tunnel.applyToPage(() -> {
                 if (isDestroyed()) return;
                 forgetHistory = true; // back never lands on the fish
                 if (up) web.loadUrl(page);
                 else if (offline != null) showOffline(offlineMode());
                 else showSetup(getString(R.string.error_server_unreachable, server, getString(R.string.nothing_answered)));
-            });
+            }));
         }, "netfish-start").start();
+    }
+
+    /**
+     * Whether the server answers: directly (at home), else, away, through the tunnel when there is
+     * one, started here. A tunnel that isn't needed (or doesn't get through) stops. Off the main thread.
+     */
+    private boolean route(String server) {
+        if (reachableDirectly(server)) {
+            tunnel.stop();
+            return true;
+        }
+        if (tunnel.configured() && tunnel.start(server)) {
+            if (reachable(server)) return true;
+            tunnel.stop();
+        }
+        return false;
+    }
+
+    /** The network changed: the tunnel on or off for it, the page following. */
+    private void reroute() {
+        String server = server();
+        if (server == null || !tunnel.configured()) return;
+        new Thread(() -> {
+            route(server);
+            runOnUiThread(() -> tunnel.applyToPage(() -> {}));
+        }, "netfish-route").start();
     }
 
     /**
@@ -507,6 +548,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         if (pipButtons != null) unregisterReceiver(pipButtons);
+        tunnel.stop();
         video.release();
         cast.release();
         web.destroy();
@@ -539,9 +581,19 @@ public class MainActivity extends Activity {
 
     /** Whether anything answers at the server, quickly: it's on and this device can reach it. */
     static boolean reachable(String origin) {
+        return reachable(origin, null);
+    }
+
+    /** Straight there, never through the tunnel: at home? */
+    static boolean reachableDirectly(String origin) {
+        return reachable(origin, Proxy.NO_PROXY);
+    }
+
+    private static boolean reachable(String origin, Proxy proxy) {
         HttpURLConnection conn = null;
         try {
-            conn = (HttpURLConnection) new URL(origin + "/api/health").openConnection();
+            URL health = new URL(origin + "/api/health");
+            conn = (HttpURLConnection) (proxy != null ? health.openConnection(proxy) : health.openConnection());
             conn.setConnectTimeout(4000);
             conn.setReadTimeout(4000);
             conn.setUseCaches(false);
@@ -800,9 +852,38 @@ public class MainActivity extends Activity {
             String server = server();
             if (!fromApp() || server == null) return;
             new Thread(() -> {
-                boolean up = reachable(server);
-                runOnUiThread(() -> web.evaluateJavascript("window.__netfishReach&&window.__netfishReach(" + up + ")", null));
+                boolean up = route(server);
+                runOnUiThread(() -> tunnel.applyToPage(() -> web.evaluateJavascript("window.__netfishReach&&window.__netfishReach(" + up + ")", null)));
             }, "netfish-check").start();
+        }
+
+        /** Away from home (Settings): whether a tunnel is set up and in use, never its configuration. */
+        @JavascriptInterface
+        public String tunnelStatus() {
+            if (!fromServer()) return "{}";
+            try {
+                JSONObject status = new JSONObject().put("configured", tunnel.configured()).put("active", tunnel.active());
+                if (tunnel.problem() != null) status.put("problem", tunnel.problem());
+                return status.toString();
+            } catch (JSONException e) {
+                return "{}";
+            }
+        }
+
+        /** A WireGuard configuration to keep (checked first): "" when it's kept, else what's wrong with it. */
+        @JavascriptInterface
+        public String tunnelSave(String config) {
+            if (!fromServer()) return "Not allowed here";
+            String problem = tunnel.save(config == null ? "" : config);
+            if (problem == null) reroute();
+            return problem == null ? "" : problem;
+        }
+
+        @JavascriptInterface
+        public void tunnelRemove() {
+            if (!fromServer()) return;
+            tunnel.remove();
+            runOnUiThread(() -> tunnel.applyToPage(() -> {}));
         }
 
         /** Updates, from the Netfish pages only (apps from 0.6.3 on): answer through window.__netfishUpdate. */

@@ -991,12 +991,15 @@ function fakeReleases(t: Title, season?: number, episode?: number) {
     [`${base}.Hindi.Tamil.Telugu.1080p.WEB-DL-MACHLI`, ['Hindi', 'Tamil', 'Telugu'], 'WEBDL-1080p', 30],
     [`${base}.JAPANESE.1080p.BluRay-SAKANA`, ['Japanese'], 'Bluray-1080p', 0],
     [`${base}.720p.WEB-DL.x264-MINNOW`, ['English'], 'WEBDL-720p', 60],
+    // The smallest of all, and AV1: what New titles must never pick.
+    [`${base}.1080p.WEB-DL.AV1.Opus-SQUID`, ['English'], 'WEBDL-1080p', 25],
   ];
   return rows.map(([title, languages, quality, seeders], i) => {
     const guid = `mock-${crypto.createHash('md5').update(title).digest('hex').slice(0, 12)}`;
     releaseCache.set(guid, { title: t, season, release: title, quality, languages });
     return {
-      guid, indexerId: 1 + (i % 3), indexer: ['FishTracker', 'ReefNZB', 'TidalTorrents'][i % 3], title, size: (season ? 14 : 6) * 1024 ** 3 + ((i * 7 + 5) % 12) * 3e8, // sizes in no particular order
+      guid, indexerId: 1 + (i % 3), indexer: ['FishTracker', 'ReefNZB', 'TidalTorrents'][i % 3], title,
+      size: (season ? 14 : 6) * 1024 ** 3 + (title.includes('AV1') ? -2e9 : ((i * 7 + 5) % 12) * 3e8), // sizes in no particular order
       seeders, leechers: Math.round(seeders / 3), quality: { quality: { name: quality, resolution: Number(quality.match(/\d{3,4}/)?.[0] ?? 0) } },
       languages: langList(languages), ageHours: 24 * (i + 2), protocol: 'torrent',
       rejected: !languages.includes('English'), rejections: languages.includes('English') ? [] : ['Language is not wanted in profile'],

@@ -9,3 +9,7 @@ Netfish for Windows includes:
   https://vulkan.lunarg.com. MIT and Apache 2.0 licences; see vulkan.txt.
 
 - .NET (Microsoft, MIT licence) and the Microsoft Edge WebView2 SDK (Microsoft, BSD-style licence).
+
+- netfish-tunnel.exe (WireGuard away from home) is built from Netfish's apps/common/tunnel with
+  wireguard-go (https://git.zx2c4.com/wireguard-go, MIT licence), gVisor's network stack
+  (https://gvisor.dev, Apache 2.0 licence) and Go (https://go.dev, BSD-style licence).

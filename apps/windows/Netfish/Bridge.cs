@@ -78,6 +78,12 @@ sealed class Bridge(MainWindow window, OfflineStore store)
             saveSnapshot: (json) => send('saveSnapshot', json),
             snapshot: () => call('snapshot'),
             serverReachable: () => call('serverReachable'),
+            // Away from home: WireGuard inside the app (Settings).
+            tunnel: {
+              status: () => call('tunnelStatus'),
+              save: (config) => call('tunnelSave', config),
+              remove: () => call('tunnelRemove'),
+            },
             toggleFullscreen: () => send('fullscreen'),
             // Windows' own volume: the player's slider follows it and sets it.
             systemVolume: {
@@ -150,6 +156,8 @@ sealed class Bridge(MainWindow window, OfflineStore store)
         }
     }
 
+    void RestartSoon() => _ = Task.Delay(500).ContinueWith(_ => window.BeginInvoke(window.RestartWebView));
+
     async Task<JsonNode?> Handle(string cmd, JsonNode? args, bool local)
     {
         switch (cmd)
@@ -204,7 +212,23 @@ sealed class Bridge(MainWindow window, OfflineStore store)
                 store.SaveSnapshot(Str(args) ?? "");
                 return null;
             case "snapshot": return store.Snapshot() is { } snap ? JsonValue.Create(snap) : null;
-            case "serverReachable": return JsonValue.Create(Server.Url is { } server && await Server.Reachable(server));
+            case "serverReachable": return JsonValue.Create(Server.Url is { } server && (await Server.Reachable(server) || await Tunnel.Reachable(server)));
+
+            // Away from home (Settings, the server's pages only): never the configuration itself back.
+            // A change restarts Edge's engine (it takes its proxy only as it starts), once this is answered.
+            case "tunnelStatus": return Tunnel.Status();
+            case "tunnelSave":
+            {
+                if (local) throw new Problem(L("Not allowed here"));
+                var problem = await Tunnel.Save(Str(args) ?? "");
+                if (problem == null) RestartSoon();
+                return problem ?? "";
+            }
+            case "tunnelRemove":
+                if (local) throw new Problem(L("Not allowed here"));
+                Tunnel.Remove();
+                RestartSoon();
+                return null;
 
             // Notifications
             case "notify":

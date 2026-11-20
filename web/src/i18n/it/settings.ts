@@ -6,6 +6,20 @@ export default {
   'On mobile data': 'Con i dati mobili',
   'The same': 'La stessa',
 
+  // Away from home: WireGuard inside the app
+  'Away from home': 'Fuori casa',
+  'Netfish can reach your server through WireGuard when you’re out, just for itself: no VPN to switch on, and nothing else on this device goes through it. At home it goes straight to the server.':
+    'Fuori casa Netfish può raggiungere il tuo server tramite WireGuard, solo per sé: nessuna VPN da attivare, e nient’altro su questo dispositivo ci passa. A casa va dritto al server.',
+  'Connected through WireGuard now.': 'Ora connesso tramite WireGuard.',
+  'Couldn’t connect: {reason}': 'Impossibile connettersi: {reason}',
+  'Set up. Used when the server doesn’t answer directly.': 'Configurato. Si usa quando il server non risponde direttamente.',
+  Replace: 'Sostituisci',
+  'WireGuard configuration': 'Configurazione WireGuard',
+  'Your router or WireGuard server gives you this, one for each device. Its AllowedIPs must include your home network. It stays on this device.':
+    'Te la dà il router o il server WireGuard, una per dispositivo. I suoi AllowedIPs devono includere la rete di casa. Resta su questo dispositivo.',
+  'That configuration doesn’t work: {reason}': 'Questa configurazione non funziona: {reason}',
+  'Saved. Netfish uses it whenever the server doesn’t answer directly.': 'Salvata. Netfish la usa ogni volta che il server non risponde direttamente.',
+
   // Downloads in the apps
   '{n} download · {size} on {device}': '{n} download · {size} su {device}',
   '{n} downloads · {size} on {device}': '{n} download · {size} su {device}',

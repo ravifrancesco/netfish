@@ -78,6 +78,9 @@ cp THIRD-PARTY.txt build/publish/licenses/
 # The setup and downloads pages are shared with the other apps.
 mkdir -p build/publish/pages
 cp ../common/setup.html ../common/offline.html ../common/loading.html ../common/player.js build/publish/pages/
+# The tunnel for away from home (apps/common/tunnel, Go), next to Netfish.exe.
+GO=$(command -v go || echo /opt/homebrew/bin/go)
+(cd ../common/tunnel && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 "$GO" build -trimpath -ldflags "-s -w" -o "$OLDPWD/build/publish/netfish-tunnel.exe" .)
 echo "Built $(pwd)/build/publish/Netfish.exe"
 
 # The installer.
