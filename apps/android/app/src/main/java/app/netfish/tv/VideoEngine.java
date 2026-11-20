@@ -5,6 +5,7 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Rational;
 import android.util.Log;
 import android.webkit.CookieManager;
 
@@ -17,6 +18,7 @@ import androidx.media3.common.Player;
 import androidx.media3.common.TrackSelectionOverride;
 import androidx.media3.common.TrackSelectionParameters;
 import androidx.media3.common.Tracks;
+import androidx.media3.common.VideoSize;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DefaultHttpDataSource;
 import androidx.media3.exoplayer.DefaultRenderersFactory;
@@ -62,6 +64,7 @@ final class VideoEngine {
     private boolean active;
     private float volume = 1f;
     private Consumer<Boolean> activeListener = showing -> {};
+    private Runnable changeListener = () -> {};
     private boolean controlsShowing;
 
     private final Runnable tick = new Runnable() {
@@ -121,6 +124,12 @@ final class VideoEngine {
             @Override
             public void onPlayWhenReadyChanged(boolean playWhenReady, int reason) {
                 if (active) push("pause", !playWhenReady);
+                changeListener.run();
+            }
+
+            @Override
+            public void onVideoSizeChanged(VideoSize size) {
+                changeListener.run();
             }
 
             @Override
@@ -147,6 +156,24 @@ final class VideoEngine {
     /** Told when a film starts and stops showing (phones go full screen and sideways). */
     void setActiveListener(Consumer<Boolean> listener) {
         activeListener = listener;
+    }
+
+    /** Told when it starts or stops playing, or the picture changes shape (picture in picture follows). */
+    void setChangeListener(Runnable listener) {
+        changeListener = listener;
+    }
+
+    /** A film is playing (or about to, once it has loaded enough). */
+    boolean playing() {
+        return active && player != null && player.getPlayWhenReady();
+    }
+
+    /** The picture's shape, within what Android allows a small window (2.39:1 either way). */
+    Rational shape() {
+        VideoSize size = player == null ? VideoSize.UNKNOWN : player.getVideoSize();
+        if (size.width == 0 || size.height == 0) return new Rational(16, 9);
+        float ratio = Math.max(1 / 2.39f, Math.min(2.39f, size.width * size.pixelWidthHeightRatio / size.height));
+        return new Rational(Math.round(ratio * 1000), 1000);
     }
 
     // ---------- From the page ----------
@@ -185,6 +212,7 @@ final class VideoEngine {
         p.setPlayWhenReady(true);
         handler.removeCallbacks(tick);
         handler.post(tick);
+        changeListener.run();
     }
 
     void command(String name, Object value) {
@@ -230,6 +258,7 @@ final class VideoEngine {
             player.stop();
             player.clearMediaItems();
         }
+        changeListener.run();
     }
 
     void pause() {

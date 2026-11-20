@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject, type VideoHTMLAttributes } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject, type VideoHTMLAttributes } from 'react';
 import { ArrowLeft, Captions, Check, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, SkipForward, Volume2, VolumeX } from 'lucide-react';
 import type { MediaSegment, Trickplay } from '@netfish/shared';
 import { SwimmingFish } from '../components/Logo';
@@ -9,7 +9,7 @@ import { setSystemMuted, setSystemVolume, systemVolume, useSystemVolume } from '
 import { isTV } from '../lib/tv';
 import { parseVtt, type Cue } from './vtt';
 import { menuSubtitles } from './tracks';
-import { locale, t } from '../i18n';
+import { locale, t, tn } from '../i18n';
 
 /**
  * Netfish's player screen: the controls, the Audio and Subtitles menu, the seek bar, the
@@ -88,7 +88,18 @@ export interface PlayerViewProps {
   pageSubtitles?: string;
   /** Whether the controls are showing (the app's player lifts its subtitles above them). */
   onControls?: (showing: boolean) => void;
+  /** The streaming quality for this film (from the server: not downloads, not a Chromecast). */
+  quality?: Quality;
 }
+
+/** A quality cap in bits/second (0: the best there is), and choosing another. */
+export interface Quality {
+  value: number;
+  choose: (value: number) => void;
+}
+
+/** The qualities to choose from in the player. */
+const QUALITIES = [0, 40_000_000, 20_000_000, 10_000_000, 6_000_000, 3_000_000];
 
 export interface Volume {
   volume: number;
@@ -224,11 +235,13 @@ export function TrackMenu(props: {
   chooseSubtitle: (index?: number) => void;
   audioMore?: ReactNode;
   subtitlesMore?: ReactNode;
+  quality?: Quality;
 }) {
   const subtitles = menuSubtitles(props.subtitles);
   const off = props.subtitleIndex === undefined || !subtitles.some((track) => track.index === props.subtitleIndex);
+  const quality = props.quality;
   return (
-    <div className="player__menu">
+    <div className={`player__menu${quality ? ' player__menu--quality' : ''}`}>
       {(props.audio.length > 0 || props.audioMore) && (
         <div className="player__menu-col">
           <h3>{t('Audio')}</h3>
@@ -257,6 +270,17 @@ export function TrackMenu(props: {
         ))}
         {props.subtitlesMore}
       </div>
+      {quality && (
+        <div className="player__menu-col">
+          <h3>{t('Quality')}</h3>
+          {QUALITIES.map((value) => (
+            <button key={value} className={`player__opt${value === quality.value ? ' is-on' : ''}`} onClick={() => quality.choose(value)}>
+              <Check size={16} className="player__tick" />
+              {value ? `${value / 1_000_000} Mbps` : t('Best')}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -479,11 +503,60 @@ export function PlayerView(props: PlayerViewProps) {
     setMenu(false);
     pick();
   };
-  const hasMenu = props.audio.length > 1 || props.subtitles.length > 0 || Boolean(props.audioMore || props.subtitlesMore);
-  // While the controls are hidden, a click or tap only brings them back (like Netflix). As they
-  // were when the finger went down: a touch shows them at once, before its click arrives.
+  const hasMenu = props.audio.length > 1 || props.subtitles.length > 0 || Boolean(props.audioMore || props.subtitlesMore || props.quality);
+
+  // ---------- clicks and taps on the picture ----------
+
+  // As the controls were when the finger went down: a touch shows them at once, before its click arrives.
   const shownAtPress = useRef(true);
-  const onSurfaceClick = () => (shownAtPress.current ? toggle() : poke());
+  const pointer = useRef('mouse');
+  const tapTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const jumping = useRef<{ side: -1 | 1; seconds: number; from: number; until: number }>(undefined);
+  const [jump, setJump] = useState<{ side: -1 | 1; seconds: number }>();
+  const jumpShown = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(
+    () => () => {
+      clearTimeout(tapTimer.current);
+      clearTimeout(jumpShown.current);
+    },
+    [],
+  );
+  /** Back or forward 10 s, 10 more each tap that follows quickly (like YouTube). */
+  const jumpTo = (side: -1 | 1) => {
+    const now = Date.now();
+    const j = jumping.current && now < jumping.current.until ? jumping.current : undefined;
+    const from = j ? (j.side === side ? j.from : j.from + j.side * j.seconds) : (video.current?.currentTime ?? time);
+    const seconds = j?.side === side ? j.seconds + 10 : 10;
+    jumping.current = { side, seconds, from, until: now + 800 };
+    seekTo(Math.max(0, from + side * seconds));
+    setJump({ side, seconds });
+    clearTimeout(jumpShown.current);
+    jumpShown.current = setTimeout(() => setJump(undefined), 800);
+  };
+  // A mouse: a click pauses, or only brings the controls back while they're hidden (like Netflix);
+  // a double click is full screen. A finger: a tap shows or hides the controls, never pauses; a
+  // double tap on the left or right goes back or forward.
+  const onSurfaceClick = (e: ReactMouseEvent) => {
+    if (pointer.current === 'mouse') return shownAtPress.current ? toggle() : poke();
+    const r = e.currentTarget.getBoundingClientRect();
+    const side = e.clientX < r.left + r.width / 2 ? -1 : 1;
+    if (jumping.current && Date.now() < jumping.current.until) return jumpTo(side);
+    if (tapTimer.current) {
+      clearTimeout(tapTimer.current);
+      tapTimer.current = undefined;
+      return jumpTo(side);
+    }
+    const wasShown = shownAtPress.current;
+    tapTimer.current = setTimeout(() => {
+      tapTimer.current = undefined;
+      // (Hidden, the touch has already brought them back.)
+      if (wasShown) {
+        clearTimeout(hideTimer.current);
+        setShowUi(false);
+      }
+    }, 280);
+  };
+  const onSurfaceDoubleClick = () => pointer.current === 'mouse' && toggleFullscreen();
 
   return (
     <div
@@ -492,6 +565,7 @@ export function PlayerView(props: PlayerViewProps) {
       onMouseMove={poke}
       onPointerDown={(e) => {
         shownAtPress.current = uiVisible;
+        pointer.current = e.pointerType;
         if (e.pointerType !== 'mouse') poke();
       }}
     >
@@ -501,7 +575,7 @@ export function PlayerView(props: PlayerViewProps) {
           className="player__surface"
           style={!props.pictureShown && props.backdrop ? { backgroundImage: `url(${props.backdrop})` } : undefined}
           onClick={onSurfaceClick}
-          onDoubleClick={toggleFullscreen}
+          onDoubleClick={onSurfaceDoubleClick}
         />
       ) : (
         <video
@@ -512,10 +586,16 @@ export function PlayerView(props: PlayerViewProps) {
           poster={props.backdrop}
           {...props.videoProps}
           onClick={onSurfaceClick}
-          onDoubleClick={toggleFullscreen}
+          onDoubleClick={onSurfaceDoubleClick}
         />
       )}
       {props.pageSubtitles && <PageSubtitles url={props.pageSubtitles} time={time} raised={uiVisible} />}
+      {jump && (
+        <div className={`player__jump player__jump--${jump.side < 0 ? 'back' : 'forward'}`} aria-hidden="true">
+          {jump.side < 0 ? <RotateCcw size={30} /> : <RotateCw size={30} />}
+          <span>{tn(jump.seconds, '{n} second', '{n} seconds')}</span>
+        </div>
+      )}
 
       {props.children}
       {props.center ? (
@@ -555,12 +635,13 @@ export function PlayerView(props: PlayerViewProps) {
         {props.actions}
       </div>
 
-      {intro && (
+      {/* (Not over the menu while it's open.) */}
+      {intro && !menu && (
         <button className="player__skip btn btn--ghost" onClick={() => seekTo(intro.end)}>
           {intro.type === 'Recap' ? t('Skip recap') : t('Skip intro')} <SkipForward size={18} />
         </button>
       )}
-      {nearEnd && next && (
+      {nearEnd && next && !menu && (
         <div className="player__next">
           <span className="muted small">{countdown !== undefined ? t('Next episode in {n}', { n: countdown }) : t('Next episode')}</span>
           <strong>{next.title}</strong>
@@ -676,6 +757,7 @@ export function PlayerView(props: PlayerViewProps) {
                   chooseSubtitle={(index) => choose(() => props.chooseSubtitle(index))}
                   audioMore={props.audioMore}
                   subtitlesMore={props.subtitlesMore}
+                  quality={props.quality && { value: props.quality.value, choose: (value) => choose(() => props.quality!.choose(value)) }}
                 />
               )}
             </div>

@@ -20,7 +20,7 @@ import { useConfig, useMe } from '../lib/hooks';
 import { appKind, desktop, useOffline } from '../lib/desktop';
 import { bytes } from '../lib/format';
 import { defaultScreenName, savedScreenName, setScreenName } from '../lib/screens';
-import { setPrefs, usePrefs } from '../lib/prefs';
+import { onMobileData, setPrefs, usePrefs } from '../lib/prefs';
 import { LANGUAGES, languageSetting, setLanguage, t, tn, type Language } from '../i18n';
 
 const BITRATES = [
@@ -352,6 +352,19 @@ export default function Settings() {
           </select>
           <small className="muted">{t('Lower it when watching away from home. Anything the server has to shrink costs it CPU.')}</small>
         </label>
+        {onMobileData() !== undefined && (
+          <label className="field">
+            <span>{t('On mobile data')}</span>
+            <select className="select" value={prefs.mobileBitrate ?? ''} onChange={(e) => setPrefs({ mobileBitrate: e.target.value === '' ? null : Number(e.target.value) })}>
+              <option value="">{t('The same')}</option>
+              {BITRATES.filter((b) => b.value).map((b) => (
+                <option key={b.value} value={b.value}>
+                  {b.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <PlaybackLanguages />
         <label className="check">
           <input type="checkbox" checked={prefs.autoplayNext} onChange={(e) => setPrefs({ autoplayNext: e.target.checked })} />

@@ -1,9 +1,12 @@
 import { useSyncExternalStore } from 'react';
+import { desktop } from './desktop';
 
 /** Per-device preferences. Nothing here matters to other devices or the server. */
 export interface Prefs {
   /** Bits/second; 0 = automatic (no cap). */
   maxBitrate: number;
+  /** On mobile data instead, when the device can tell; null = the same. */
+  mobileBitrate: number | null;
   subtitlesByDefault: boolean;
   subtitleLanguage: string;
   audioLanguage: string;
@@ -18,6 +21,7 @@ export interface Prefs {
 const KEY = 'netfish.prefs';
 const DEFAULTS: Prefs = {
   maxBitrate: 0,
+  mobileBitrate: null,
   subtitlesByDefault: false,
   subtitleLanguage: 'en',
   audioLanguage: '',
@@ -98,4 +102,18 @@ export function deviceName(): string {
   const browser = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
   const device = /iPhone|iPad/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Mac/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'Web';
   return `Netfish ${browser} (${device})`;
+}
+
+/** Whether this device is on mobile data now, when it can tell (the Android app; Chrome on Android). */
+export function onMobileData(): boolean | undefined {
+  const app = desktop()?.mobileData;
+  if (app) return app();
+  const type = (navigator as Navigator & { connection?: { type?: string } }).connection?.type;
+  return type ? type === 'cellular' : undefined;
+}
+
+/** The streaming quality now (bits/second, 0 = the best): on mobile data, its own one if set. */
+export function streamingBitrate(): number {
+  const p = getPrefs();
+  return p.mobileBitrate !== null && onMobileData() ? p.mobileBitrate : p.maxBitrate;
 }

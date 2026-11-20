@@ -22,6 +22,9 @@
 
     <!-- Player -->
     <string name="error_cant_play">The TV couldn\'t play this (%1$s)</string>
+    <!-- Picture in picture: its button -->
+    <string name="pip_play">Play</string>
+    <string name="pip_pause">Pause</string>
     <string name="notice_channel">Ready to watch</string>
     <string name="update_cant_check">Couldn\'t check for updates (%1$s)</string>
     <string name="update_not_this_build">This test build can\'t update itself</string>

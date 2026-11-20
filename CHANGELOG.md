@@ -7,6 +7,25 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.8.3 (2026-11-19)
+
+### New
+- **Picture in picture on Android phones and tablets.** Press Home while a film plays and it carries on in a small window you can move around, with play/pause. Closing the small window stops the film; tapping it brings Netfish back.
+- **Double tap to skip.** On a touchscreen, a double tap on the right goes forward 10 seconds and one on the left goes back 10. Keep tapping for 10 more each time.
+- **Quality in the player.** The audio and subtitles menu has a Quality column, from Best down to 3 Mbps, for what you're watching now. The film carries on from where it was.
+- **A quality for mobile data.** Settings → Playback on this device → **On mobile data**: its own streaming quality, used by itself whenever you're on mobile data. Where the device can tell: the Android app, and Chrome on Android.
+
+### Changed
+- **A tap on a touchscreen shows or hides the controls,** and no longer pauses: the play/pause button does. A mouse click still pauses.
+- **"This video can't be played in this app"** ends with the player's own number for what went wrong.
+
+### Fixed
+- Skip intro and the next episode's box no longer cover the audio and subtitles menu when it's open.
+
+### Update
+- **Server.**
+- **Android app** (phones and tablets), for picture in picture and the mobile data quality.
+
 ## 0.8.2 (2026-11-08)
 
 ### New

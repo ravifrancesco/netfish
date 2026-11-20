@@ -143,4 +143,9 @@ export default {
   'Track {id}': 'Traccia {id}',
   "This download couldn't play: {error}": 'Impossibile riprodurre questo download: {error}',
   "this device can't open the file": 'questo dispositivo non riesce ad aprire il file',
+  // A double tap on the picture: back or forward
+  '{n} second': '{n} secondo',
+  '{n} seconds': '{n} secondi',
+  // The menu's Quality column
+  Best: 'Migliore',
 } as Record<string, string>;

@@ -3,6 +3,8 @@ export default {
   // Streaming quality
   'Best available (home network)': 'Migliore disponibile (rete di casa)',
   '3 Mbps (mobile data)': '3 Mbps (dati mobili)',
+  'On mobile data': 'Con i dati mobili',
+  'The same': 'La stessa',
 
   // Downloads in the apps
   '{n} download · {size} on {device}': '{n} download · {size} su {device}',

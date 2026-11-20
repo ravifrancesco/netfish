@@ -140,6 +140,8 @@ export interface DesktopBridge {
   };
   /** TV: keep the screen from dimming while a film plays. */
   keepAwake?: (on: boolean) => void;
+  /** On mobile data right now (the Android app from 0.8.3 on). */
+  mobileData?: () => boolean;
   videoOverlay?: VideoOverlay;
   /** Chromecast (the Android app on phones and tablets with Google Play services). */
   cast?: CastBridge;
@@ -216,6 +218,7 @@ interface AndroidNative {
   platform?(): string;
   changeServer(): void;
   keepAwake(on: boolean): void;
+  onMobileData?(): boolean;
   videoProfile?(): string;
   videoLoad?(request: string): void;
   videoCommand?(name: string, value: string): void;
@@ -333,6 +336,7 @@ function androidBridge(): DesktopBridge | undefined {
     version: native.version(),
     changeServer: () => native.changeServer(),
     keepAwake: (on) => native.keepAwake(on),
+    mobileData: native.onMobileData ? () => Boolean(native.onMobileData!()) : undefined,
     // Phones and tablets: downloads, saved as MP4 for Android's player.
     ...(phone
       ? {

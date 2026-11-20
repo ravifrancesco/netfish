@@ -5,16 +5,23 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.app.PictureInPictureParams;
+import android.app.RemoteAction;
+import android.content.BroadcastReceiver;
 import android.content.Intent;
 import android.app.UiModeManager;
 import android.content.Context;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.drawable.Icon;
 import android.media.AudioManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkCapabilities;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -37,6 +44,8 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
 import androidx.annotation.OptIn;
+import androidx.annotation.RequiresApi;
+import androidx.core.content.ContextCompat;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.ui.PlayerView;
 
@@ -75,6 +84,9 @@ public class MainActivity extends Activity {
     private String returnUrl;
     private boolean forgetHistory;
     private View splash;
+    /** Phones and tablets: a film carries on in a small window when you leave the app (picture in picture). */
+    private boolean pip;
+    private BroadcastReceiver pipButtons;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -120,6 +132,8 @@ public class MainActivity extends Activity {
         video = new VideoEngine(this, playerView, state ->
                 web.evaluateJavascript("window.__netfishVideo&&window.__netfishVideo(" + state + ")", null));
         video.setActiveListener(this::filmShowing);
+        pip = !tv && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && getPackageManager().hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE);
+        if (pip && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startPip();
         if (offline != null) {
             offline.setListener(list -> web.evaluateJavascript("window.__netfishOfflineChanged&&window.__netfishOfflineChanged(" + list + ")", null));
         }
@@ -404,10 +418,84 @@ public class MainActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
-        // Pressing Home mid-film pauses it, like any TV or phone app.
+        // Into the small window: the film carries on (and the page with it, to say how far it got).
+        if (isInPictureInPictureMode()) return;
+        pauseAll();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // The small window closed: the film stops with it.
+        pauseAll();
+    }
+
+    /** Pressing Home mid-film pauses it, like any TV app (phones: unless it goes on in the small window). */
+    private void pauseAll() {
         web.evaluateJavascript("document.querySelectorAll('video').forEach(function(v){v.pause()})", null);
         video.pause();
         web.onPause();
+    }
+
+    // ---------- Picture in picture (phones and tablets) ----------
+
+    private static final String PIP_ACTION = BuildConfig.APPLICATION_ID + ".PIP";
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private void startPip() {
+        video.setChangeListener(this::updatePip);
+        // The small window's play/pause button.
+        pipButtons = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                video.command(intent.getBooleanExtra("play", false) ? "play" : "pause", null);
+            }
+        };
+        ContextCompat.registerReceiver(this, pipButtons, new IntentFilter(PIP_ACTION), ContextCompat.RECEIVER_NOT_EXPORTED);
+    }
+
+    /** What the small window would be like now: the film's shape, play or pause, and (Android 12+) going there by itself while a film plays. */
+    @RequiresApi(Build.VERSION_CODES.O)
+    private PictureInPictureParams pipParams() {
+        boolean playing = video.playing();
+        Intent press = new Intent(PIP_ACTION).setPackage(getPackageName()).putExtra("play", !playing);
+        PendingIntent pending = PendingIntent.getBroadcast(this, playing ? 1 : 2, press, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        String label = getString(playing ? R.string.pip_pause : R.string.pip_play);
+        Icon icon = Icon.createWithResource(this, playing ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play);
+        PictureInPictureParams.Builder params = new PictureInPictureParams.Builder()
+                .setAspectRatio(video.shape())
+                .setActions(java.util.Collections.singletonList(new RemoteAction(icon, label, label, pending)));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) params.setAutoEnterEnabled(playing).setSeamlessResizeEnabled(false);
+        return params.build();
+    }
+
+    private void updatePip() {
+        if (!pip || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+        try {
+            setPictureInPictureParams(pipParams());
+        } catch (RuntimeException ignored) {
+            // turned off for this app in Android's settings
+        }
+    }
+
+    /** Home or Recents while a film plays (before Android 12, which goes into the small window by itself). */
+    @Override
+    protected void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        if (!pip || Build.VERSION.SDK_INT < Build.VERSION_CODES.O || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S || !video.playing()) return;
+        try {
+            enterPictureInPictureMode(pipParams());
+        } catch (RuntimeException ignored) {
+            // turned off for this app in Android's settings
+        }
+    }
+
+    /** In the small window, only the film: Netfish's controls go until it's full size again. */
+    @Override
+    public void onPictureInPictureModeChanged(boolean small, Configuration config) {
+        super.onPictureInPictureModeChanged(small, config);
+        web.setVisibility(small ? View.INVISIBLE : View.VISIBLE);
+        if (small) video.command("controls", false);
     }
 
     @Override
@@ -418,6 +506,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (pipButtons != null) unregisterReceiver(pipButtons);
         video.release();
         cast.release();
         web.destroy();
@@ -590,6 +679,14 @@ public class MainActivity extends Activity {
                 if (on) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                 else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             });
+        }
+
+        /** On mobile data right now (the page streams at its own quality for it). */
+        @JavascriptInterface
+        public boolean onMobileData() {
+            ConnectivityManager networks = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+            NetworkCapabilities now = networks == null ? null : networks.getNetworkCapabilities(networks.getActiveNetwork());
+            return now != null && now.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR);
         }
 
         // ----- The player underneath the page -----

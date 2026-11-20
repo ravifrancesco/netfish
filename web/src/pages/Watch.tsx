@@ -7,7 +7,7 @@ import type { PlaybackSession, ProgressReport, StreamTrack, TogetherCommand } fr
 import { api } from '../api';
 import { useToast } from '../components/ui';
 import { FishPair, SwimmingFish } from '../components/Logo';
-import { getPrefs, usePrefs } from '../lib/prefs';
+import { getPrefs, streamingBitrate, usePrefs } from '../lib/prefs';
 import { rememberSubtitle } from '../lib/playbackPrefs';
 import { desktop, type CastDevice } from '../lib/desktop';
 import { CastVideo, CHROMECAST_PROFILE } from '../player/cast';
@@ -138,6 +138,9 @@ function Player() {
   const [castDevices, setCastDevices] = useState<CastDevice[]>([]);
   /** The Chromecast in use (its name), while casting. */
   const [castingTo, setCastingTo] = useState<string>();
+  /** Quality chosen in the player, for this film (else the settings': on mobile data, its own). */
+  const [quality, setQuality] = useState<number>();
+  const qualityRef = useRef<number>(undefined);
   const castingRef = useRef(false);
   const castVideo = useRef<CastVideo | null>(null);
   /** The page's own <video>, kept while the cast one stands in for it. */
@@ -369,8 +372,8 @@ function Player() {
           cast: casting || undefined,
           // Only mpv and ExoPlayer switch audio tracks inside a file; anything else plays its default one.
           defaultAudioOnly: casting || !(overlayActive.current && appSwitchesTracks),
-          deviceProfile: casting ? CHROMECAST_PROFILE : overlayActive.current ? overlayProfile.current : buildDeviceProfile(getPrefs().maxBitrate),
-          maxBitrate: getPrefs().maxBitrate || undefined,
+          deviceProfile: casting ? CHROMECAST_PROFILE : overlayActive.current ? overlayProfile.current : buildDeviceProfile(qualityRef.current ?? streamingBitrate()),
+          maxBitrate: (qualityRef.current ?? streamingBitrate()) || undefined,
           startSeconds: opts.start,
           audioStreamIndex: opts.audio,
           subtitleStreamIndex: opts.subtitle,
@@ -544,7 +547,9 @@ function Player() {
       fallbackTried.current = true;
       void load({ start: video.current?.currentTime ?? 0, audio: audioIndex, allowDirectPlay: false });
     } else if (!hls.current) {
-      setError(t("This video can't be played in this app."));
+      // With the player's own number (3: it couldn't decode it, 4: the format), for a bug report.
+      const code = video.current?.error?.code;
+      setError(`${t("This video can't be played in this app.")}${code ? ` (${code})` : ''}`);
     }
   };
 
@@ -760,6 +765,14 @@ function Player() {
   // The app's player keeps its subtitles above the controls while they show (like the web player does).
   const onControls = useCallback((showing: boolean) => useOverlay && !castingRef.current && overlay?.command('controls', showing), [useOverlay, overlay]);
 
+  /** Another quality for this film: the stream again from here, the server shrinking it to that. */
+  const chooseQuality = (value: number) => {
+    if (value === (qualityRef.current ?? streamingBitrate())) return;
+    qualityRef.current = value;
+    setQuality(value);
+    void load({ start: video.current?.currentTime ?? 0, audio: audioIndex, subtitle: subtitle?.burnIn ? subtitle.index : undefined });
+  };
+
   const chooseAudio = (track: StreamTrack) => {
     if (track.index === audioIndex) return;
     const s = sessionRef.current;
@@ -889,6 +902,7 @@ function Player() {
       subtitleIndex={subtitle?.index}
       chooseSubtitle={(index) => chooseSubtitle(index === undefined ? undefined : session?.subtitleTracks.find((tr) => tr.index === index))}
       tracksKnown={Boolean(session)}
+      quality={castingTo === undefined ? { value: quality ?? streamingBitrate(), choose: chooseQuality } : undefined}
       audioMore={
         d?.detailHref && (
           <Link className="player__link" to={`${d.detailHref}?sheet=versions`}>

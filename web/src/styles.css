@@ -3141,6 +3141,35 @@ html.is-overlay-video body,
   z-index: 4; /* above the controls bar, whose top edge reaches up behind it */
   animation: pop-in 0.25s var(--ease);
 }
+/* A double tap on the left or right: how far back or forward. */
+.player__jump {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  height: fit-content;
+  margin-block: auto;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 18px 22px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-weight: 650;
+  pointer-events: none;
+  animation: pop-in 0.2s var(--ease);
+}
+.player__jump--back {
+  left: 12%;
+}
+.player__jump--forward {
+  right: 12%;
+}
+/* No zooming on a double tap: it goes back or forward. */
+.player__surface,
+.player__video {
+  touch-action: manipulation;
+}
 .player__next {
   position: absolute;
   right: clamp(16px, 3vw, 40px);
@@ -3293,6 +3322,11 @@ html.is-tv .seek:focus .seek__thumb {
   border: 1px solid var(--line-2);
   box-shadow: var(--shadow);
   animation: pop-in 0.18s var(--ease);
+}
+/* With Quality too: three columns. */
+.player__menu--quality {
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  width: min(640px, 92vw);
 }
 .player__menu-col {
   display: grid;
