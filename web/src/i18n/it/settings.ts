@@ -10,13 +10,22 @@ export default {
   'Away from home': 'Fuori casa',
   'Netfish can reach your server through WireGuard when you’re out, just for itself: no VPN to switch on, and nothing else on this device goes through it. At home it goes straight to the server.':
     'Fuori casa Netfish può raggiungere il tuo server tramite WireGuard, solo per sé: nessuna VPN da attivare, e nient’altro su questo dispositivo ci passa. A casa va dritto al server.',
-  'Connected through WireGuard now.': 'Ora connesso tramite WireGuard.',
-  'Couldn’t connect: {reason}': 'Impossibile connettersi: {reason}',
-  'Set up. Used when the server doesn’t answer directly.': 'Configurato. Si usa quando il server non risponde direttamente.',
+  'Connected through WireGuard': 'Connesso tramite WireGuard',
+  'Couldn’t connect': 'Impossibile connettersi',
+  'Ready for when you’re out': 'Pronto per quando sei fuori',
+  'Used when the server doesn’t answer directly.': 'Si usa quando il server non risponde direttamente.',
   Replace: 'Sostituisci',
   'WireGuard configuration': 'Configurazione WireGuard',
-  'Your router or WireGuard server gives you this, one for each device. Its AllowedIPs must include your home network. It stays on this device.':
-    'Te la dà il router o il server WireGuard, una per dispositivo. I suoi AllowedIPs devono includere la rete di casa. Resta su questo dispositivo.',
+  'Choose the WireGuard file': 'Scegli il file WireGuard',
+  'The .conf file your router or WireGuard server made for this device.': 'Il file .conf che il router o il server WireGuard ha creato per questo dispositivo.',
+  'Paste it instead': 'Oppure incollala',
+  'Check it': 'Controlla',
+  'Choose another': 'Scegline un altro',
+  'Connects to': 'Si collega a',
+  Reaches: 'Raggiunge',
+  'That isn’t a WireGuard file.': 'Questo non è un file WireGuard.',
+  'Your server ({server}) isn’t among what it reaches, so Netfish couldn’t use it away from home.':
+    'Il tuo server ({server}) non è tra gli indirizzi che raggiunge, quindi fuori casa Netfish non potrebbe usarla.',
   'That configuration doesn’t work: {reason}': 'Questa configurazione non funziona: {reason}',
   'Saved. Netfish uses it whenever the server doesn’t answer directly.': 'Salvata. Netfish la usa ogni volta che il server non risponde direttamente.',
 

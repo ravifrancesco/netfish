@@ -7,6 +7,20 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.9.2 (2026-11-20)
+
+### New
+- **You can see when Netfish is connected away from home.** At start-up, a small ring appears ahead of the fish, and the fish swims through it once WireGuard is connected.
+
+### Changed
+- **Away from home: choose the file.** Settings → Away from home now takes the WireGuard `.conf` file itself (tap to choose it, or drag it in on a computer). Pasting still works.
+  - Before saving, it shows where the file connects and what it reaches, and warns when your server isn't among them.
+  - Once saved, it shows whether it's connected, ready for when you're out, or couldn't connect.
+
+### Update
+- **Server**, for the new Away from home in Settings.
+- **Android and Mac apps**, to choose the file and for the start-up ring. **Windows app** for the ring.
+
 ## 0.9.1 (2026-11-20)
 
 ### New

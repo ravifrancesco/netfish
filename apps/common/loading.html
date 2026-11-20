@@ -7,7 +7,9 @@
     <title>Netfish</title>
     <!--
       What the apps show while they look for the server (a few seconds at most): the fish,
-      swimming. Bundled in every app, so it shows at once, with or without a network.
+      swimming. Bundled in every app, so it shows at once, with or without a network. Away from
+      home, through WireGuard (netfishTunnel below): a ring appears ahead of the fish, and once
+      the tunnel is up the fish swims through it, into Netfish.
     -->
     <style>
       :root { color-scheme: dark; }
@@ -26,12 +28,20 @@
       .word .net { font-weight: 300; color: #b5c0ca; }
       .word .fish { font-weight: 800; margin-left: 0.04em; }
       .status { min-height: 1.5em; color: #7c8996; font-size: 14px; opacity: 0; animation: in 0.6s ease-out 1.4s forwards; }
+      .ring { fill: none; stroke: #36e2c6; stroke-width: 1.6; stroke-linecap: round; opacity: 0; transition: opacity 0.6s ease; }
+      .tunnel .ring { opacity: 0.55; animation: glow 1.6s ease-in-out infinite; }
+      .through .ring { opacity: 1; }
+      .through .swim { transform-box: fill-box; transform-origin: center; animation: through 1.1s cubic-bezier(0.5, 0, 0.75, 0) forwards; }
+      .through .bubble { display: none; }
+      .tunnel .status, .through .status { color: #36e2c6; }
+      @keyframes glow { 50% { opacity: 0.95; } }
+      @keyframes through { 0% { transform: none; opacity: 1; } 65% { opacity: 1; } 100% { transform: translateX(36px) scale(0.7); opacity: 0; } }
       @keyframes in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
       @keyframes bob { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(2px, -3px); } }
       @keyframes wag { from { transform: rotate(-9deg); } to { transform: rotate(9deg); } }
       @keyframes rise { 0% { opacity: 0; transform: translate(0, 0) scale(0.6); } 20% { opacity: 0.9; } 100% { opacity: 0; transform: translate(6px, -22px) scale(1.1); } }
       @media (prefers-reduced-motion: reduce) {
-        .swim, .tail, .bubble, .word, .status { animation: none; }
+        .swim, .tail, .bubble, .word, .status, .ring { animation: none !important; }
         .status { opacity: 1; }
       }
     </style>
@@ -42,11 +52,14 @@
         <defs>
           <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8cf8e6" /><stop offset="1" stop-color="#13b89c" /></linearGradient>
         </defs>
+        <!-- The ring's far side behind the fish, its near side in front: the fish goes through it. -->
+        <path class="ring" d="M67 18 A6 14 0 0 1 67 46" />
         <g class="swim">
           <path class="tail" d="M15 32 L6 23 L6 41 Z" fill="url(#g)" stroke="url(#g)" stroke-width="4" stroke-linejoin="round" />
           <path d="M23 15 L52 32 L23 49 Z" fill="url(#g)" stroke="url(#g)" stroke-width="6" stroke-linejoin="round" />
           <circle cx="38" cy="27.5" r="2.5" fill="#03140f" />
         </g>
+        <path class="ring" d="M67 18 A6 14 0 0 0 67 46" />
         <circle class="bubble" cx="56" cy="26" r="2" />
         <circle class="bubble" cx="58" cy="24" r="1.4" />
         <circle class="bubble" cx="55" cy="27" r="1.7" />
@@ -58,10 +71,21 @@
     </div>
     <script>
       const lang = (navigator.languages && navigator.languages[0]) || navigator.language || 'en';
-      if (/^it\b/i.test(lang)) {
+      const it = /^it\b/i.test(lang);
+      const status = document.getElementById('status');
+      if (it) {
         document.documentElement.lang = 'it';
-        document.getElementById('status').textContent = 'Cerco il tuo server…';
+        status.textContent = 'Cerco il tuo server…';
       }
+      const SAYS = it
+        ? { connecting: 'Fuori casa, mi collego…', connected: 'Connesso tramite WireGuard' }
+        : { connecting: 'Away from home, connecting…', connected: 'Connected through WireGuard' };
+      // The apps, away from home: 'connecting' (the ring appears), then 'connected' (through it).
+      window.netfishTunnel = (state) => {
+        document.body.classList.toggle('tunnel', state === 'connecting');
+        document.body.classList.toggle('through', state === 'connected');
+        if (SAYS[state]) status.textContent = SAYS[state];
+      };
     </script>
   </body>
 </html>

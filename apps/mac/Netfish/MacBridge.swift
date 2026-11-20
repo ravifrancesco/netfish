@@ -153,7 +153,7 @@ final class MacBridge: NSObject, WKScriptMessageHandlerWithReply {
         case "snapshot": return store.snapshot() ?? NSNull()
         case "serverReachable":
             guard let server = Server.url else { return false }
-            return await Tunnel.shared.route(server)
+            return await Tunnel.shared.route(server) != .none
 
         // Away from home (Settings, the server's pages only): never the configuration itself back
         case "tunnelStatus": return Tunnel.shared.status

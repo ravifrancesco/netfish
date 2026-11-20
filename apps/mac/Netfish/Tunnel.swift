@@ -35,6 +35,9 @@ final class Tunnel {
         return s
     }
 
+    /// How the server answers: directly (at home), through the tunnel (away), or not at all.
+    enum Route { case home, away, none }
+
     /// Home or away as the network changes (Wi-Fi to a phone's hotspot): the tunnel on or off, no reload.
     func watchNetwork() {
         network.pathUpdateHandler = { _ in
@@ -147,27 +150,29 @@ final class Tunnel {
     /// The proxy for mpv ("http://127.0.0.1:n"), while the tunnel's on.
     var proxyURL: String? { port.map { "http://127.0.0.1:\($0)" } }
 
-    /// Whether the server answers: directly (at home), else, away, through the tunnel when there is
-    /// one, started here. A tunnel that isn't needed (or doesn't get through) stops.
-    func route(_ server: URL) async -> Bool {
+    /// How the server answers: directly (at home), else, away, through the tunnel when there is one,
+    /// started here (`connecting` first). A tunnel that isn't needed (or doesn't get through) stops.
+    func route(_ server: URL, connecting: () -> Void = {}) async -> Route {
         if await Server.reachable(server) {
             if active {
                 stop()
                 apply()
             }
-            return true
+            return .home
         }
-        guard configured, await start() else {
+        guard configured else { return .none }
+        connecting()
+        guard await start() else {
             apply()
-            return false
+            return .none
         }
         if await reachableThroughTunnel(server) {
             apply()
-            return true
+            return .away
         }
         stop()
         apply()
-        return false
+        return .none
     }
 
     private func reachableThroughTunnel(_ server: URL) async -> Bool {

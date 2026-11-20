@@ -7,6 +7,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.PictureInPictureParams;
 import android.app.RemoteAction;
+import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.Intent;
 import android.app.UiModeManager;
@@ -35,6 +36,7 @@ import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
@@ -90,6 +92,9 @@ public class MainActivity extends Activity {
     private boolean pip;
     /** Away from home: WireGuard inside the app, when the server doesn't answer directly. */
     private Tunnel tunnel;
+    /** A page waiting for the file someone's choosing. */
+    private ValueCallback<Uri[]> chosen;
+    private static final int CHOOSE_FILE = 7;
     private BroadcastReceiver pipButtons;
 
     @Override
@@ -172,7 +177,22 @@ public class MainActivity extends Activity {
         Bridge bridge = new Bridge();
         web.addJavascriptInterface(bridge, "NetfishAndroid");
         web.addJavascriptInterface(bridge, "NetfishTV"); // the name earlier versions used
-        web.setWebChromeClient(new WebChromeClient());
+        web.setWebChromeClient(new WebChromeClient() {
+            // A page's "choose a file" (Settings → Away from home: a WireGuard file): Android's own picker.
+            @Override
+            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                if (chosen != null) chosen.onReceiveValue(null);
+                chosen = callback;
+                try {
+                    startActivityForResult(new Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*"), CHOOSE_FILE);
+                } catch (ActivityNotFoundException e) {
+                    // (A TV without a file picker: pasting is the way there.)
+                    chosen.onReceiveValue(null);
+                    chosen = null;
+                }
+                return true;
+            }
+        });
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -246,31 +266,47 @@ public class MainActivity extends Activity {
         String page = path != null && path.startsWith("/") ? server.replaceAll("/+$", "") + path : server;
         web.loadUrl(LOADING);
         new Thread(() -> {
-            boolean up = route(server);
+            // Away from home, the loading fish says so: a ring ahead of it, then through it.
+            Route route = route(server, () -> runOnUiThread(() -> loadingSays("connecting")));
             runOnUiThread(() -> tunnel.applyToPage(() -> {
                 if (isDestroyed()) return;
                 forgetHistory = true; // back never lands on the fish
-                if (up) web.loadUrl(page);
-                else if (offline != null) showOffline(offlineMode());
-                else showSetup(getString(R.string.error_server_unreachable, server, getString(R.string.nothing_answered)));
+                if (route == Route.AWAY) {
+                    loadingSays("connected");
+                    web.postDelayed(() -> web.loadUrl(page), 1300);
+                } else if (route == Route.HOME) {
+                    web.loadUrl(page);
+                } else if (offline != null) {
+                    showOffline(offlineMode());
+                } else {
+                    showSetup(getString(R.string.error_server_unreachable, server, getString(R.string.nothing_answered)));
+                }
             }));
         }, "netfish-start").start();
     }
 
+    private void loadingSays(String tunnelState) {
+        if (LOADING.equals(currentUrl)) web.evaluateJavascript("window.netfishTunnel&&window.netfishTunnel('" + tunnelState + "')", null);
+    }
+
+    /** How the server answers: directly (at home), through the tunnel (away), or not at all. */
+    private enum Route { HOME, AWAY, NONE }
+
     /**
-     * Whether the server answers: directly (at home), else, away, through the tunnel when there is
-     * one, started here. A tunnel that isn't needed (or doesn't get through) stops. Off the main thread.
+     * How the server answers: directly (at home), else, away, through the tunnel when there is one,
+     * started here (`connecting` first). A tunnel that isn't needed (or doesn't get through) stops.
+     * Off the main thread.
      */
-    private boolean route(String server) {
+    private Route route(String server, Runnable connecting) {
         if (reachableDirectly(server)) {
             tunnel.stop();
-            return true;
+            return Route.HOME;
         }
-        if (tunnel.configured() && tunnel.start(server)) {
-            if (reachable(server)) return true;
-            tunnel.stop();
-        }
-        return false;
+        if (!tunnel.configured()) return Route.NONE;
+        connecting.run();
+        if (tunnel.start(server) && reachable(server)) return Route.AWAY;
+        tunnel.stop();
+        return Route.NONE;
     }
 
     /** The network changed: the tunnel on or off for it, the page following. */
@@ -278,7 +314,7 @@ public class MainActivity extends Activity {
         String server = server();
         if (server == null || !tunnel.configured()) return;
         new Thread(() -> {
-            route(server);
+            route(server, () -> {});
             runOnUiThread(() -> tunnel.applyToPage(() -> {}));
         }, "netfish-route").start();
     }
@@ -303,6 +339,14 @@ public class MainActivity extends Activity {
             // can't happen
         }
         return target;
+    }
+
+    @Override
+    protected void onActivityResult(int request, int result, Intent data) {
+        super.onActivityResult(request, result, data);
+        if (request != CHOOSE_FILE || chosen == null) return;
+        chosen.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result, data));
+        chosen = null;
     }
 
     @Override
@@ -852,7 +896,7 @@ public class MainActivity extends Activity {
             String server = server();
             if (!fromApp() || server == null) return;
             new Thread(() -> {
-                boolean up = route(server);
+                boolean up = route(server, () -> {}) != Route.NONE;
                 runOnUiThread(() -> tunnel.applyToPage(() -> web.evaluateJavascript("window.__netfishReach&&window.__netfishReach(" + up + ")", null)));
             }, "netfish-check").start();
         }

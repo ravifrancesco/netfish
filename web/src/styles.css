@@ -6152,3 +6152,116 @@ html.is-desktop.is-mac.is-fullscreen .channel__top {
 .error-text {
   color: var(--danger);
 }
+/* Settings → Away from home: how it stands, or the file chosen before keeping it, or where to choose one. */
+.away-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+}
+.away-card--check {
+  align-items: flex-start;
+}
+.away-card__dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+.away-card__dot.is-on {
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(54, 226, 198, 0.18);
+}
+.away-card__dot.is-wrong {
+  background: var(--danger);
+}
+.away-card__icon {
+  flex: none;
+  color: var(--accent);
+  margin-top: 2px;
+}
+.away-card__text {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.away-card__text .small {
+  overflow-wrap: anywhere;
+}
+.away-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 14px;
+  margin: 4px 0 0;
+  font-size: 0.88rem;
+}
+.away-facts dt {
+  color: var(--text-3);
+}
+.away-facts dd {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+.away-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 4px;
+  color: #f2c14e;
+  font-size: 0.88rem;
+}
+.away-warn svg {
+  flex: none;
+  margin-top: 2px;
+}
+.away-drop {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 26px 16px;
+  border: 1.5px dashed var(--line-2);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+.away-drop svg {
+  color: var(--accent);
+}
+.away-drop:hover,
+.away-drop:focus-visible,
+.away-drop.is-over {
+  border-color: var(--accent);
+  background: rgba(54, 226, 198, 0.06);
+}
+.away-paste {
+  margin-top: 14px;
+}
+.away-actions {
+  margin-top: 12px;
+}
+/* Phones: the buttons under the rest. */
+@media (max-width: 720px) {
+  .away-card {
+    flex-wrap: wrap;
+  }
+  .away-card__text {
+    flex-basis: calc(100% - 40px);
+  }
+  .away-card > .row-gap {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

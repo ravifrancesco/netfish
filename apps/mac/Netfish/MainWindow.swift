@@ -119,9 +119,17 @@ final class MainWindow: NSWindowController, NSWindowDelegate, WKNavigationDelega
     private func start(_ server: URL) {
         web.load(URLRequest(url: LocalScheme.url("loading.html", query: [:])))
         Task { @MainActor in
-            // (Away from home: through the tunnel, when there is one.)
-            if await Tunnel.shared.route(server) { return open(server) }
-            showOffline(["offline": true])
+            // Away from home, through the tunnel when there is one: the loading fish says so, a ring
+            // ahead of it, then through it, into Netfish.
+            let says = { [weak self] (state: String) in self?.web.evaluateJavaScript("window.netfishTunnel && window.netfishTunnel('\(state)')") }
+            switch await Tunnel.shared.route(server, connecting: { says("connecting") }) {
+            case .home: open(server)
+            case .away:
+                says("connected")
+                try? await Task.sleep(nanoseconds: 1_300_000_000)
+                open(server)
+            case .none: showOffline(["offline": true])
+            }
         }
     }
 
@@ -202,6 +210,15 @@ final class MainWindow: NSWindowController, NSWindowDelegate, WKNavigationDelega
         // Anything else (IMDb, Letterboxd…) opens in the browser.
         if url.scheme == "http" || url.scheme == "https" { NSWorkspace.shared.open(url) }
         decisionHandler(.cancel)
+    }
+
+    /// A page's "choose a file" (Settings → Away from home: a WireGuard file).
+    func webView(_ webView: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping ([URL]?) -> Void) {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = parameters.allowsMultipleSelection
+        panel.canChooseDirectories = false
+        guard let window else { return completionHandler(nil) }
+        panel.beginSheetModal(for: window) { completionHandler($0 == .OK ? panel.urls : nil) }
     }
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {

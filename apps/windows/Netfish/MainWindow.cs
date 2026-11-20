@@ -174,8 +174,30 @@ sealed class MainWindow : Form
     async Task Start(Uri server)
     {
         Navigate(LocalPages.Page("loading.html"));
-        if (await Server.Reachable(server) || await Tunnel.Reachable(server)) Navigate(server);
-        else ShowOffline(new JsonObject { ["offline"] = true });
+        if (await Server.Reachable(server))
+        {
+            Navigate(server);
+            return;
+        }
+        // Away from home, through the tunnel when there is one: the loading fish says so, a ring
+        // ahead of it, then through it, into Netfish.
+        if (Tunnel.Port != null)
+        {
+            await LoadingSays("connecting");
+            if (await Tunnel.Reachable(server))
+            {
+                await LoadingSays("connected");
+                await Task.Delay(1300);
+                Navigate(server);
+                return;
+            }
+        }
+        ShowOffline(new JsonObject { ["offline"] = true });
+    }
+
+    async Task LoadingSays(string tunnelState)
+    {
+        try { if (Web != null) await Web.ExecuteScriptAsync($"window.netfishTunnel && window.netfishTunnel('{tunnelState}')"); } catch { }
     }
 
     /// <summary>Edge's engine went away (crashed or updated), or the tunnel changed: start it again.</summary>
