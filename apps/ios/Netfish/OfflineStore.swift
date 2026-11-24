@@ -72,6 +72,39 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
         return URLSession(configuration: config, delegate: self, delegateQueue: .main)
     }()
 
+    #if os(macOS)
+    /// Away from home on the Mac: the tunnel's proxy port while it's on (the app keeps it up to
+    /// date), so downloads go through it like the page and the player.
+    var tunnelPort: Int?
+    private var proxied: (port: Int, session: URLSession)?
+    #endif
+
+    /// The film itself: through the tunnel while it's on (Mac), else in the background.
+    private var transfers: URLSession { throughTunnel ?? session }
+
+    /// A session through the tunnel while it's on (Mac), else nil.
+    private var throughTunnel: URLSession? {
+        #if os(macOS)
+        if let port = tunnelPort {
+            if let proxied, proxied.port == port { return proxied.session }
+            let config = URLSessionConfiguration.default
+            config.httpShouldSetCookies = false
+            config.connectionProxyDictionary = [
+                kCFNetworkProxiesHTTPEnable as String: 1,
+                kCFNetworkProxiesHTTPProxy as String: "127.0.0.1",
+                kCFNetworkProxiesHTTPPort as String: port,
+                "HTTPSEnable": 1,
+                "HTTPSProxy": "127.0.0.1",
+                "HTTPSPort": port,
+            ]
+            let through = URLSession(configuration: config, delegate: self, delegateQueue: .main)
+            proxied = (port, through)
+            return through
+        }
+        #endif
+        return nil
+    }
+
     private let root: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         #if os(macOS)
@@ -235,7 +268,7 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpShouldHandleCookies = false
         request.setValue(cookie, forHTTPHeaderField: "Cookie")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await (throughTunnel ?? URLSession.shared).data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { throw Problem(L("HTTP error")) }
         try data.write(to: file, options: .atomic)
         return http.value(forHTTPHeaderField: "Content-Type") ?? ""
@@ -295,7 +328,7 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
         var request = URLRequest(url: url)
         request.httpShouldHandleCookies = false
         request.setValue(cookie, forHTTPHeaderField: "Cookie")
-        let task = session.downloadTask(with: request)
+        let task = transfers.downloadTask(with: request)
         task.taskDescription = itemId
         if entry.size > 0 { task.countOfBytesClientExpectsToReceive = entry.size }
         task.resume()
@@ -339,7 +372,10 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
     // ---------- Deleting ----------
 
     private func cancelTask(_ itemId: String?) async {
-        let tasks = await session.allTasks
+        var tasks = await session.allTasks
+        #if os(macOS)
+        if let proxied { tasks += await proxied.session.allTasks }
+        #endif
         for task in tasks where itemId == nil || task.taskDescription == itemId { task.cancel() }
     }
 

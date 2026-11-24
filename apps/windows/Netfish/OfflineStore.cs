@@ -74,7 +74,30 @@ sealed class OfflineStore
     public event Action<JsonArray>? Changed;
 
     static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
-    static readonly HttpClient http = new(new SocketsHttpHandler { UseCookies = false, ConnectTimeout = TimeSpan.FromSeconds(15) }) { Timeout = Timeout.InfiniteTimeSpan };
+    static HttpClient? client;
+    static string? clientProxy;
+    /// <summary>Through the tunnel while there is one (it goes direct or through WireGuard itself),
+    /// like the page and the player: downloads work away from home too.</summary>
+    static HttpClient Http
+    {
+        get
+        {
+            var proxy = Tunnel.ProxyUrl;
+            if (client == null || clientProxy != proxy)
+            {
+                var handler = new SocketsHttpHandler { UseCookies = false, ConnectTimeout = TimeSpan.FromSeconds(15) };
+                if (proxy != null)
+                {
+                    handler.Proxy = new WebProxy(proxy);
+                    handler.UseProxy = true;
+                }
+                // The one before keeps going for downloads already under way.
+                client = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
+                clientProxy = proxy;
+            }
+            return client;
+        }
+    }
 
     readonly string root = Path.Combine(AppData.Root, "Offline");
     readonly string manifest = Path.Combine(AppData.Root, "offline.json");
@@ -265,7 +288,7 @@ sealed class OfflineStore
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.TryAddWithoutValidation("Cookie", cookie);
-        using var response = await http.SendAsync(request, timeout.Token);
+        using var response = await Http.SendAsync(request, timeout.Token);
         response.EnsureSuccessStatusCode();
         await File.WriteAllBytesAsync(file, await response.Content.ReadAsByteArrayAsync(timeout.Token), timeout.Token);
         return response.Content.Headers.ContentType?.ToString() ?? "";
@@ -405,7 +428,7 @@ sealed class OfflineStore
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.TryAddWithoutValidation("Cookie", cookie);
         if (resumeFrom > 0) request.Headers.Range = new RangeHeaderValue(resumeFrom, null);
-        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
+        using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
         if (response.StatusCode == HttpStatusCode.Unauthorized) throw new Problem(L("Sign in to Netfish again, then retry."));
         if (response.StatusCode == HttpStatusCode.Forbidden) throw new Problem(L("Your account isn't allowed to download."));
         if (!response.IsSuccessStatusCode) throw new Problem(L("The server said no ({status}).", ("status", (int)response.StatusCode)));

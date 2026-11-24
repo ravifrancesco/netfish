@@ -7,6 +7,18 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.9.3 (2026-11-23)
+
+### Changed
+- **Starting away from home is one smooth movement.** The ring, the tunnel, keeps its shape and breathes all along: the fish swims into it and is gone, the tunnel waits for as long as Netfish takes to load, then the fish swims out of it as the net draws. "Connected through WireGuard" stays until then.
+
+### Fixed
+- **Downloads work away from home on Mac and Windows**, through WireGuard like everything else.
+
+### Update
+- **Server**, for the opening animation.
+- **Android, Mac and Windows apps.**
+
 ## 0.9.2 (2026-11-20)
 
 ### New

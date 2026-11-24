@@ -272,8 +272,9 @@ public class MainActivity extends Activity {
                 if (isDestroyed()) return;
                 forgetHistory = true; // back never lands on the fish
                 if (route == Route.AWAY) {
-                    loadingSays("connected");
-                    web.postDelayed(() -> web.loadUrl(page), 1300);
+                    // The fish swims into the tunnel (timed from when the page has it); Netfish (#tunnel)
+                    // takes the tunnel over and has it come out.
+                    loadingSays("connected", () -> web.postDelayed(() -> web.loadUrl(page.contains("#") ? page : page + "#tunnel"), 900));
                 } else if (route == Route.HOME) {
                     web.loadUrl(page);
                 } else if (offline != null) {
@@ -286,7 +287,16 @@ public class MainActivity extends Activity {
     }
 
     private void loadingSays(String tunnelState) {
-        if (LOADING.equals(currentUrl)) web.evaluateJavascript("window.netfishTunnel&&window.netfishTunnel('" + tunnelState + "')", null);
+        loadingSays(tunnelState, null);
+    }
+
+    /** Then: once the page has it. */
+    private void loadingSays(String tunnelState, Runnable then) {
+        if (!LOADING.equals(currentUrl)) {
+            if (then != null) then.run();
+            return;
+        }
+        web.evaluateJavascript("window.netfishTunnel&&window.netfishTunnel('" + tunnelState + "')", then == null ? null : result -> then.run());
     }
 
     /** How the server answers: directly (at home), through the tunnel (away), or not at all. */

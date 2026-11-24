@@ -180,15 +180,15 @@ sealed class MainWindow : Form
             return;
         }
         // Away from home, through the tunnel when there is one: the loading fish says so, a ring
-        // ahead of it, then through it, into Netfish.
+        // ahead of it, then it swims in, and Netfish (#tunnel) takes the tunnel over and has it come out.
         if (Tunnel.Port != null)
         {
             await LoadingSays("connecting");
             if (await Tunnel.Reachable(server))
             {
                 await LoadingSays("connected");
-                await Task.Delay(1300);
-                Navigate(server);
+                await Task.Delay(900);
+                Navigate(new UriBuilder(server) { Fragment = "tunnel" }.Uri);
                 return;
             }
         }

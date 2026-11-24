@@ -77,7 +77,11 @@ final class MainWindow: NSWindowController, NSWindowDelegate, WKNavigationDelega
             self?.push("__netfishVideo", state)
         }
         // Away from home: mpv through the tunnel too, while it's on.
-        Tunnel.shared.onChange = { [weak self] in self?.player.set("http-proxy", Tunnel.shared.proxyURL ?? "") }
+        // The player and downloads through the tunnel while it's on.
+        Tunnel.shared.onChange = { [weak self] in
+            self?.player.set("http-proxy", Tunnel.shared.proxyURL ?? "")
+            self?.store.tunnelPort = Tunnel.shared.port
+        }
         Tunnel.shared.watchNetwork()
 
         if let server = Server.url { start(server) } else { showSetup(error: nil) }
@@ -125,9 +129,13 @@ final class MainWindow: NSWindowController, NSWindowDelegate, WKNavigationDelega
             switch await Tunnel.shared.route(server, connecting: { says("connecting") }) {
             case .home: open(server)
             case .away:
-                says("connected")
-                try? await Task.sleep(nanoseconds: 1_300_000_000)
-                open(server)
+                // The fish swims into the tunnel (timed from when the page has it); Netfish (#tunnel)
+                // takes the tunnel over and has it come out.
+                _ = try? await web.evaluateJavaScript("window.netfishTunnel && window.netfishTunnel('connected')")
+                try? await Task.sleep(nanoseconds: 900_000_000)
+                var through = URLComponents(url: server, resolvingAgainstBaseURL: false)
+                through?.fragment = "tunnel"
+                open(through?.url ?? server)
             case .none: showOffline(["offline": true])
             }
         }

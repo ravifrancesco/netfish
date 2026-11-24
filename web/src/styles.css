@@ -3431,6 +3431,126 @@ html.is-tv .seek:focus .seek__thumb {
   transform: translateY(110%);
   animation: nf-rise 0.65s var(--ease) 1.55s forwards;
 }
+/* Through WireGuard: the tunnel the apps' loading page (apps/common/loading.html) left, an oval
+   ring at the same place, size and breath, in halves: the back one (the right, where the fish comes
+   out) behind the fish, never over it; the front one only where the fish isn't out yet. It breathes
+   until Netfish is ready; then the fish swims out of it, seen only past its middle, as the ring
+   carries on its way, shrinking, and the net draws. */
+.splash__markbox {
+  position: relative;
+  display: flex;
+}
+.splash__markbox > .splash__mark {
+  position: relative;
+}
+.splash__ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18.75%;
+  height: 43.75%;
+  transform: translate(-50%, -50%) scale(1.7);
+}
+.splash__ring i {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  border: calc(clamp(92px, 15vw, 148px) / 48) solid var(--accent);
+  border-radius: 50%;
+  animation: nf-breathe 1.6s ease-in-out infinite;
+}
+.splash__ring.is-back {
+  clip-path: inset(-30% -30% -30% 50%);
+}
+.splash__ring.is-front {
+  clip-path: inset(-30% 50% -30% -30%);
+}
+.splash__fish-out {
+  position: absolute;
+  inset: 0;
+  clip-path: inset(-50% -50% -50% 50%);
+}
+.splash--tunnel .splash__fish {
+  transform: translateX(-27px);
+  animation: none;
+}
+.splash__tail {
+  transform-box: fill-box;
+  transform-origin: 100% 50%;
+  animation: nf-wag 0.7s ease-in-out infinite alternate;
+}
+.splash__says {
+  position: absolute;
+  top: calc(50% + 123px);
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--accent);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+  white-space: nowrap;
+}
+.splash--tunnel:not(.is-waiting) .splash__ring {
+  animation: nf-ring-go 0.75s cubic-bezier(0.6, 0, 0.3, 1) forwards;
+}
+.splash--tunnel:not(.is-waiting) .splash__fish-out {
+  animation: nf-fish-out 0.75s cubic-bezier(0.6, 0, 0.3, 1) forwards;
+}
+.splash--tunnel:not(.is-waiting) .splash__fish {
+  animation: nf-swim-out 0.9s cubic-bezier(0.25, 0.45, 0.35, 1) forwards;
+}
+.splash--tunnel:not(.is-waiting) .splash__says {
+  animation: nf-fade 0.5s ease forwards;
+}
+.splash.is-waiting .splash__mark,
+.splash.is-waiting .splash__net,
+.splash.is-waiting .splash__net line,
+.splash.is-waiting .splash__word,
+.splash.is-waiting .splash__word .wordmark {
+  animation-play-state: paused;
+}
+@keyframes nf-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+}
+@keyframes nf-ring-go {
+  80% {
+    opacity: 1;
+  }
+  to {
+    left: -4.7%;
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0;
+  }
+}
+@keyframes nf-fish-out {
+  to {
+    clip-path: inset(-50% -50% -50% -4.7%);
+  }
+}
+@keyframes nf-swim-out {
+  to {
+    transform: none;
+  }
+}
+@keyframes nf-fade {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes nf-wag {
+  from {
+    transform: rotate(-9deg);
+  }
+  to {
+    transform: rotate(9deg);
+  }
+}
 @keyframes nf-draw {
   to {
     stroke-dashoffset: 0;
@@ -3745,6 +3865,10 @@ html.is-tv ::-webkit-scrollbar {
   }
   .splash__net {
     opacity: 0;
+  }
+  .splash__ring i,
+  .splash__tail {
+    animation: none !important;
   }
   .splash__word {
     max-width: none;
