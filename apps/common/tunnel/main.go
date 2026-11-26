@@ -1,4 +1,4 @@
-// netfish-tunnel: WireGuard inside the Netfish apps (Android, Mac, Windows), for reaching the
+// netfish-tunnel: WireGuard inside the Netfish apps (Android, Mac, Windows, iPhone), for reaching the
 // server away from home without a VPN on the whole device.
 //
 // The app starts it and writes a WireGuard configuration on stdin (wg-quick's format, as a
@@ -9,7 +9,11 @@
 // for the tunnel's addresses (AllowedIPs) go through WireGuard unless they answer directly (back
 // at home), the rest straight out. It prints
 // "PORT <n>" once it's listening, or "ERROR <reason>" and exits, and exits when stdin closes (the
-// app has gone). It never prints keys.
+// app has gone). It never prints keys. The iPhone app can't start programs: it has this built in
+// (ios.go) and calls it directly.
+//
+// Apple's video player can't use a proxy, so the proxy also forwards plain requests:
+// http://127.0.0.1:<port>/through/<host:port>/<path> is http://<host:port>/<path>, the same way.
 package main
 
 import (
@@ -188,6 +192,7 @@ type tunnel struct {
 	allowed []netip.Prefix
 	dns     bool
 	direct  net.Dialer
+	forward *httputil.ReverseProxy
 
 	// The tunnel's addresses that answered directly (at home after all), or didn't, and when that
 	// was found out: looked at again in the background now and then, never holding a connection up.
@@ -285,13 +290,18 @@ func (t *tunnel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !r.URL.IsAbs() {
-		http.Error(w, "netfish-tunnel is a proxy", http.StatusBadRequest)
-		return
+		// /through/<host:port>/<path>: that address's <path>, as if asked for it there.
+		rest, ok := strings.CutPrefix(r.URL.Path, "/through/")
+		host, path, _ := strings.Cut(rest, "/")
+		if !ok || host == "" {
+			http.Error(w, "netfish-tunnel is a proxy", http.StatusBadRequest)
+			return
+		}
+		r.URL.Scheme, r.URL.Host, r.URL.Path, r.URL.RawPath = "http", host, "/"+path, ""
+		r.Host = host
 	}
-	forward.ServeHTTP(w, r)
+	t.forward.ServeHTTP(w, r)
 }
-
-var forward *httputil.ReverseProxy
 
 func (t *tunnel) connect(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
@@ -357,6 +367,59 @@ func useDNS(servers []string) {
 	}
 }
 
+// start: WireGuard up with this configuration, and its proxy listening on 127.0.0.1. Stopping
+// closes both.
+func start(c *config) (port int, stop func(), err error) {
+	settings, err := c.uapi()
+	if err != nil {
+		return 0, nil, err
+	}
+	tun, tnet, err := netstack.CreateNetTUN(c.addresses, c.dns, c.mtu)
+	if err != nil {
+		return 0, nil, err
+	}
+	dev := device.NewDevice(tun, conn.NewDefaultBind(), device.NewLogger(device.LogLevelSilent, ""))
+	if err := dev.IpcSet(settings); err != nil {
+		dev.Close()
+		return 0, nil, errors.New("WireGuard didn't take the configuration")
+	}
+	if err := dev.Up(); err != nil {
+		dev.Close()
+		return 0, nil, err
+	}
+	var allowed []netip.Prefix
+	for _, p := range c.peers {
+		allowed = append(allowed, p.allowed...)
+	}
+	t := &tunnel{net: tnet, allowed: allowed, dns: len(c.dns) > 0, direct: net.Dialer{Timeout: 20 * time.Second}, routes: map[string]route{}}
+	t.forward = &httputil.ReverseProxy{
+		Rewrite: func(pr *httputil.ProxyRequest) {
+			pr.Out.URL = pr.In.URL
+			pr.Out.Host = pr.In.Host
+		},
+		Transport: &http.Transport{
+			DialContext:         t.dial,
+			MaxIdleConnsPerHost: 8,
+			IdleConnTimeout:     90 * time.Second,
+		},
+		// Films stream: pass every byte on as it comes.
+		FlushInterval: -1,
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		dev.Close()
+		return 0, nil, err
+	}
+	go func() { _ = http.Serve(listener, t) }()
+	var once sync.Once
+	return listener.Addr().(*net.TCPAddr).Port, func() {
+		once.Do(func() {
+			listener.Close()
+			dev.Close()
+		})
+	}, nil
+}
+
 func main() {
 	dns := flag.String("dns", "", "the device's DNS servers, comma separated")
 	check := flag.Bool("check", false, "only check the configuration")
@@ -385,49 +448,12 @@ func main() {
 		fmt.Println("OK")
 		return
 	}
-	settings, err := c.uapi()
+	port, stop, err := start(c)
 	if err != nil {
 		fail(err)
 	}
-	tun, tnet, err := netstack.CreateNetTUN(c.addresses, c.dns, c.mtu)
-	if err != nil {
-		fail(err)
-	}
-	dev := device.NewDevice(tun, conn.NewDefaultBind(), device.NewLogger(device.LogLevelSilent, ""))
-	if err := dev.IpcSet(settings); err != nil {
-		fail(errors.New("WireGuard didn't take the configuration"))
-	}
-	if err := dev.Up(); err != nil {
-		fail(err)
-	}
-	var allowed []netip.Prefix
-	for _, p := range c.peers {
-		allowed = append(allowed, p.allowed...)
-	}
-	t := &tunnel{net: tnet, allowed: allowed, dns: len(c.dns) > 0, direct: net.Dialer{Timeout: 20 * time.Second}, routes: map[string]route{}}
-	forward = &httputil.ReverseProxy{
-		Rewrite: func(pr *httputil.ProxyRequest) {
-			pr.Out.URL = pr.In.URL
-			pr.Out.Host = pr.In.Host
-		},
-		Transport: &http.Transport{
-			DialContext:         t.dial,
-			MaxIdleConnsPerHost: 8,
-			IdleConnTimeout:     90 * time.Second,
-		},
-		// Films stream: pass every byte on as it comes.
-		FlushInterval: -1,
-	}
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		fail(err)
-	}
-	fmt.Printf("PORT %d\n", listener.Addr().(*net.TCPAddr).Port)
+	fmt.Printf("PORT %d\n", port)
 	// The app gone (stdin closed): so is the tunnel.
-	go func() {
-		_, _ = io.Copy(io.Discard, in)
-		dev.Close()
-		os.Exit(0)
-	}()
-	_ = http.Serve(listener, t)
+	_, _ = io.Copy(io.Discard, in)
+	stop()
 }

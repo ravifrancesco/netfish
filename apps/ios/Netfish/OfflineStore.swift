@@ -1,4 +1,5 @@
 import Foundation
+import Network
 @preconcurrency import WebKit
 
 /// Downloads for watching without a connection, like Netflix downloads: kept in
@@ -72,37 +73,37 @@ final class OfflineStore: NSObject, URLSessionDownloadDelegate {
         return URLSession(configuration: config, delegate: self, delegateQueue: .main)
     }()
 
-    #if os(macOS)
-    /// Away from home on the Mac: the tunnel's proxy port while it's on (the app keeps it up to
-    /// date), so downloads go through it like the page and the player.
+    /// Away from home: the tunnel's proxy port while it's on (the app keeps it up to date), so
+    /// downloads go through it like the page and the player. (On the iPhone they then only carry on
+    /// while Netfish is open: the background downloader is outside the app, the tunnel inside it.)
     var tunnelPort: Int?
     private var proxied: (port: Int, session: URLSession)?
-    #endif
 
-    /// The film itself: through the tunnel while it's on (Mac), else in the background.
+    /// The film itself: through the tunnel while it's on, else in the background.
     private var transfers: URLSession { throughTunnel ?? session }
 
-    /// A session through the tunnel while it's on (Mac), else nil.
+    /// A session through the tunnel while it's on, else nil.
     private var throughTunnel: URLSession? {
+        guard let port = tunnelPort else { return nil }
+        if let proxied, proxied.port == port { return proxied.session }
+        let config = URLSessionConfiguration.default
+        config.httpShouldSetCookies = false
         #if os(macOS)
-        if let port = tunnelPort {
-            if let proxied, proxied.port == port { return proxied.session }
-            let config = URLSessionConfiguration.default
-            config.httpShouldSetCookies = false
-            config.connectionProxyDictionary = [
-                kCFNetworkProxiesHTTPEnable as String: 1,
-                kCFNetworkProxiesHTTPProxy as String: "127.0.0.1",
-                kCFNetworkProxiesHTTPPort as String: port,
-                "HTTPSEnable": 1,
-                "HTTPSProxy": "127.0.0.1",
-                "HTTPSPort": port,
-            ]
-            let through = URLSession(configuration: config, delegate: self, delegateQueue: .main)
-            proxied = (port, through)
-            return through
-        }
+        config.connectionProxyDictionary = [
+            kCFNetworkProxiesHTTPEnable as String: 1,
+            kCFNetworkProxiesHTTPProxy as String: "127.0.0.1",
+            kCFNetworkProxiesHTTPPort as String: port,
+            "HTTPSEnable": 1,
+            "HTTPSProxy": "127.0.0.1",
+            "HTTPSPort": port,
+        ]
+        #else
+        guard #available(iOS 17, *), let endpoint = NWEndpoint.Port(rawValue: UInt16(port)) else { return nil }
+        config.proxyConfigurations = [ProxyConfiguration(httpCONNECTProxy: .hostPort(host: "127.0.0.1", port: endpoint))]
         #endif
-        return nil
+        let through = URLSession(configuration: config, delegate: self, delegateQueue: .main)
+        proxied = (port, through)
+        return through
     }
 
     private let root: URL = {

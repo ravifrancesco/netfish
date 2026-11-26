@@ -11,6 +11,7 @@ Apple only lets apps outside the App Store onto an iPhone through a Mac, or thro
 | Lasts | Forever | 7 days, then plug in and reinstall | Renews itself every 7 days |
 | Downloads for offline viewing | No | Yes | Yes |
 | Picture in picture, AirPlay | Yes | Yes | Yes |
+| Away from home through WireGuard, built in (iOS 17 or later) | No | Yes | Yes |
 
 Films play with Apple's player in all three. MP4 and HEVC play as-is; MKV files are repackaged by your server on the fly (light work), and DTS/TrueHD sound is converted.
 
@@ -27,6 +28,7 @@ Films play with Apple's player in all three. MP4 and HEVC play as-is; MKV files 
 You need a Mac. It takes about 30 minutes the first time, mostly downloading Xcode.
 
 1. **Get Xcode** from the Mac App Store. Open it once, agree to the licence, and let it install its components. When it asks which platforms to add, include **iOS**.
+   Then install **Go**, which the app needs for away from home: the installer from [go.dev/dl](https://go.dev/dl/), or `brew install go`.
 2. **Add your Apple ID:** Xcode → **Settings** → **Accounts** → **+** → **Apple ID**, and sign in.
 3. **Get the Netfish project:** on the [GitHub page](https://github.com/ravifrancesco/netfish), click **Code → Download ZIP** and unzip it (or `git clone https://github.com/ravifrancesco/netfish`). Open `apps/ios/Netfish.xcodeproj` (double-click it).
 4. **Choose your team:**

@@ -11,6 +11,7 @@ Apple permette di installare su iPhone app che non vengono dall'App Store solo t
 | Durata | Per sempre | 7 giorni, poi ricolleghi e reinstalli | Si rinnova da sola ogni 7 giorni |
 | Download per guardare offline | No | Sì | Sì |
 | Picture in Picture, AirPlay | Sì | Sì | Sì |
+| Fuori casa con WireGuard, integrato (iOS 17 o successivo) | No | Sì | Sì |
 
 In tutti e tre i casi i film si riproducono con il lettore di Apple. MP4 e HEVC partono così come sono; i file MKV vengono reimpacchettati al volo dal tuo server (un lavoro leggero) e l'audio DTS/TrueHD viene convertito.
 
@@ -27,6 +28,7 @@ In tutti e tre i casi i film si riproducono con il lettore di Apple. MP4 e HEVC 
 Ti serve un Mac. La prima volta ci vogliono circa 30 minuti, soprattutto per scaricare Xcode. Xcode è solo in inglese, quindi i nomi dei suoi menu qui sotto restano in inglese.
 
 1. **Scarica Xcode** dal Mac App Store. Aprilo una volta, accetta la licenza e lascia che installi i suoi componenti. Quando ti chiede quali piattaforme aggiungere, includi **iOS**.
+   Poi installa **Go**, che serve all'app per fuori casa: l'installer da [go.dev/dl](https://go.dev/dl/), oppure `brew install go`.
 2. **Aggiungi il tuo Apple ID:** Xcode → **Settings** → **Accounts** → **+** → **Apple ID**, e accedi.
 3. **Scarica il progetto Netfish:** nella [pagina GitHub](https://github.com/ravifrancesco/netfish), clicca **Code → Download ZIP** ed estrai il file (oppure `git clone https://github.com/ravifrancesco/netfish`). Apri `apps/ios/Netfish.xcodeproj` con un doppio clic.
 4. **Scegli il tuo team:**

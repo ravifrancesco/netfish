@@ -39,7 +39,7 @@ function summary(): Summary | undefined {
 }
 
 /**
- * Settings → Away from home (the Android, Mac and Windows apps): WireGuard inside Netfish, so the
+ * Settings → Away from home (the Android, Mac, Windows and iPhone apps): WireGuard inside Netfish, so the
  * server can be reached from anywhere without a VPN on the whole device. A configuration chosen
  * (the .conf file) or pasted is checked here and by the app, then kept by the app: never shown again.
  */

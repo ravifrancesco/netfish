@@ -137,7 +137,7 @@ The apps show the interface from your server, so most new features arrive by upd
 
 **1. Portainer → Stacks → Add stack**, name it `netfish`, paste [`docker-compose.yml`](docker-compose.yml), and **Deploy**. No variables are needed: Portainer pulls the ready-made image `ghcr.io/ravifrancesco/netfish:latest` (built by GitHub for PCs and mini PCs, amd64, and for the Raspberry Pi and other ARM boards, arm64).
 
-**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.9.4`.
+**2. Updating:** Portainer → Stacks → netfish → **Update the stack** with **Re-pull image** switched on (or Containers → netfish → **Recreate** with **Pull latest image**). Your settings are kept. To stay on one version, use a version tag instead of `latest`, e.g. `ghcr.io/ravifrancesco/netfish:0.9.5`.
 
 <details>
 <summary>Or build the image on your server yourself</summary>
@@ -242,7 +242,7 @@ Samsung only installs apps outside its store in Developer Mode, signed for your 
 
 ## iPhone & iPad app
 
-`apps/ios/` is a universal app around the same interface, with **downloads**: the Download button, Offline tabs and the downloads page work like on the Mac, files live in the app's private storage, keep downloading in the background, and play without a connection (away from home, the app opens your downloads automatically). Downloads are saved as MP4 (H.264/HEVC) since iPhones don't play MKV; Netfish asks Jellyfin to repackage when needed.
+`apps/ios/` is a universal app around the same interface, with **downloads**: the Download button, Offline tabs and the downloads page work like on the Mac, files live in the app's private storage, keep downloading in the background, and play without a connection (when the server can't be reached, the app opens your downloads automatically). On iOS 17 and later it can also reach your server **away from home through WireGuard**, built in like the Android, Mac and Windows apps: Settings → **Away from home**. Building it needs Go (`brew install go`) as well as Xcode. Downloads are saved as MP4 (H.264/HEVC) since iPhones don't play MKV; Netfish asks Jellyfin to repackage when needed.
 
 Films play with **Apple's player underneath Netfish's own player** (like the Mac app with mpv), with picture in picture and AirPlay: MP4/MOV, H.264/HEVC and Dolby sound play as-is; MKV files are rewrapped by the server (light work) and DTS/TrueHD sound is converted. Subtitles are drawn by Netfish over the picture.
 

@@ -156,7 +156,7 @@ export interface DesktopBridge {
   keepAwake?: (on: boolean) => void;
   /** On mobile data right now (the Android app from 0.8.3 on, the iPhone app from 0.9.0). */
   mobileData?: () => boolean;
-  /** Away from home: WireGuard inside the app (Android, Mac and Windows apps from 0.9.1 on). */
+  /** Away from home: WireGuard inside the app (Android, Mac and Windows apps from 0.9.1 on, iPhone and iPad on iOS 17 from 0.9.5). */
   tunnel?: TunnelBridge;
   videoOverlay?: VideoOverlay;
   /** Chromecast (the Android app on phones and tablets with Google Play services). */

@@ -9,13 +9,14 @@
 /* Begin PBXBuildFile section */
 		1347E968C10D6C51B05E4C35 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 04D608AB5E40E0B9A2F7F142 /* InfoPlist.strings */; };
 		2267DF39A022FCE118999923 /* Bridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF90EF32444D133F072D1FC2 /* Bridge.swift */; };
+		28F1B1C72F5582B80A32D665 /* loading.html in Resources */ = {isa = PBXBuildFile; fileRef = D5944F2E2D3103EE6F501DE8 /* loading.html */; };
 		3761190D56E6AC778F639FB4 /* WebViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E04F74E7FC7DCAEACB46D55 /* WebViewController.swift */; };
 		3C3276CA51807F52629939F0 /* LocalScheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33803339248507EFC6EA654E /* LocalScheme.swift */; };
 		51C5217266CF8867FEF0A9CA /* offline.html in Resources */ = {isa = PBXBuildFile; fileRef = 196F85C51A8848D87B64E383 /* offline.html */; };
-		3A1D6C2E8F4B5A7C9E0D1F2A /* loading.html in Resources */ = {isa = PBXBuildFile; fileRef = 4B2E7D3F9A5C6B8D0F1E2A3B /* loading.html */; };
-		5C3F8E4A0B6D7C9E1F2A3B4C /* player.js in Resources */ = {isa = PBXBuildFile; fileRef = 6D4A9F5B1C7E8D0F2A3B4C5D /* player.js */; };
 		605EC8A07E3A654DA7893A25 /* OfflineStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73B6329DEE5665832C9AEFC1 /* OfflineStore.swift */; };
 		60AF367DA0E64DB98DC26691 /* NetfishApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC44BF1A2D0B4F664CB97B4 /* NetfishApp.swift */; };
+		6BF7FEA649501DCD87E503C9 /* player.js in Resources */ = {isa = PBXBuildFile; fileRef = B4213ED2CE9566FA4507DB1E /* player.js */; };
+		809BECEF4D3CC47B1EB7630F /* Tunnel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AF22B49AEEAC38066227C0A /* Tunnel.swift */; };
 		834E49893E24B876B2E4A272 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A917EC4ED88393BDD8002BC3 /* Assets.xcassets */; };
 		86B33A89962539DEBD564720 /* AppleVideo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEAA094EAE981ECDD68211F6 /* AppleVideo.swift */; };
 		A7DB3C8022A72EA3297AD9A1 /* setup.html in Resources */ = {isa = PBXBuildFile; fileRef = 5E09BADF6CD90E32844B34CA /* setup.html */; };
@@ -24,9 +25,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		0AF22B49AEEAC38066227C0A /* Tunnel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tunnel.swift; sourceTree = "<group>"; };
 		196F85C51A8848D87B64E383 /* offline.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = offline.html; sourceTree = "<group>"; };
-		4B2E7D3F9A5C6B8D0F1E2A3B /* loading.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = loading.html; sourceTree = "<group>"; };
-		6D4A9F5B1C7E8D0F2A3B4C5D /* player.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = player.js; sourceTree = "<group>"; };
 		33803339248507EFC6EA654E /* LocalScheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalScheme.swift; sourceTree = "<group>"; };
 		4EEAA0F8785190938922BFDD /* Strings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Strings.swift; sourceTree = "<group>"; };
 		5DC44BF1A2D0B4F664CB97B4 /* NetfishApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetfishApp.swift; sourceTree = "<group>"; };
@@ -38,8 +38,11 @@
 		9E04F74E7FC7DCAEACB46D55 /* WebViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewController.swift; sourceTree = "<group>"; };
 		A917EC4ED88393BDD8002BC3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AF90EF32444D133F072D1FC2 /* Bridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bridge.swift; sourceTree = "<group>"; };
+		B4213ED2CE9566FA4507DB1E /* player.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = player.js; sourceTree = "<group>"; };
 		BAC648800865C85E5EACFE93 /* Server.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Server.swift; sourceTree = "<group>"; };
+		BFA7AEB14823A61BAFB74D71 /* Netfish-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Netfish-Bridging-Header.h"; sourceTree = "<group>"; };
 		CEAA094EAE981ECDD68211F6 /* AppleVideo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleVideo.swift; sourceTree = "<group>"; };
+		D5944F2E2D3103EE6F501DE8 /* loading.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = loading.html; sourceTree = "<group>"; };
 		DCA266AEA29F8D634BBB798D /* Netfish.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Netfish.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -47,9 +50,9 @@
 		09418D812A57DC481DE51401 /* common */ = {
 			isa = PBXGroup;
 			children = (
-				4B2E7D3F9A5C6B8D0F1E2A3B /* loading.html */,
-				6D4A9F5B1C7E8D0F2A3B4C5D /* player.js */,
+				D5944F2E2D3103EE6F501DE8 /* loading.html */,
 				196F85C51A8848D87B64E383 /* offline.html */,
+				B4213ED2CE9566FA4507DB1E /* player.js */,
 				5E09BADF6CD90E32844B34CA /* setup.html */,
 			);
 			path = common;
@@ -80,10 +83,12 @@
 				AF90EF32444D133F072D1FC2 /* Bridge.swift */,
 				97F87851B8373815E95FD473 /* Info.plist */,
 				33803339248507EFC6EA654E /* LocalScheme.swift */,
+				BFA7AEB14823A61BAFB74D71 /* Netfish-Bridging-Header.h */,
 				5DC44BF1A2D0B4F664CB97B4 /* NetfishApp.swift */,
 				73B6329DEE5665832C9AEFC1 /* OfflineStore.swift */,
 				BAC648800865C85E5EACFE93 /* Server.swift */,
 				4EEAA0F8785190938922BFDD /* Strings.swift */,
+				0AF22B49AEEAC38066227C0A /* Tunnel.swift */,
 				9E04F74E7FC7DCAEACB46D55 /* WebViewController.swift */,
 				04D608AB5E40E0B9A2F7F142 /* InfoPlist.strings */,
 			);
@@ -106,6 +111,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5914BF6B952CFCE8B71915B3 /* Build configuration list for PBXNativeTarget "Netfish" */;
 			buildPhases = (
+				D3045A820F5C550C42B87190 /* netfish-tunnel */,
 				8111DE3E8D6F16D8CB350D97 /* Sources */,
 				7CF1DF6A2D95B4269ECAD903 /* Resources */,
 			);
@@ -162,14 +168,36 @@
 			files = (
 				834E49893E24B876B2E4A272 /* Assets.xcassets in Resources */,
 				1347E968C10D6C51B05E4C35 /* InfoPlist.strings in Resources */,
-				3A1D6C2E8F4B5A7C9E0D1F2A /* loading.html in Resources */,
-				5C3F8E4A0B6D7C9E1F2A3B4C /* player.js in Resources */,
+				28F1B1C72F5582B80A32D665 /* loading.html in Resources */,
 				51C5217266CF8867FEF0A9CA /* offline.html in Resources */,
+				6BF7FEA649501DCD87E503C9 /* player.js in Resources */,
 				A7DB3C8022A72EA3297AD9A1 /* setup.html in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		D3045A820F5C550C42B87190 /* netfish-tunnel */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "netfish-tunnel";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"$SRCROOT/tunnel/build.sh\"";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		8111DE3E8D6F16D8CB350D97 /* Sources */ = {
@@ -183,6 +211,7 @@
 				605EC8A07E3A654DA7893A25 /* OfflineStore.swift in Sources */,
 				D32F22425C3FAF568598FF71 /* Server.swift in Sources */,
 				B8EE5CEB454AF11FAB321DD0 /* Strings.swift in Sources */,
+				809BECEF4D3CC47B1EB7630F /* Tunnel.swift in Sources */,
 				3761190D56E6AC778F639FB4 /* WebViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -255,7 +284,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				MARKETING_VERSION = 0.9.4;
+				MARKETING_VERSION = 0.9.5;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -314,7 +343,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				MARKETING_VERSION = 0.9.4;
+				MARKETING_VERSION = 0.9.5;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -333,15 +362,20 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = NTCXDFHQC3;
 				ENABLE_PREVIEWS = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				INFOPLIST_FILE = Netfish/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				LIBRARY_SEARCH_PATHS = "$(BUILT_PRODUCTS_DIR)";
+				OTHER_LDFLAGS = "-lnetfishtunnel -lresolv";
 				PRODUCT_BUNDLE_IDENTIFIER = app.netfish.ios;
 				PRODUCT_NAME = Netfish;
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
+				SWIFT_OBJC_BRIDGING_HEADER = "Netfish/Netfish-Bridging-Header.h";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -354,15 +388,20 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = NTCXDFHQC3;
 				ENABLE_PREVIEWS = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				INFOPLIST_FILE = Netfish/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				LIBRARY_SEARCH_PATHS = "$(BUILT_PRODUCTS_DIR)";
+				OTHER_LDFLAGS = "-lnetfishtunnel -lresolv";
 				PRODUCT_BUNDLE_IDENTIFIER = app.netfish.ios;
 				PRODUCT_NAME = Netfish;
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
+				SWIFT_OBJC_BRIDGING_HEADER = "Netfish/Netfish-Bridging-Header.h";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;

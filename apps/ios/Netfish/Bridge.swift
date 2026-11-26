@@ -19,6 +19,15 @@ enum Bridge {
         return plist["ExpirationDate"] as? Date
     }()
 
+    /// Away from home (Settings): only where the app can have it (iOS 17 and later).
+    private static let tunnel = Tunnel.available ? """
+        tunnel: {
+          status: () => call('tunnelStatus'),
+          save: (config) => call('tunnelSave', config),
+          remove: () => call('tunnelRemove'),
+        },
+    """ : ""
+
     static let script = """
     (() => {
       if (window.netfishDesktop) return;
@@ -51,6 +60,7 @@ enum Bridge {
         mobileData: () => Boolean(window.__netfishCellular),
         connect: (input) => call('connect', input),
         currentServer: () => call('currentServer'),
+    \(tunnel)
         // Apple's player draws the film underneath the page; the page's player drives it.
         videoOverlay: {
           name: 'Apple player',
@@ -118,7 +128,16 @@ final class BridgeHandler: NSObject, WKScriptMessageHandlerWithReply {
         case "snapshot": return store.snapshot() ?? NSNull()
         case "serverReachable":
             guard let server = Server.url else { return false }
-            return await Server.reachable(server)
+            return await Tunnel.shared.route(server) != .none
+        // Away from home (Settings, the server's pages only): never the configuration itself back
+        case "tunnelStatus": return Tunnel.shared.status
+        case "tunnelSave":
+            guard !local else { throw Problem(L("Not allowed here")) }
+            return await Tunnel.shared.save(args as? String ?? "") ?? ""
+        case "tunnelRemove":
+            guard !local else { throw Problem(L("Not allowed here")) }
+            Tunnel.shared.remove()
+            return nil
         case "installExpires":
             return Bridge.installExpires.map { ISO8601DateFormatter().string(from: $0) } ?? NSNull()
         case "openServer":

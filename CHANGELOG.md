@@ -7,6 +7,16 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.9.5 (2026-11-26)
+
+### New
+- **Away from home on iPhone and iPad.** Like the Android, Mac and Windows apps, the iPhone app can now reach your server through WireGuard, built in and used only by Netfish: no VPN to switch on. Set it up in Settings → **Away from home** with the device's WireGuard `.conf` file. Needs iOS 17 or later.
+  - Pages, films and downloads all go through it. Away from home, downloads carry on only while Netfish is open.
+  - Installing with Xcode now also needs Go (`brew install go`).
+
+### Update
+- **iPhone app.**
+
 ## 0.9.4 (2026-11-25)
 
 ### Changed

@@ -23,7 +23,7 @@ Notes for anyone (person or AI assistant) working on Netfish's code.
 | `server/` | Fastify + TypeScript. Routes in `server/src/routes.ts`, logic in `server/src/services/`, one client per service in `server/src/clients/`, the readable log in `server/src/lib/log.ts` |
 | `web/` | The React web UI, used by the browser and inside every app |
 | `shared/` | TypeScript types shared by server and web (`shared/src/index.ts`) |
-| `apps/{mac,windows,ios,android,tizen,common}` | The native shells. `apps/common/player.js` is built from the web app and committed. `apps/common/tunnel/` is netfish-tunnel (Go): WireGuard away from home, carried by the Android, Mac and Windows apps |
+| `apps/{mac,windows,ios,android,tizen,common}` | The native shells. `apps/common/player.js` is built from the web app and committed. `apps/common/tunnel/` is netfish-tunnel (Go): WireGuard away from home, carried by the Android, Mac and Windows apps and built into the iPhone app (`apps/ios/tunnel/build.sh`, iOS 17+) |
 | `server/dev/mock.ts`, `server/dev/mock/world.ts` | A fake Jellyfin, Seerr, Radarr, Sonarr, Bazarr and qBittorrent on port 7700, for development |
 | `scripts/` | Builds and the release script |
 | `release/` | Build output only (not committed) |
@@ -40,7 +40,7 @@ Notes for anyone (person or AI assistant) working on Netfish's code.
 ## Developing
 
 - Node 22 or later. `npm install` at the root (npm workspaces).
-- Go (`brew install go`) for the Android, Mac and Windows builds: each builds netfish-tunnel for itself.
+- Go (`brew install go`) for the Android, Mac, Windows and iPhone builds: each builds netfish-tunnel for itself.
 - `npm run dev:mock` runs the mock services, the server against them and the web dev server. Mock users: demo/demo, sam/sam, admin/admin.
   - Mock switches: `MOCK_MORE_FRESH=1` (more well-liked titles nobody has), `MOCK_EMPTY_FIRST_SEARCH=1` (the first search finds nothing), `MOCK_FORCED` (forced subtitle tracks), `MOCK_EMPTY` (empty deleted shows).
   - Stop the mock with `pkill -f "tsx dev/mock.ts"`. Killing whatever listens on port 7700 also kills a Netfish server connected to it.

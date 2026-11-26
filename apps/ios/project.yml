@@ -10,7 +10,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.9.4"
+    MARKETING_VERSION: "0.9.5"
     CURRENT_PROJECT_VERSION: "1"
 targets:
   Netfish:
@@ -27,8 +27,19 @@ targets:
         buildPhase: resources
       - path: ../common/player.js
         buildPhase: resources
+    # Away from home: netfish-tunnel (Go) built in as a library, for the device or simulator being built.
+    preBuildScripts:
+      - name: netfish-tunnel
+        script: '"$SRCROOT/tunnel/build.sh"'
+        basedOnDependencyAnalysis: false
     settings:
       base:
+        SWIFT_OBJC_BRIDGING_HEADER: Netfish/Netfish-Bridging-Header.h
+        LIBRARY_SEARCH_PATHS: $(BUILT_PRODUCTS_DIR)
+        OTHER_LDFLAGS: -lnetfishtunnel -lresolv
+        # The tunnel is built for arm64 only: simulators on Apple silicon Macs.
+        EXCLUDED_ARCHS[sdk=iphonesimulator*]: x86_64
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
         PRODUCT_BUNDLE_IDENTIFIER: app.netfish.ios
         PRODUCT_NAME: Netfish
         TARGETED_DEVICE_FAMILY: "1,2"

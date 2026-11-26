@@ -65,6 +65,12 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
             }
         }
         network.start(queue: .global(qos: .utility))
+        // Away from home: downloads through the tunnel too, while it's on.
+        Tunnel.shared.onChange = { [weak self] in self?.store.tunnelPort = Tunnel.shared.port }
+        Tunnel.shared.watchNetwork()
+        NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+            Task { @MainActor in await Tunnel.shared.wake() }
+        }
         if let server = Server.url { start(server) } else { showSetup(error: nil) }
     }
 
@@ -73,8 +79,21 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     private func start(_ server: URL) {
         web.load(URLRequest(url: LocalScheme.url("loading.html", query: [:])))
         Task { @MainActor in
-            if await Server.reachable(server) { return open(server) }
-            showOffline(["offline": true])
+            // Away from home, through the tunnel when there is one: the loading fish says so, a ring
+            // ahead of it, then through it, into Netfish.
+            let says = { [weak self] (state: String) in self?.web.evaluateJavaScript("window.netfishTunnel && window.netfishTunnel('\(state)')") }
+            switch await Tunnel.shared.route(server, connecting: { says("connecting") }) {
+            case .home: open(server)
+            case .away:
+                // The fish swims into the tunnel (timed from when the page has it); Netfish (#tunnel)
+                // takes the tunnel over and has it come out.
+                _ = try? await web.evaluateJavaScript("window.netfishTunnel && window.netfishTunnel('connected')")
+                try? await Task.sleep(nanoseconds: 900_000_000)
+                var through = URLComponents(url: server, resolvingAgainstBaseURL: false)
+                through?.fragment = "tunnel"
+                open(through?.url ?? server)
+            case .none: showOffline(["offline": true])
+            }
         }
     }
 
@@ -117,7 +136,12 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
             let domain = cookie.domain.hasPrefix(".") ? String(cookie.domain.dropFirst()) : cookie.domain
             return host == domain || host.hasSuffix("." + domain)
         }
-        video.load(url: url, start: (request["startSeconds"] as? NSNumber)?.doubleValue ?? 0, cookies: cookies)
+        // Away from home, through the tunnel's forwarding address, with the same sign-in.
+        let playable = Tunnel.shared.playable(url)
+        let sent = playable == url ? cookies : cookies.compactMap { cookie in
+            HTTPCookie(properties: [.name: cookie.name, .value: cookie.value, .domain: playable.host ?? "", .path: "/"])
+        }
+        video.load(url: playable, start: (request["startSeconds"] as? NSNumber)?.doubleValue ?? 0, cookies: sent)
     }
 
     private func pushVideo(_ state: [String: Any]) {
