@@ -81,6 +81,12 @@ gh release create "$TAG" --title "Netfish $VERSION" --notes-file "$STAGE/notes.m
   "$STAGE/Netfish-server.tar.gz" "$STAGE/Netfish-mac.dmg" "$STAGE/Netfish-mac.zip" "$STAGE/Netfish-windows.exe" "$STAGE/Netfish-android.apk" \
   "$STAGE/Netfish-samsung.wgt" "$STAGE/Netfish-ios.ipa"
 rm -rf "$STAGE"
+# SideStore's source (apps/ios/sidestore.json) points at the iPhone app just uploaded: SideStore offers
+# the update to everyone who installed Netfish from it.
+node scripts/sidestore-source.mjs "$OWNER"
+git add apps/ios/sidestore.json
+git commit -q -m "Netfish $VERSION: SideStore source"
+git push -q origin main
 # Every version's files are on GitHub: only this one's stay here, so old copies don't pile
 # up (or show up in Spotlight next to the installed app).
 find release -maxdepth 1 -name 'Netfish-*' ! -name "Netfish-$VERSION-*" -delete

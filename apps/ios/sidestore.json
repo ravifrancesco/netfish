@@ -1,0 +1,44 @@
+{
+  "name": "Netfish",
+  "identifier": "app.netfish.source",
+  "subtitle": "Your home cinema.",
+  "iconURL": "https://raw.githubusercontent.com/ravifrancesco/netfish/main/apps/ios/Netfish/Assets.xcassets/AppIcon.appiconset/icon-1024.png",
+  "website": "https://github.com/ravifrancesco/netfish",
+  "tintColor": "#36e2c6",
+  "apps": [
+    {
+      "name": "Netfish",
+      "bundleIdentifier": "app.netfish.ios",
+      "developerName": "Netfish",
+      "subtitle": "Your home cinema.",
+      "localizedDescription": "Films, shows and channels from your Netfish server. Download them to watch offline.",
+      "iconURL": "https://raw.githubusercontent.com/ravifrancesco/netfish/main/apps/ios/Netfish/Assets.xcassets/AppIcon.appiconset/icon-1024.png",
+      "tintColor": "#36e2c6",
+      "category": "entertainment",
+      "versions": [
+        {
+          "version": "0.9.4",
+          "buildVersion": "1",
+          "date": "2026-11-25",
+          "localizedDescription": "Changed\n- Pages open at once. Once Netfish has started, it gets Movies, Shows, Channels, Photos, Discover and your requests ready in the background, with their first pictures. Pages you come back to show straight away too, and refresh as they open.\n\nFixed\n- Android phones stay sideways from one episode to the next. The phone no longer turns upright for a moment when the next episode or channel starts.\n- Black bars around the film on Android, instead of dark grey: on an OLED screen they're off.\n\nUpdate\n- Server, for the faster pages.\n- Android app, for the two fixes.",
+          "downloadURL": "https://github.com/ravifrancesco/netfish/releases/download/v0.9.4/Netfish-ios.ipa",
+          "size": 934647,
+          "sha256": "6a9dd5ef642cdbdb4102ad821ecae96c2e97666dfb4b111595b94a81a9582c9b",
+          "minOSVersion": "16.0"
+        }
+      ],
+      "version": "0.9.4",
+      "versionDate": "2026-11-25",
+      "versionDescription": "Changed\n- Pages open at once. Once Netfish has started, it gets Movies, Shows, Channels, Photos, Discover and your requests ready in the background, with their first pictures. Pages you come back to show straight away too, and refresh as they open.\n\nFixed\n- Android phones stay sideways from one episode to the next. The phone no longer turns upright for a moment when the next episode or channel starts.\n- Black bars around the film on Android, instead of dark grey: on an OLED screen they're off.\n\nUpdate\n- Server, for the faster pages.\n- Android app, for the two fixes.",
+      "downloadURL": "https://github.com/ravifrancesco/netfish/releases/download/v0.9.4/Netfish-ios.ipa",
+      "size": 934647,
+      "appPermissions": {
+        "entitlements": [],
+        "privacy": {
+          "NSLocalNetworkUsageDescription": "Netfish connects to your Netfish server on your home network."
+        }
+      }
+    }
+  ],
+  "news": []
+}

@@ -50,9 +50,14 @@ You need a Mac. It takes about 30 minutes the first time, mostly downloading Xco
 [AltStore](https://altstore.io) and [SideStore](https://sidestore.io) are free community tools that install apps with your own Apple ID and renew them automatically, so you don't have to reinstall every week. They aren't made by Apple or Netfish.
 
 1. Set up AltStore (needs a computer running AltServer on your Wi-Fi) or SideStore (works on the phone alone after setup) by following their own guides.
-2. On the iPhone, download **[Netfish-ios.ipa](https://github.com/ravifrancesco/netfish/releases/latest/download/Netfish-ios.ipa)**.
-3. Open it with AltStore/SideStore (Share → AltStore/SideStore, or **+** in the app and pick the file). It signs and installs Netfish.
+2. In AltStore/SideStore, open **Sources**, tap **+** and add Netfish's source:
+   `https://raw.githubusercontent.com/ravifrancesco/netfish/main/apps/ios/sidestore.json`
+3. Open **Browse**, tap **Netfish** and install it. It signs and installs Netfish.
 4. Do steps 6, 8 and 9 of option 2 (Developer Mode, Trust, server address) if asked.
+
+New versions of the app then show up in **My Apps**, with an **Update** button.
+
+Or without the source: download **[Netfish-ios.ipa](https://github.com/ravifrancesco/netfish/releases/latest/download/Netfish-ios.ipa)** on the iPhone and open it with AltStore/SideStore (Share → AltStore/SideStore, or **+** in **My Apps** and pick the file). Each new version is then downloaded the same way.
 
 ## Problems
 

@@ -50,9 +50,14 @@ Ti serve un Mac. La prima volta ci vogliono circa 30 minuti, soprattutto per sca
 [AltStore](https://altstore.io) e [SideStore](https://sidestore.io) sono strumenti gratuiti della community che installano app con il tuo Apple ID e le rinnovano da soli, così non devi reinstallare ogni settimana. Non sono fatti da Apple né da Netfish.
 
 1. Configura AltStore (serve un computer con AltServer sulla tua rete Wi-Fi) o SideStore (dopo la configurazione funziona solo con il telefono) seguendo le loro guide.
-2. Sull'iPhone, scarica **[Netfish-ios.ipa](https://github.com/ravifrancesco/netfish/releases/latest/download/Netfish-ios.ipa)**.
-3. Aprilo con AltStore/SideStore (Condividi → AltStore/SideStore, oppure **+** nell'app e scegli il file). L'app firma e installa Netfish.
+2. In AltStore/SideStore apri **Sources**, tocca **+** e aggiungi la fonte di Netfish:
+   `https://raw.githubusercontent.com/ravifrancesco/netfish/main/apps/ios/sidestore.json`
+3. Apri **Browse**, tocca **Netfish** e installala. L'app firma e installa Netfish.
 4. Se te lo chiede, segui i passaggi 6, 8 e 9 dell'opzione 2 (Modalità sviluppatore, Autorizza, indirizzo del server).
+
+Le nuove versioni dell'app compaiono poi in **My Apps**, con il pulsante **Update**.
+
+Oppure senza la fonte: sull'iPhone scarica **[Netfish-ios.ipa](https://github.com/ravifrancesco/netfish/releases/latest/download/Netfish-ios.ipa)** e aprilo con AltStore/SideStore (Condividi → AltStore/SideStore, oppure **+** in **My Apps** e scegli il file). Ogni nuova versione si scarica allo stesso modo.
 
 ## Problemi
 

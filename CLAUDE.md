@@ -61,7 +61,7 @@ Notes for anyone (person or AI assistant) working on Netfish's code.
 2. Add `## X.Y.Z (date)` to `CHANGELOG.md`: what's new, changed and fixed, and what to update (server, apps). The release page shows this entry.
 3. `npm run build:player` and commit `apps/common/player.js` if it changed.
 4. Commit "Netfish X.Y.Z", push `main`.
-5. `scripts/release.sh` builds every app, tags `vX.Y.Z` and uploads 7 files (server, Mac ×2, Windows, Android, Samsung, iOS). The tag makes GitHub Actions build the Docker image.
+5. `scripts/release.sh` builds every app, tags `vX.Y.Z` and uploads 7 files (server, Mac ×2, Windows, Android, Samsung, iOS). The tag makes GitHub Actions build the Docker image. Then it writes `apps/ios/sidestore.json` (SideStore's source for the iPhone app, pointing at the new `.ipa`) and pushes it to `main`.
 6. Check `gh release view vX.Y.Z` (7 files) and `gh run list` (the image build passed).
 
 ## Channels and New titles
