@@ -17,21 +17,21 @@
       "category": "entertainment",
       "versions": [
         {
-          "version": "0.9.5",
+          "version": "0.9.6",
           "buildVersion": "1",
           "date": "2026-11-26",
-          "localizedDescription": "New\n- Away from home on iPhone and iPad. Like the Android, Mac and Windows apps, the iPhone app can now reach your server through WireGuard, built in and used only by Netfish: no VPN to switch on. Set it up in Settings → Away from home with the device's WireGuard .conf file. Needs iOS 17 or later. - Pages, films and downloads all go through it. Away from home, downloads carry on only while Netfish is open. - Installing with Xcode now also needs Go (brew install go).\n\nUpdate\n- iPhone app.",
-          "downloadURL": "https://github.com/ravifrancesco/netfish/releases/download/v0.9.5/Netfish-ios.ipa",
-          "size": 4688424,
-          "sha256": "41256a675f19ae08bb0048903578f977f53ed49a051c9e4e01d3052800770400",
+          "localizedDescription": "Fixed\n- Away from home on iPhone and iPad: the WireGuard .conf file couldn't be chosen (it was greyed out). Any file can be chosen now, and Netfish says if it isn't a WireGuard file.\n\nUpdate\n- Server.",
+          "downloadURL": "https://github.com/ravifrancesco/netfish/releases/download/v0.9.6/Netfish-ios.ipa",
+          "size": 4688423,
+          "sha256": "a10fc1e7e54b426605a8edc67520ae6573a0cfd8ee23662c9d73038271ee46d2",
           "minOSVersion": "16.0"
         }
       ],
-      "version": "0.9.5",
+      "version": "0.9.6",
       "versionDate": "2026-11-26",
-      "versionDescription": "New\n- Away from home on iPhone and iPad. Like the Android, Mac and Windows apps, the iPhone app can now reach your server through WireGuard, built in and used only by Netfish: no VPN to switch on. Set it up in Settings → Away from home with the device's WireGuard .conf file. Needs iOS 17 or later. - Pages, films and downloads all go through it. Away from home, downloads carry on only while Netfish is open. - Installing with Xcode now also needs Go (brew install go).\n\nUpdate\n- iPhone app.",
-      "downloadURL": "https://github.com/ravifrancesco/netfish/releases/download/v0.9.5/Netfish-ios.ipa",
-      "size": 4688424,
+      "versionDescription": "Fixed\n- Away from home on iPhone and iPad: the WireGuard .conf file couldn't be chosen (it was greyed out). Any file can be chosen now, and Netfish says if it isn't a WireGuard file.\n\nUpdate\n- Server.",
+      "downloadURL": "https://github.com/ravifrancesco/netfish/releases/download/v0.9.6/Netfish-ios.ipa",
+      "size": 4688423,
       "appPermissions": {
         "entitlements": [],
         "privacy": {
