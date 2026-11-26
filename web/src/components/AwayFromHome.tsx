@@ -180,7 +180,7 @@ export function AwayFromHome() {
             <strong>{t('Choose the WireGuard file')}</strong>
             <span className="muted small">{t('The .conf file your router or WireGuard server made for this device.')}</span>
           </button>
-          <input ref={picker} type="file" accept=".conf,.txt,text/plain" hidden onChange={(e) => void take(e.target.files?.[0])} />
+          <input ref={picker} type="file" hidden onChange={(e) => void take(e.target.files?.[0])} />
           {problem && <p className="error-text small">{problem}</p>}
           {pasting ? (
             <label className="field away-paste">

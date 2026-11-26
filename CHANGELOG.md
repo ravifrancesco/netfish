@@ -7,6 +7,14 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.9.6 (2026-11-26)
+
+### Fixed
+- **Away from home on iPhone and iPad:** the WireGuard `.conf` file couldn't be chosen (it was greyed out). Any file can be chosen now, and Netfish says if it isn't a WireGuard file.
+
+### Update
+- **Server.**
+
 ## 0.9.5 (2026-11-26)
 
 ### New
