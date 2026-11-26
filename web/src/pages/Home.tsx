@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery } from '@tanstack/react-query';
 import { Info, Play, Plug, Plus, Star, X } from 'lucide-react';
 import type { HomeResponse } from '@netfish/shared';
 import { api } from '../api';
@@ -104,9 +104,12 @@ export function Discover() {
   return <Home part="discover" />;
 }
 
+/** Kept while Netfish is open, so it's there at once when you come back (lib/preload.ts). */
+export const homeQuery = (part: 'home' | 'discover') => queryOptions({ queryKey: ['home', part], queryFn: () => api.home(part), staleTime: 60_000, gcTime: Infinity });
+
 export default function Home({ part = 'home' }: { part?: 'home' | 'discover' }) {
   const discover = part === 'discover';
-  const home = useQuery({ queryKey: ['home', part], queryFn: () => api.home(part), staleTime: 60_000, refetchInterval: 60_000 });
+  const home = useQuery({ ...homeQuery(part), refetchInterval: 60_000 });
   const me = useMe().data;
   // The apps keep a copy of Home, shown greyed out (downloads aside) when offline.
   useEffect(() => {

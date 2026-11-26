@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { RotateCcw, Trash2, X } from 'lucide-react';
 import { useSearchParams } from 'react-router';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { infiniteQueryOptions, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import type { MediaType } from '@netfish/shared';
 import { api } from '../api';
 import { Grid } from '../components/Cards';
@@ -34,13 +34,9 @@ const SORTS = [
   { value: 'longest', label: t('Longest first') },
 ];
 
-/**
- * The library, then what was deleted from disk to save space: after everything on disk, apart,
- * greyed out, in the same order. Open one to see when it went, and to get it back.
- */
-function Library({ mediaType, sort, jump }: { mediaType: MediaType; sort: string; jump?: boolean }) {
-  const { data: config } = useConfig();
-  const q = useInfiniteQuery({
+/** The library, 60 at a time; kept while Netfish is open, so it's there at once (lib/preload.ts). */
+export const libraryQuery = (mediaType: MediaType, sort: string) =>
+  infiniteQueryOptions({
     queryKey: ['library', mediaType, sort],
     queryFn: ({ pageParam }) => api.library(mediaType, sort, pageParam),
     initialPageParam: 0,
@@ -48,7 +44,16 @@ function Library({ mediaType, sort, jump }: { mediaType: MediaType; sort: string
       const loaded = all.reduce((n, p) => n + p.items.length, 0);
       return loaded < last.total ? loaded : undefined;
     },
+    gcTime: Infinity,
   });
+
+/**
+ * The library, then what was deleted from disk to save space: after everything on disk, apart,
+ * greyed out, in the same order. Open one to see when it went, and to get it back.
+ */
+function Library({ mediaType, sort, jump }: { mediaType: MediaType; sort: string; jump?: boolean }) {
+  const { data: config } = useConfig();
+  const q = useInfiniteQuery(libraryQuery(mediaType, sort));
   const sentinel = useAutoLoad(() => void q.fetchNextPage(), Boolean(q.hasNextPage && !q.isFetchingNextPage));
   // Only once the library's last page is in: they come after all of it.
   const removed = useQuery({

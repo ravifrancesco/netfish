@@ -1,5 +1,5 @@
 import { Link, useSearchParams } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery } from '@tanstack/react-query';
 import { CalendarClock, TriangleAlert } from 'lucide-react';
 import type { DownloadItem, RequestItem } from '@netfish/shared';
 import { api } from '../api';
@@ -102,8 +102,11 @@ const REQUEST_LABEL: Record<RequestItem['requestStatus'], string> = {
   completed: t('Done'),
 };
 
+/** Kept while Netfish is open, so it's there at once (lib/preload.ts). */
+export const requestsQuery = (scope: 'mine' | 'all') => queryOptions({ queryKey: ['requests', scope], queryFn: () => api.requests(scope), gcTime: Infinity });
+
 function Requests({ scope }: { scope: 'mine' | 'all' }) {
-  const q = useQuery({ queryKey: ['requests', scope], queryFn: () => api.requests(scope), refetchInterval: 10_000 });
+  const q = useQuery({ ...requestsQuery(scope), refetchInterval: 10_000 });
   if (q.isError) return <ErrorState error={q.error} retry={() => void q.refetch()} />;
   if (!q.data) return <PageLoader />;
   if (!q.data.items.length) return <Empty>{t('No requests yet.')}</Empty>;

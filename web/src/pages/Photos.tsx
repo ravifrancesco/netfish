@@ -3,9 +3,9 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { ArrowLeft, ChevronLeft, ChevronRight, Images, Pause, Play, X } from 'lucide-react';
 import type { Photo } from '@netfish/shared';
-import { api } from '../api';
 import { Empty, ErrorState, Img, PageLoader } from '../components/ui';
 import { clock } from '../lib/format';
+import { photosQuery } from '../lib/photos';
 import { locale, t, tn } from '../i18n';
 
 /**
@@ -15,15 +15,7 @@ import { locale, t, tn } from '../i18n';
 export default function Photos() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const q = useInfiniteQuery({
-    queryKey: ['photos', id ?? '', 'pages'],
-    queryFn: ({ pageParam }) => api.photos(id, pageParam),
-    initialPageParam: 0,
-    getNextPageParam: (last, pages) => {
-      const loaded = pages.reduce((n, p) => n + p.photos.length, 0);
-      return loaded < last.total ? loaded : undefined;
-    },
-  });
+  const q = useInfiniteQuery(photosQuery(id));
   const first = q.data?.pages[0];
   const items = q.data?.pages.flatMap((p) => p.photos) ?? [];
   const pictures = items.filter((p) => !p.video);

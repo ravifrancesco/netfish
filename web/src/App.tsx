@@ -21,6 +21,7 @@ import { useReadyNotifications, useTogetherNotifications } from './lib/notify';
 import { JoinRoom } from './components/Together';
 import { useLive } from './lib/together';
 import { useOfflineAware } from './lib/offline';
+import { usePreload } from './lib/preload';
 import { CastBar, RemoteBar } from './components/PlayOn';
 import { forgetPicked, ProfilePicker, useProfiles, wasPicked } from './components/ProfilePicker';
 
@@ -79,6 +80,8 @@ function Shell({ user }: { user: NonNullable<ReturnType<typeof useMe>['data']> }
   useLive();
   // The apps: downloads watched offline reach the server, and a lost server means offline mode.
   useOfflineAware();
+  // The rest of the menu, ready before it's opened.
+  usePreload();
   return (
     <>
       <ScrollToTop />

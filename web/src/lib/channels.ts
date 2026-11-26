@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery } from '@tanstack/react-query';
 import type { Channel, ChannelProgram } from '@netfish/shared';
 import { api } from '../api';
 import { useConfig } from './hooks';
@@ -14,21 +14,23 @@ let offset = 0;
 /** The server's time now (ms). */
 export const serverNow = () => Date.now() + offset;
 
+/** What's on now; kept while Netfish is open, so the guide is there at once (lib/preload.ts). */
+export const channelsQuery = queryOptions({
+  queryKey: ['channels'],
+  queryFn: async () => {
+    const before = Date.now();
+    const res = await api.channels();
+    // Halfway through the round trip is when the server read its clock.
+    offset = res.now - (before + Date.now()) / 2;
+    return res;
+  },
+  staleTime: 20_000,
+  gcTime: Infinity,
+});
+
 export function useChannels() {
   const on = Boolean(useConfig().data?.features.channels);
-  return useQuery({
-    queryKey: ['channels'],
-    queryFn: async () => {
-      const before = Date.now();
-      const res = await api.channels();
-      // Halfway through the round trip is when the server read its clock.
-      offset = res.now - (before + Date.now()) / 2;
-      return res;
-    },
-    enabled: on,
-    refetchInterval: 60_000,
-    staleTime: 20_000,
-  });
+  return useQuery({ ...channelsQuery, enabled: on, refetchInterval: 60_000 });
 }
 
 /** The server's clock, ticking (every `ms`). */

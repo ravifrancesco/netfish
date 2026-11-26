@@ -7,6 +7,19 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.9.4 (2026-11-25)
+
+### Changed
+- **Pages open at once.** Once Netfish has started, it gets Movies, Shows, Channels, Photos, Discover and your requests ready in the background, with their first pictures. Pages you come back to show straight away too, and refresh as they open.
+
+### Fixed
+- **Android phones stay sideways from one episode to the next.** The phone no longer turns upright for a moment when the next episode or channel starts.
+- **Black bars around the film on Android**, instead of dark grey: on an OLED screen they're off.
+
+### Update
+- **Server**, for the faster pages.
+- **Android app**, for the two fixes.
+
 ## 0.9.3 (2026-11-23)
 
 ### Changed

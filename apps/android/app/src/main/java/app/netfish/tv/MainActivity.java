@@ -119,6 +119,8 @@ public class MainActivity extends Activity {
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0xff06080b);
         PlayerView playerView = new PlayerView(this);
+        // Black around the picture, not the app's dark blue: on an OLED screen, off.
+        playerView.setBackgroundColor(Color.BLACK);
         web = new WebView(this);
         web.setBackgroundColor(Color.TRANSPARENT);
         web.setFocusable(true);
@@ -434,9 +436,37 @@ public class MainActivity extends Activity {
         returnUrl = null;
     }
 
+    /** When the last film stopped (uptime), for {@link #filmGone}. */
+    private long filmStoppedAt;
+
     /** Phones: a film fills the screen, sideways, without the status bar; back to normal after. */
     private void filmShowing(boolean showing) {
         if (tv) return;
+        web.removeCallbacks(filmGone);
+        if (showing) {
+            film(true);
+        } else {
+            filmStoppedAt = SystemClock.uptimeMillis();
+            web.postDelayed(filmGone, 300);
+        }
+    }
+
+    /**
+     * Back to normal once the page has left the player. The next episode or channel stops one film
+     * and starts the next on the same page: staying sideways in between, the phone doesn't turn.
+     */
+    private final Runnable filmGone = new Runnable() {
+        @Override
+        public void run() {
+            String url = web.getUrl();
+            String path = url != null ? Uri.parse(url).getPath() : null;
+            boolean player = path != null && (path.startsWith("/watch/") || path.matches("/channels/[^/]+"));
+            if (player && SystemClock.uptimeMillis() - filmStoppedAt < 8000) web.postDelayed(this, 250);
+            else film(false);
+        }
+    };
+
+    private void film(boolean showing) {
         setRequestedOrientation(showing ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             WindowInsetsController bars = getWindow().getInsetsController();
