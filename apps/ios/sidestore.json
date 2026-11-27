@@ -17,21 +17,21 @@
       "category": "entertainment",
       "versions": [
         {
-          "version": "0.9.6",
+          "version": "0.9.7",
           "buildVersion": "1",
-          "date": "2026-11-26",
-          "localizedDescription": "Fixed\n- Away from home on iPhone and iPad: the WireGuard .conf file couldn't be chosen (it was greyed out). Any file can be chosen now, and Netfish says if it isn't a WireGuard file.\n\nUpdate\n- Server.",
-          "downloadURL": "https://github.com/ravifrancesco/netfish/releases/download/v0.9.6/Netfish-ios.ipa",
-          "size": 4688423,
-          "sha256": "a10fc1e7e54b426605a8edc67520ae6573a0cfd8ee23662c9d73038271ee46d2",
+          "date": "2026-11-27",
+          "localizedDescription": "New\n- Brightness and volume in the player on phones and tablets. Swipe up or down on the left of the picture for brightness, on the right for volume. The screen gets its own brightness back when you leave the player.\n\nUpdate\n- Server, the Android app and the iPhone app.",
+          "downloadURL": "https://github.com/ravifrancesco/netfish/releases/download/v0.9.7/Netfish-ios.ipa",
+          "size": 4692481,
+          "sha256": "3c00a28ccda0ae3443a77734c3f999d08a54474576239b1e75e2f931d32416ea",
           "minOSVersion": "16.0"
         }
       ],
-      "version": "0.9.6",
-      "versionDate": "2026-11-26",
-      "versionDescription": "Fixed\n- Away from home on iPhone and iPad: the WireGuard .conf file couldn't be chosen (it was greyed out). Any file can be chosen now, and Netfish says if it isn't a WireGuard file.\n\nUpdate\n- Server.",
-      "downloadURL": "https://github.com/ravifrancesco/netfish/releases/download/v0.9.6/Netfish-ios.ipa",
-      "size": 4688423,
+      "version": "0.9.7",
+      "versionDate": "2026-11-27",
+      "versionDescription": "New\n- Brightness and volume in the player on phones and tablets. Swipe up or down on the left of the picture for brightness, on the right for volume. The screen gets its own brightness back when you leave the player.\n\nUpdate\n- Server, the Android app and the iPhone app.",
+      "downloadURL": "https://github.com/ravifrancesco/netfish/releases/download/v0.9.7/Netfish-ios.ipa",
+      "size": 4692481,
       "appPermissions": {
         "entitlements": [],
         "privacy": {
