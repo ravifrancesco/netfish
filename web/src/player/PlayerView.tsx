@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject, type VideoHTMLAttributes } from 'react';
-import { ArrowLeft, Captions, Check, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, SkipForward, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, Captions, Check, Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, SkipForward, Sun, Volume2, VolumeX } from 'lucide-react';
 import type { MediaSegment, Trickplay } from '@netfish/shared';
 import { SwimmingFish } from '../components/Logo';
 import { clock } from '../lib/format';
 import { getPrefs, setPrefs } from '../lib/prefs';
-import { desktop } from '../lib/desktop';
+import { desktop, type Levels } from '../lib/desktop';
 import { setSystemMuted, setSystemVolume, systemVolume, useSystemVolume } from '../lib/systemVolume';
 import { isTV } from '../lib/tv';
 import { parseVtt, type Cue } from './vtt';
@@ -537,6 +537,8 @@ export function PlayerView(props: PlayerViewProps) {
   // a double click is full screen. A finger: a tap shows or hides the controls, never pauses; a
   // double tap on the left or right goes back or forward.
   const onSurfaceClick = (e: ReactMouseEvent) => {
+    // The end of a swipe, not a tap.
+    if (slide.current?.which) return;
     if (pointer.current === 'mouse') return shownAtPress.current ? toggle() : poke();
     const r = e.currentTarget.getBoundingClientRect();
     const side = e.clientX < r.left + r.width / 2 ? -1 : 1;
@@ -558,6 +560,46 @@ export function PlayerView(props: PlayerViewProps) {
   };
   const onSurfaceDoubleClick = () => pointer.current === 'mouse' && toggleFullscreen();
 
+  // ---------- swipes up and down: brightness on the left, volume on the right (phones and tablets) ----------
+
+  const levels = desktop()?.levels;
+  type Slide = { x: number; y: number; left: boolean; height: number; from?: Levels; which?: keyof Levels; start?: number };
+  const slide = useRef<Slide>(undefined);
+  const [level, setLevel] = useState<{ which: keyof Levels; value: number }>();
+  const levelShown = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(levelShown.current), []);
+  const onSlideDown = (e: ReactPointerEvent) => {
+    if (!levels || e.pointerType !== 'touch' || !e.isPrimary) return void (slide.current = undefined);
+    const r = e.currentTarget.getBoundingClientRect();
+    const s: Slide = { x: e.clientX, y: e.clientY, left: e.clientX < r.left + r.width / 2, height: r.height };
+    slide.current = s;
+    void levels.get().then((now) => slide.current === s && (s.from = now));
+  };
+  const onSlideMove = (e: ReactPointerEvent) => {
+    const s = slide.current;
+    if (!s?.from || !e.isPrimary) return;
+    if (!s.which) {
+      const dx = e.clientX - s.x;
+      const dy = e.clientY - s.y;
+      if (Math.abs(dy) < 16 || Math.abs(dy) < Math.abs(dx) * 1.5) return;
+      s.which = s.left ? 'brightness' : 'volume';
+      s.y = e.clientY;
+      s.start = s.from[s.which];
+      clearTimeout(tapTimer.current);
+      tapTimer.current = undefined;
+    }
+    // Three quarters of the screen's height: from nothing to full.
+    const value = Math.min(1, Math.max(0, s.start! + (s.y - e.clientY) / (s.height * 0.75)));
+    levels!.set(s.which, value);
+    clearTimeout(levelShown.current);
+    setLevel({ which: s.which, value });
+  };
+  const onSlideUp = () => {
+    if (!slide.current?.which) return;
+    clearTimeout(levelShown.current);
+    levelShown.current = setTimeout(() => setLevel(undefined), 700);
+  };
+
   return (
     <div
       ref={container}
@@ -576,6 +618,10 @@ export function PlayerView(props: PlayerViewProps) {
           style={!props.pictureShown && props.backdrop ? { backgroundImage: `url(${props.backdrop})` } : undefined}
           onClick={onSurfaceClick}
           onDoubleClick={onSurfaceDoubleClick}
+          onPointerDown={onSlideDown}
+          onPointerMove={onSlideMove}
+          onPointerUp={onSlideUp}
+          onPointerCancel={onSlideUp}
         />
       ) : (
         <video
@@ -594,6 +640,15 @@ export function PlayerView(props: PlayerViewProps) {
         <div className={`player__jump player__jump--${jump.side < 0 ? 'back' : 'forward'}`} aria-hidden="true">
           {jump.side < 0 ? <RotateCcw size={30} /> : <RotateCw size={30} />}
           <span>{tn(jump.seconds, '{n} second', '{n} seconds')}</span>
+        </div>
+      )}
+
+      {level && (
+        <div className={`player__level player__level--${level.which === 'brightness' ? 'left' : 'right'}`} aria-hidden="true">
+          <div className="player__level-bar">
+            <div style={{ height: `${Math.round(level.value * 100)}%` }} />
+          </div>
+          {level.which === 'brightness' ? <Sun size={22} /> : level.value === 0 ? <VolumeX size={22} /> : <Volume2 size={22} />}
         </div>
       )}
 

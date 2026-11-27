@@ -71,6 +71,9 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
             Task { @MainActor in await Tunnel.shared.wake() }
         }
+        NotificationCenter.default.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in if let view = self?.view { Levels.restore(view) } }
+        }
         if let server = Server.url { start(server) } else { showSetup(error: nil) }
     }
 

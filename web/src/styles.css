@@ -3166,9 +3166,48 @@ html.is-overlay-video body,
   right: 12%;
 }
 /* No zooming on a double tap: it goes back or forward. */
-.player__surface,
 .player__video {
   touch-action: manipulation;
+}
+/* The app's player: swipes up and down set the brightness and volume, so no scrolling either. */
+.player__surface {
+  touch-action: none;
+}
+/* A swipe up or down: the brightness (left) or volume (right). */
+.player__level {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  height: fit-content;
+  margin-block: auto;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 14px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  pointer-events: none;
+  z-index: 3;
+}
+.player__level--left {
+  left: calc(8% + env(safe-area-inset-left, 0px));
+}
+.player__level--right {
+  right: calc(8% + env(safe-area-inset-right, 0px));
+}
+.player__level-bar {
+  width: 6px;
+  height: min(140px, 30vh);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+.player__level-bar > div {
+  width: 100%;
+  background: #fff;
 }
 .player__next {
   position: absolute;

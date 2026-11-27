@@ -7,6 +7,14 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.9.7 (2026-11-27)
+
+### New
+- **Brightness and volume in the player on phones and tablets.** Swipe up or down on the left of the picture for brightness, on the right for volume. The screen gets its own brightness back when you leave the player.
+
+### Update
+- **Server**, the **Android app** and the **iPhone app**.
+
 ## 0.9.6 (2026-11-26)
 
 ### Fixed

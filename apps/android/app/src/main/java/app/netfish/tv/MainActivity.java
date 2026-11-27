@@ -28,6 +28,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.provider.Settings;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -483,7 +484,13 @@ public class MainActivity extends Activity {
                     : View.SYSTEM_UI_FLAG_VISIBLE);
         }
         if (showing) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            // The screen's own brightness back, after a swipe changed it.
+            WindowManager.LayoutParams attributes = getWindow().getAttributes();
+            attributes.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE;
+            getWindow().setAttributes(attributes);
+        }
     }
 
     // ---------- Back (remote, gesture, Esc) ----------
@@ -857,6 +864,46 @@ public class MainActivity extends Activity {
             }
             Object argument = parsed == JSONObject.NULL ? null : parsed;
             runOnUiThread(() -> video.command(name, argument));
+        }
+
+        // ----- The player's swipes: brightness and volume (phones and tablets) -----
+
+        /** The screen's brightness (Netfish's own while it has one) and the volume, 0 to 1, as JSON. */
+        @JavascriptInterface
+        public String levels() {
+            if (!fromServer()) return "{}";
+            float brightness = getWindow().getAttributes().screenBrightness;
+            if (brightness < 0) {
+                try {
+                    brightness = Settings.System.getInt(getContentResolver(), Settings.System.SCREEN_BRIGHTNESS) / 255f;
+                } catch (Settings.SettingNotFoundException e) {
+                    brightness = 0.5f;
+                }
+            }
+            AudioManager audio = (AudioManager) getSystemService(AUDIO_SERVICE);
+            float volume = (float) audio.getStreamVolume(AudioManager.STREAM_MUSIC) / Math.max(1, audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
+            try {
+                return new JSONObject().put("brightness", Math.min(1f, brightness)).put("volume", volume).toString();
+            } catch (JSONException e) {
+                return "{}";
+            }
+        }
+
+        /** brightness (Netfish's screen only, until the film stops) or volume, 0 to 1. */
+        @JavascriptInterface
+        public void setLevel(String which, double level) {
+            if (!fromServer()) return;
+            float value = (float) Math.max(0, Math.min(1, level));
+            runOnUiThread(() -> {
+                if ("brightness".equals(which)) {
+                    WindowManager.LayoutParams attributes = getWindow().getAttributes();
+                    attributes.screenBrightness = Math.max(0.01f, value);
+                    getWindow().setAttributes(attributes);
+                } else if ("volume".equals(which)) {
+                    AudioManager audio = (AudioManager) getSystemService(AUDIO_SERVICE);
+                    audio.setStreamVolume(AudioManager.STREAM_MUSIC, Math.round(value * audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)), 0);
+                }
+            });
         }
 
         // ----- Downloads (phones and tablets) -----

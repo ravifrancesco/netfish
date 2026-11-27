@@ -40,6 +40,11 @@ export interface VideoOverlay {
   onState: (callback: (state: Record<string, unknown>) => void) => () => void;
 }
 
+export interface Levels {
+  brightness: number;
+  volume: number;
+}
+
 /** The Mac and Windows apps can update themselves from GitHub Releases. */
 export interface UpdateStatus {
   current: string;
@@ -159,6 +164,15 @@ export interface DesktopBridge {
   /** Away from home: WireGuard inside the app (Android, Mac and Windows apps from 0.9.1 on, iPhone and iPad on iOS 17 from 0.9.5). */
   tunnel?: TunnelBridge;
   videoOverlay?: VideoOverlay;
+  /**
+   * Phones and tablets: the screen's brightness and the phone's volume, 0 to 1, for the
+   * player's up-and-down swipes. The app gives the screen its own brightness back when the film
+   * stops. Apps from 0.9.7 on.
+   */
+  levels?: {
+    get: () => Promise<Levels>;
+    set: (which: keyof Levels, level: number) => void;
+  };
   /** Chromecast (the Android app on phones and tablets with Google Play services). */
   cast?: CastBridge;
   /** The whole app window (the Mac app), rather than one element of the page. */
@@ -242,6 +256,9 @@ interface AndroidNative {
   videoProfile?(): string;
   videoLoad?(request: string): void;
   videoCommand?(name: string, value: string): void;
+  /** Brightness and volume, JSON (phones and tablets, apps from 0.9.7 on). */
+  levels?(): string;
+  setLevel?(which: string, level: number): void;
   download?(descriptor: string): string;
   offlineList?(): string;
   removeOffline?(itemId: string): string;
@@ -395,6 +412,13 @@ function androidBridge(): DesktopBridge | undefined {
           onState: videoStateViaWindow,
         }
       : undefined,
+    levels:
+      phone && native.levels && native.setLevel
+        ? {
+            get: async () => JSON.parse(native.levels!()) as Levels,
+            set: (which, level) => native.setLevel!(which, level),
+          }
+        : undefined,
     cast: native.castAvailable?.() ? castBridge(native) : undefined,
   });
 }

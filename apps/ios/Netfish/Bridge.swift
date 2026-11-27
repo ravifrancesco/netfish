@@ -71,6 +71,10 @@ enum Bridge {
           command: (name, value) => { call('videoCommand', { name, value: value === undefined ? null : value }); },
           onState: (cb) => { video.add(cb); return () => video.delete(cb); },
         },
+        levels: {
+          get: () => call('levels'),
+          set: (which, level) => { call('setLevel', { which, level }); },
+        },
       };
     })();
     """
@@ -155,7 +159,18 @@ final class BridgeHandler: NSObject, WKScriptMessageHandlerWithReply {
             return nil
         case "videoCommand":
             let command = args as? [String: Any] ?? [:]
-            controller?.video.command(command["name"] as? String ?? "", command["value"])
+            let name = command["name"] as? String ?? ""
+            controller?.video.command(name, command["value"])
+            if name == "stop", let view = controller?.view { Levels.restore(view) }
+            return nil
+        case "levels":
+            guard let view = controller?.view else { return [:] as [String: Double] }
+            return Levels.current(view)
+        case "setLevel":
+            let level = args as? [String: Any] ?? [:]
+            if let view = controller?.view {
+                Levels.set(level["which"] as? String ?? "", (level["level"] as? NSNumber)?.doubleValue ?? 0, in: view)
+            }
             return nil
         case "connect":
             guard local else { throw Problem(L("Not allowed here")) }
