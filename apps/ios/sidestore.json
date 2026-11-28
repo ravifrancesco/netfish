@@ -17,21 +17,21 @@
       "category": "entertainment",
       "versions": [
         {
-          "version": "0.9.7",
+          "version": "0.9.8",
           "buildVersion": "1",
           "date": "2026-11-27",
-          "localizedDescription": "New\n- Brightness and volume in the player on phones and tablets. Swipe up or down on the left of the picture for brightness, on the right for volume. The screen gets its own brightness back when you leave the player.\n\nUpdate\n- Server, the Android app and the iPhone app.",
-          "downloadURL": "https://github.com/ravifrancesco/netfish/releases/download/v0.9.7/Netfish-ios.ipa",
-          "size": 4692481,
-          "sha256": "3c00a28ccda0ae3443a77734c3f999d08a54474576239b1e75e2f931d32416ea",
+          "localizedDescription": "Fixed\n- A requested film without Play. A film you asked for that was also coming up as a ✨ new title on a channel stayed hidden after it arrived: its page had no Play button and Activity didn't show its download. It shows like anything else now.\n\nUpdate\n- Server.",
+          "downloadURL": "https://github.com/ravifrancesco/netfish/releases/download/v0.9.8/Netfish-ios.ipa",
+          "size": 4692140,
+          "sha256": "f79b54910c38ded10e369497eaf62105a64044185079a2331baa141a797811c4",
           "minOSVersion": "16.0"
         }
       ],
-      "version": "0.9.7",
+      "version": "0.9.8",
       "versionDate": "2026-11-27",
-      "versionDescription": "New\n- Brightness and volume in the player on phones and tablets. Swipe up or down on the left of the picture for brightness, on the right for volume. The screen gets its own brightness back when you leave the player.\n\nUpdate\n- Server, the Android app and the iPhone app.",
-      "downloadURL": "https://github.com/ravifrancesco/netfish/releases/download/v0.9.7/Netfish-ios.ipa",
-      "size": 4692481,
+      "versionDescription": "Fixed\n- A requested film without Play. A film you asked for that was also coming up as a ✨ new title on a channel stayed hidden after it arrived: its page had no Play button and Activity didn't show its download. It shows like anything else now.\n\nUpdate\n- Server.",
+      "downloadURL": "https://github.com/ravifrancesco/netfish/releases/download/v0.9.8/Netfish-ios.ipa",
+      "size": 4692140,
       "appPermissions": {
         "entitlements": [],
         "privacy": {
