@@ -7,6 +7,14 @@ Every version of Netfish, newest first. Each one says what's new, what changed a
 
 Install files for every version are on [Releases](https://github.com/ravifrancesco/netfish/releases).
 
+## 0.9.8 (2026-11-27)
+
+### Fixed
+- **A requested film without Play.** A film you asked for that was also coming up as a ✨ new title on a channel stayed hidden after it arrived: its page had no Play button and Activity didn't show its download. It shows like anything else now.
+
+### Update
+- **Server.**
+
 ## 0.9.7 (2026-11-27)
 
 ### New

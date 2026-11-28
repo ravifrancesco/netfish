@@ -191,8 +191,12 @@ export function freshPlans(): FreshPlan[] {
 }
 /** Aired, on the way out: on no channel any more. */
 export const freshRetired = () => new Set(stored.titles.filter((f) => f.state === 'aired').map((f) => f.key));
-/** Not in anyone's library or Activity (all of them, until someone keeps one or asks for it). */
-export const freshHidden = () => new Set(stored.titles.filter((f) => f.state !== 'kept' && !f.keptBy).map((f) => f.key));
+/**
+ * Not in anyone's library or Activity (Netfish's own copies, until someone keeps one or asks for
+ * it). Not those only planned: Netfish has no copy yet, so one there is someone else's (asked for
+ * in the meantime), and theirs to see.
+ */
+export const freshHidden = () => new Set(stored.titles.filter((f) => f.state !== 'kept' && f.state !== 'planned' && !f.keptBy).map((f) => f.key));
 
 /** Whether someone kept a new title, or asked for it. Undefined: it isn't one. */
 export const freshRequested = (key: string) => {
